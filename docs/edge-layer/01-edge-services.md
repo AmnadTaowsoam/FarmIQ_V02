@@ -66,7 +66,8 @@ Edge still uses the **DB-based outbox** (`sync_outbox`) as the authoritative mec
     - Cleanup job drops rows older than TTL (configurable).
   - If duplicate detected: skip downstream processing and log a lightweight dedupe message (no sensitive payload logging).
 - **Validation and security**:
-  - Validate envelope contains `tenant_id`, `farm_id`, `barn_id`, `device_id`, `event_id`, `occurred_at`, `trace_id`.
+  - Validate envelope contains `event_id`, `trace_id`, `tenant_id`, `device_id`, `event_type`, `ts`, `payload` (see `iot-layer/03-mqtt-topic-map.md`).
+  - Validate required topic segments are present (e.g., `farmId`, `barnId`, `stationId`, `sessionId`) and consistent with provisioning.
   - If `trace_id` missing, generate and attach before routing.
   - Never log full payload; log `event_type`, ids, `trace_id`, and payload size only.
 - **Public APIs (device-facing)**:

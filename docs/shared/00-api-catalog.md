@@ -119,7 +119,7 @@ All FarmIQ services must follow `shared/01-api-standards.md`:
   - `GET /api/ready` (recommended)
   - `GET /api-docs`
   - `GET /api-docs/openapi.json` (or `openapi.yaml`)
-  - `POST /api/v1/media/images` (multipart; **only device→edge HTTP call**)
+  - `POST /api/v1/media/images/presign` + `PUT {upload_url}` (presigned upload; **only device→edge HTTP calls**)
   - `GET /api/v1/media/objects/{objectId}`
   - `GET /api/v1/media/objects/{objectId}/meta`
 - **Data ownership**: `media_objects` + PVC `/data/media`

@@ -18,8 +18,8 @@ The IoT-layer consists of **lightweight agents** that run on or near physical de
   - Manages session-based image + weight capture, then sends results to the edge.
 
 Key characteristics:
-- Stateless where possible; no long-term persistence at device level.
-- Resilient to brief connectivity loss (buffer in memory/disk only if needed).
+- Stateless where possible; no long-term persistence beyond the required offline outbox/buffer.
+- Resilient to extended connectivity loss via **store-and-forward buffering that persists across reboot** (multi-hour windows; see offline rules).
 - Use authenticated connections (e.g., mutual TLS or token-based auth) to the edge.
 
 ---
@@ -28,7 +28,7 @@ Key characteristics:
 
 Each IoT agent/device must be provisioned with:
 - `tenant_id`, `farm_id`, `barn_id`, `device_id`
-- Edge connection settings (MQTT broker host/port, HTTP base URL)
+- Edge connection settings (MQTT broker host/port, and `edge-media-store` base URL for presign/upload)
 - Credentials (recommended: per-device certificate for mTLS, or signed device token)
 
 Provisioning principles:
@@ -40,11 +40,13 @@ Provisioning principles:
 
 ## Communication with edge
 
-- Primary protocols:
-  - **MQTT (100%)** via `edge-mqtt-broker` for all telemetry and device events.
-  - **HTTP (only for media upload)**: multipart image upload directly to `edge-media-store`.
+FarmIQ enforces **MQTT-only** device→edge ingestion:
+- **MQTT (100%)** for all telemetry and session events to the edge broker.
+- **HTTP (only)** for **media upload** via **presigned URL** issued by `edge-media-store`.
 
-API expectations:
+**No HTTP fallback** for telemetry or events; devices must use MQTT with offline buffering.
+
+API expectations (for HTTP media upload only):
 - Base path: `/api`.
 - Health: `GET /api/health`.
 - Error format: `{"error": {"code": "...", "message": "...", "traceId": "..."}}`.
@@ -70,66 +72,79 @@ API expectations:
 
 ## MQTT message envelope (authoritative)
 
+All MQTT messages MUST use this envelope (fields are required unless marked optional). See `iot-layer/03-mqtt-topic-map.md` for the complete schema.
+
 ```json
 {
+  "schema_version": "1.0",
   "event_id": "uuid",
-  "event_type": "string",
-  "tenant_id": "uuid-v7",
-  "farm_id": "uuid-v7",
-  "barn_id": "uuid-v7",
-  "device_id": "string",
-  "station_id": "string",
-  "session_id": "uuid-v7",
-  "occurred_at": "ISO-8601",
   "trace_id": "string",
-  "payload": {}
+  "tenant_id": "uuid-v7",
+  "device_id": "string",
+  "event_type": "string",
+  "ts": "ISO-8601",
+  "payload": {},
+  "content_hash": "string",
+  "retry_count": 0,
+  "produced_at": "ISO-8601"
 }
 ```
 
+Required fields:
+- `event_id`, `trace_id`, `tenant_id`, `device_id`, `event_type`, `ts`, `payload`
+
+Optional fields:
+- `schema_version`: defaults to `"1.0"` if omitted by the device (edge may add/normalize).
+- `content_hash`: optional hash of `payload` for integrity/debugging (do not treat as security control).
+- `retry_count`: optional number of local publish retries (for diagnostics only).
+- `produced_at`: optional timestamp when message was produced (if different from `ts`).
+
 Notes:
-- `station_id` and `session_id` are optional unless required by the topic type.
 - `trace_id` must be present; if missing, `edge-ingress-gateway` enriches it.
+- Topic segments carry routing context (e.g., `farmId`, `barnId`, `stationId`, `sessionId`) and MUST match what the device is provisioned for.
 
 ---
 
-## MQTT QoS policy and offline rules (MVP defaults)
+## MQTT QoS policy and offline rules (authoritative)
+
+See `iot-layer/03-mqtt-topic-map.md` for the complete QoS/retained/LWT rules.
 
 ### QoS and retain policy (authoritative)
 
 - **Telemetry readings** (every ~1 minute)
-  - **QoS**: 0 (default) OR 1 if business requires guaranteed delivery
-  - **Retain**: false
-  - **Reason**: avoid backlog storms; telemetry can tolerate occasional loss if aggregation is used.
+  - **QoS**: **1** (at-least-once)
+  - **Retain**: **NO**
+  - **Event type**: `telemetry.reading`
 
 - **WeighVision session events** (must not be lost)
-  - **QoS**: 1
-  - **Retain**: false
+  - **QoS**: **1**
+  - **Retain**: **NO**
   - **Events**:
     - `weighvision.session.created`
-    - `weighvision.weight.read`
-    - `weighvision.capture.triggered`
+    - `weighvision.weight.recorded`
+    - `weighvision.image.captured`
+    - `weighvision.inference.completed`
     - `weighvision.session.finalized`
 
 - **Device status/heartbeat** (latest state only)
-  - **QoS**: 1
-  - **Retain**: true
+  - **QoS**: **1**
+  - **Retain**: **YES**
   - **Topic**: `iot/status/{tenantId}/{farmId}/{barnId}/{deviceId}`
-  - **Payload must include**: `last_seen_at`, `firmware_version`, `ip` (optional), `signal_strength` (optional), health flags
+  - **LWT (Last Will and Testament)**: publish an "offline" status when the device disconnects unexpectedly.
+  - **Payload must include**: `last_seen_at`, `firmware_version`, `ip` (optional), `signal_strength` (optional), health flags (e.g., `camera_ok`, `scale_ok`, `disk_ok`)
 
 ### Duplicate delivery and idempotency (mandatory)
 
-- Every MQTT message MUST include: `event_id` (UUID), `occurred_at`, `trace_id`.
+- Every MQTT message MUST include: `event_id` (UUID), `ts`, `trace_id`.
 - Edge must treat MQTT delivery as **at-least-once**.
 - Edge must dedupe on `(tenant_id, event_id)` using an **Edge DB TTL cache**.
 - Cloud ingestion must also dedupe on `(tenant_id, event_id)` for safety.
 
-### Device offline buffering (store-and-forward, must persist across reboot)
+### Device offline buffering (store-and-forward; must persist across reboot)
 
-If MQTT cannot publish, agents must buffer locally:
-- **Telemetry**: buffer up to **6 hours** OR **360 messages** (whichever smaller); drop oldest telemetry first when full.
-- **WeighVision events**: buffer up to **72 hours** OR **10,000 events** (whichever smaller);
-  - Do not drop `session.created` / `session.finalized` if possible.
-  - Drop non-critical `capture.triggered` first under pressure.
+If MQTT is disconnected, buffer locally (file queue JSONL or SQLite):
+- **Telemetry**: up to configurable limits (guidance: **6 hours** OR **360 messages**; drop oldest first).
+- **WeighVision events**: up to configurable limits (guidance: **72 hours** OR **10,000 events**; preserve created/finalized, drop non-critical first).
 
 Storage options (device dependent):
 - Append-only JSONL file queue, or
@@ -137,11 +152,12 @@ Storage options (device dependent):
 
 ### Replay strategy (when connection restored)
 
-- Publish buffered messages in chronological order by `occurred_at`.
-- Throttle + jitter:
+- Publish buffered messages in chronological order by `ts`.
+- Backoff + retry with jitter (**0–200ms**) to prevent thundering herd.
+- Preserve ordering per device/session.
+- Throttle guidance:
   - **Telemetry**: max **5 msgs/sec** per device
   - **WeighVision**: max **20 msgs/sec** per station
-  - Add jitter: random delay **0–200ms**
 - On successful publish, mark as ACKed locally and safely delete/compact.
 
 ---
@@ -159,7 +175,8 @@ Storage options (device dependent):
 
 - Keep IoT-agent logic simple: perform local data collection and minimal validation, delegate heavy logic to the edge.
 - Ensure secure provisioning of credentials/keys for connecting to the edge.
-- Implement backoff and local queueing only for very small windows (e.g., a few minutes) to avoid hidden long-term buffers at device-level.  
+- Offline buffering supports multi-hour windows (6 hours for telemetry, 72 hours for WeighVision events) to handle extended connectivity loss.
+- All MQTT topics, event types, envelope schema, and QoS rules are defined in `iot-layer/03-mqtt-topic-map.md` (single source of truth).  
 
 ## Links
 
@@ -167,5 +184,3 @@ Storage options (device dependent):
 - `iot-layer/02-iot-weighvision-agent.md`
 - `iot-layer/03-mqtt-topic-map.md`
 - `shared/01-api-standards.md`
-
-

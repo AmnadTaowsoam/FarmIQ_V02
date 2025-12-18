@@ -58,7 +58,7 @@ flowchart LR
 
   iot_sensor -->|MQTT| edge_mqtt
   iot_weigh -->|MQTT| edge_mqtt
-  iot_weigh -->|HTTP multipart image upload| edge_media
+  iot_weigh -->|HTTP presigned media upload| edge_media
   edge_mqtt --> edge_ingress
   edge_ingress --> edge_ts
   edge_ingress --> edge_sess
@@ -107,7 +107,7 @@ flowchart LR
   - Manages WeighVision sessions on device.
   - Phase 1: capture image + scale weight as part of a session.
   - Phase 2: scheduled image capture and upload to edge.
-  - Publishes all session events via MQTT; uploads images via HTTP multipart to `edge-media-store`.
+  - Publishes all session events via MQTT; uploads media via HTTP presigned URL (presign + `PUT`) to `edge-media-store`.
 
 ### Edge-layer services
 - **`edge-mqtt-broker`**

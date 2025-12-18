@@ -52,7 +52,7 @@ FarmIQ is organized into **three layers**:
 
 - **IoT-layer**
   - Runs directly on sensor gateways and WeighVision devices.
-  - Publishes telemetry and events via MQTT; uploads media via HTTP multipart to `edge-media-store`.
+- Publishes telemetry and events via MQTT; uploads media via HTTP presigned URL (presign + `PUT`) to `edge-media-store`.
   - Stateless, configuration-driven, and replaceable.
 
 - **Edge-layer**
@@ -72,7 +72,7 @@ FarmIQ is organized into **three layers**:
 
 ### IoT (agents; NOT microservices)
 - **`iot-sensor-agent`**: Reads sensor data (e.g., temperature, humidity, weight) every minute and publishes to edge via MQTT.
-- **`iot-weighvision-agent`**: Publishes session events via MQTT; uploads media via HTTP multipart to `edge-media-store` only.
+- **`iot-weighvision-agent`**: Publishes session events via MQTT; uploads media via HTTP presigned URL (presign + `PUT`) to `edge-media-store` only.
 
 ### Edge (Kubernetes / k3s)
 - **`edge-mqtt-broker`** (EMQX/Mosquitto): MQTT endpoint for IoT devices (ingress only).

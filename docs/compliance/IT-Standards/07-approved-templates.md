@@ -421,7 +421,7 @@ FROM node:24-alpine AS production
 RUN adduser -D -u 1001 appuser
 COPY --from=build /app/dist ./dist
 USER appuser
-HEALTHCHECK --interval=30s CMD curl -f http://localhost:3000/health || exit 1
+HEALTHCHECK --interval=30s CMD curl -f http://localhost:3000/api/health || exit 1
 CMD ["node", "dist/index.js"]
 ```
 
@@ -447,8 +447,10 @@ All templates follow JSON structured logging:
 | Template | Endpoint | Response |
 |:---------|:---------|:---------|
 | Node.js | `/api/health` | `OK` (200) |
-| Python | `/health` | `{"status": "healthy"}` (200) |
+| Python | `/api/health` (primary)<br/>`/health` (alias) | `{"status": "healthy"}` (200) |
 | Frontend | `/` (nginx) | HTML (200) |
+
+**Requirement**: Both Node.js and Python services MUST expose `/api/health`. Python services should keep `/health` as an alias to the same handler for backward compatibility, but `/api/health` is the standard endpoint.
 
 ### 5.4 Azure Pipeline Stages
 
@@ -592,4 +594,3 @@ ENABLE_FEATURE_X=true
 ---
 
 *เอกสารนี้อธิบาย Boilerplate Templates ที่ได้รับการอนุมัติ ปรับปรุงครั้งล่าสุด: December 2024*
-

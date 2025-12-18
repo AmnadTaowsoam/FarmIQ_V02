@@ -5,7 +5,17 @@ Last updated: 2025-12-17
 
 ---
 
-## Why this exists
+## ⚠️ LEGACY / MIGRATION-ONLY
+
+**This document describes legacy topic bridge functionality that is now superseded by `edge-ingress-gateway` normalize+route.**
+
+The topic bridge capability is implemented **inside `edge-ingress-gateway`** as part of its normalization and routing logic. This document is retained for migration reference only.
+
+**Current implementation**: All topic validation, envelope validation, deduplication, and routing is handled by `edge-ingress-gateway`. See `edge-layer/01-edge-services.md` for current architecture.
+
+---
+
+## Why this exists (historical context)
 
 Devices publish telemetry and events over MQTT. To keep device firmware simple and enable backward compatibility, the edge layer provides a “topic bridge” capability implemented inside **`edge-ingress-gateway`**:
 - Validate topic structure and message envelope.
@@ -34,14 +44,15 @@ See `iot-layer/03-mqtt-topic-map.md` for the complete topic map. The ingestion g
 
 Reject messages where:
 - Topic segments do not match expected patterns, or IDs are missing.
-- Topic IDs disagree with envelope IDs (e.g., topic `tenantId` != payload `tenant_id`).
+- Topic IDs disagree with envelope IDs (e.g., topic `tenantId` != payload `tenant_id`, topic `deviceId` != payload `device_id`).
 
 ### Envelope validation
 
 All messages must include:
-- `event_id`, `event_type`, `occurred_at`, `trace_id`
-- `tenant_id`, `farm_id`, `barn_id`, `device_id`
-- Optional: `station_id`, `session_id` when topic type requires them
+- `event_id`, `trace_id`, `tenant_id`, `device_id`, `event_type`, `ts`, `payload`
+- Optional: `schema_version`, `content_hash`, `retry_count`, `produced_at`
+
+Topic segments carry routing context (e.g., `farmId`, `barnId`, `stationId`, `sessionId`) and MUST be present and valid per `iot-layer/03-mqtt-topic-map.md`.
 
 If `trace_id` is missing:
 - Generate a trace id and attach it before routing (also log that enrichment occurred).
@@ -89,10 +100,11 @@ All internal calls must propagate `trace_id`/`requestId` for observability.
 ## Operational visibility
 
 `edge-ingress-gateway` exposes ops/admin endpoints only:
-- `GET /api/v1/ingress/stats`
+- `GET /api/health` (standard health endpoint)
+- `GET /api/v1/ingress/stats` (optional admin)
 - `POST /api/v1/devices/config/publish` (optional admin)
 
-It does not expose device telemetry ingestion endpoints over HTTP.
+It does not expose device telemetry ingestion endpoints over HTTP (MQTT-only for device→edge).
 
 ---
 
@@ -101,7 +113,6 @@ It does not expose device telemetry ingestion endpoints over HTTP.
 - Use `boilerplates/Backend-node` for `edge-ingress-gateway`.
 - Do not log full payloads; log only IDs, types, `trace_id`, and sizes.
 - Persisted dedupe must use the edge DB TTL cache (no in-memory cache service).
-
 
 
 

@@ -66,8 +66,10 @@ These are the required compliance references in this repo:
 - [x] **Datadog tracing and correlation**  
   Decision: `dd-trace`/`ddtrace` across services (single approach).  
   Evidence: `docs/shared/02-observability-datadog.md`
-- [ ] **Alerts configured to detect issues before users complain (In-house 8.1 / Outsource 7.1)**  
-  Evidence target: Datadog monitors and dashboards (implementation task); runbook: `docs/shared/05-runbook-ops.md`
+- [x] **Alerts + SLOs documented (In-house 8.1 / Outsource 7.1) — DONE (docs)**  
+  Evidence: `docs/08-alerts-slos.md`
+- [ ] **Alerts implemented in Datadog (In-house 8.1 / Outsource 7.1) — PARTIAL (next step)**  
+  Next step: create monitors/dashboards in Datadog per `docs/08-alerts-slos.md` and link screenshots/export here or in `docs/shared/05-runbook-ops.md`.
 
 ### Performance and testing
 
@@ -87,12 +89,13 @@ These are the required compliance references in this repo:
 - [x] **Input validation (Security 3.1 / 3.2)**  
   Evidence: `docs/shared/01-api-standards.md` (Zod/Pydantic).
 - [x] **Least privilege & RBAC (Security 2.2 / 2.3)**  
-  Evidence: `docs/cloud-layer/01-cloud-services.md` (`cloud-identity-access` RBAC), `docs/shared/00-api-catalog.md` (auth notes).
+  Evidence: `docs/cloud-layer/01-cloud-services.md` (`cloud-identity-access` RBAC), `docs/06-rbac-authorization-matrix.md`, `docs/shared/00-api-catalog.md` (auth notes).
 - [x] **Session management without external in-memory session store**  
   Decision: JWT/OIDC with configurable token expiry; no server-side session store.  
   Evidence: `docs/cloud-layer/01-cloud-services.md`, `docs/shared/01-api-standards.md`
-- [ ] **Authorization matrix documented (Security 2.3)**  
-  Evidence target: project-specific RBAC matrix (to be added under cloud identity docs or a separate RBAC doc if required).
+- [x] **Authorization matrix documented (Security 2.3) — DONE (docs)**  
+  Evidence: `docs/06-rbac-authorization-matrix.md`  
+  Next step: implement permission checks + audit logging per matrix in each service.
 - [ ] **VAPT completed before go-live (Security 8 / In-house 5.2 / Outsource 4.1)**  
   Evidence target: VAPT reports and remediation log.
 
@@ -104,8 +107,10 @@ These are the required compliance references in this repo:
   Evidence: Node boilerplate and per-service implementation.
 - [x] **Environment separation and protection (In-house 5.1 / Outsource 3.3 / Infrastructure 4)**  
   Evidence: `docs/shared/03-deployment-kubernetes.md`
-- [ ] **Backup & recovery / DR plan (Infrastructure 6 / Outsource 6.6)**  
-  Evidence target: DR plan and restore test results; runbook references in `docs/shared/05-runbook-ops.md`.
+- [x] **Backup & recovery / DR plan documented (Infrastructure 6 / Outsource 6.6) — DONE (docs)**  
+  Evidence: `docs/07-backup-dr-plan.md`
+- [ ] **Restore drill executed and recorded (Infrastructure 6 / Outsource 6.6) — PARTIAL (next step)**  
+  Next step: run quarterly restore drill per `docs/07-backup-dr-plan.md` and attach results (duration, issues, remediation).
 - [x] **Maintenance page for UI (Infrastructure 7.1 / In-house 7.4)**  
   Evidence: `docs/cloud-layer/02-dashboard.md`, `docs/shared/03-deployment-kubernetes.md`
 
@@ -124,6 +129,8 @@ These are the required compliance references in this repo:
   Evidence: `docs/shared/01-api-standards.md`, `docs/shared/00-api-catalog.md`
 - [x] **Workflow and troubleshooting/runbook documentation (In-house 6.1 / Outsource 5.1 / 8.5)**  
   Evidence: `docs/shared/05-runbook-ops.md`
+- [x] **RBAC matrix, DR plan, and alerting/SLOs docs (Security/Infrastructure)**  
+  Evidence: `docs/06-rbac-authorization-matrix.md`, `docs/07-backup-dr-plan.md`, `docs/08-alerts-slos.md`
 
 ---
 

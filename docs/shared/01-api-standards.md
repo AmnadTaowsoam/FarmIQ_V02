@@ -22,9 +22,9 @@ This doc defines the standard patterns; the full endpoint inventory lives in `sh
 
 FarmIQ enforces:
 - **MQTT-only** for all device telemetry and events.
-- **HTTP is allowed only for image upload** (multipart) directly to `edge-media-store`.
+- **HTTP is allowed only for media upload** via **presigned URL** issued by `edge-media-store`.
 
-Authoritative MQTT topics and envelope are defined in `iot-layer/00-overview.md`.
+Authoritative MQTT topics and envelope are defined in `iot-layer/03-mqtt-topic-map.md`.
 
 ---
 
@@ -128,16 +128,13 @@ Suggested error codes:
 
 ```json
 {
+  "schema_version": "1.0",
   "event_id": "uuid",
-  "event_type": "telemetry.reading",
-  "tenant_id": "uuid-v7",
-  "farm_id": "uuid-v7",
-  "barn_id": "uuid-v7",
-  "device_id": "device-sensor-001",
-  "station_id": null,
-  "session_id": null,
-  "occurred_at": "2025-01-01T10:00:00Z",
   "trace_id": "trace-id-123",
+  "tenant_id": "uuid-v7",
+  "device_id": "device-sensor-001",
+  "event_type": "telemetry.reading",
+  "ts": "2025-01-01T10:00:00Z",
   "payload": {
     "metric": "temperature",
     "value": 26.4,
@@ -150,16 +147,13 @@ Suggested error codes:
 
 ```json
 {
+  "schema_version": "1.0",
   "event_id": "uuid",
-  "event_type": "weighvision.session.created",
-  "tenant_id": "uuid-v7",
-  "farm_id": "uuid-v7",
-  "barn_id": "uuid-v7",
-  "device_id": "weighvision-device-001",
-  "station_id": "station-01",
-  "session_id": "uuid-v7",
-  "occurred_at": "2025-01-01T10:05:00Z",
   "trace_id": "trace-id-789",
+  "tenant_id": "uuid-v7",
+  "device_id": "weighvision-device-001",
+  "event_type": "weighvision.session.created",
+  "ts": "2025-01-01T10:05:00Z",
   "payload": {
     "batch_id": "uuid-v7"
   }
@@ -168,9 +162,13 @@ Suggested error codes:
 
 ### Image upload (only allowed device HTTP call)
 
-- **Endpoint**: `POST /api/v1/media/images` on `edge-media-store`
-- **Content-Type**: `multipart/form-data`
-- **Fields**: `tenantId`, `farmId`, `barnId`, `deviceId`, `stationId` (optional), `sessionId` (optional), `traceId`, `capturedAt`, `image`
+- **Step 1 (presign)**: `POST /api/v1/media/images/presign` on `edge-media-store`
+  - Request body (JSON): `tenantId`, `farmId`, `barnId`, `deviceId`, `stationId` (optional), `sessionId` (optional), `traceId`, `capturedAt`, `contentType`, `contentLength` (optional)
+  - Response: `upload_url`, `media_id`, `expires_at` (+ optional required headers)
+
+- **Step 2 (upload)**: `PUT {upload_url}` (binary JPEG/PNG)
+
+- **Step 3 (notify)**: publish `weighvision.image.captured` via MQTT with a `payload` that includes `media_id` (and optional `content_type`, `size_bytes`, `sha256`).
 
 If validation fails (HTTP):
 

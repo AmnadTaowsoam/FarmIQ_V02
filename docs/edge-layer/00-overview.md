@@ -45,7 +45,7 @@ Ownership guards:
 
 - **Ingress from IoT**
   - MQTT (100%) → `edge-mqtt-broker` → `edge-ingress-gateway` for all telemetry and device events.
-  - HTTP is used only for media upload: device → `edge-media-store` `POST /api/v1/media/images` (multipart).
+- HTTP is used only for media upload: device → `edge-media-store` `POST /api/v1/media/images/presign` + `PUT {upload_url}` (presigned upload).
 
 - **Internal edge communication**
   - HTTP/gRPC calls between edge services (e.g., ingress → telemetry, ingress → session/media).

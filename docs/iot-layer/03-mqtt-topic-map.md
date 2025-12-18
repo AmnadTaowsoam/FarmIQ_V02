@@ -25,9 +25,10 @@ Last updated: 2025-12-17
 
 - **`telemetry.reading`**: One telemetry sample for a specific metric.
 - **`sensor.heartbeat`** (optional): Device heartbeat event (in addition to retained status).
+- **`device.status`**: Latest device status payload (retained on `iot/status/...`).
 - **`weighvision.session.created`**: WeighVision session started.
 - **`weighvision.weight.recorded`**: A scale weight measurement associated with a session.
-- **`weighvision.image.captured`**: Image capture notification (image is uploaded via HTTP multipart).
+- **`weighvision.image.captured`**: Image capture notification (image is uploaded via HTTP presigned URL).
 - **`weighvision.inference.completed`**: Inference result computed (usually produced by edge inference, may be forwarded to cloud).
 - **`weighvision.session.finalized`**: Session ended/finalized.
 
@@ -41,26 +42,24 @@ All MQTT messages MUST use this envelope (fields are required unless marked opti
 {
   "schema_version": "1.0",
   "event_id": "uuid",
-  "event_type": "string",
-  "occurred_at": "ISO-8601",
-  "tenant_id": "uuid-v7",
-  "farm_id": "uuid-v7",
-  "barn_id": "uuid-v7",
-  "device_id": "string",
-  "station_id": "string",
-  "session_id": "uuid-v7",
   "trace_id": "string",
+  "tenant_id": "uuid-v7",
+  "device_id": "string",
+  "event_type": "string",
+  "ts": "ISO-8601",
+  "payload": {},
   "content_hash": "string",
   "retry_count": 0,
-  "payload": {}
+  "produced_at": "ISO-8601"
 }
 ```
 
 Notes:
-- **`station_id`** is required for WeighVision topics; otherwise omit or set to `null`.
-- **`session_id`** is required for WeighVision session events; otherwise omit or set to `null`.
+- Topic segments carry routing context (e.g., `farmId`, `barnId`, `stationId`, `sessionId`) and MUST match what the device is provisioned for.
+- Devices MUST NOT rely on HTTP fallback for telemetry/events; all device → edge ingestion is MQTT-only.
 - **`content_hash`** (optional): hash of `payload` for integrity/debugging (do not treat as security control).
 - **`retry_count`** (optional): number of local publish retries (for diagnostics only).
+- **`produced_at`** (optional): timestamp the agent produced the message (useful when replaying buffered events); if omitted, `ts` is used.
 
 ---
 
@@ -102,7 +101,7 @@ If MQTT is disconnected, buffer locally (file queue JSONL or SQLite):
 
 ### Replay strategy (when connection restored)
 
-- Publish buffered messages in chronological order by `occurred_at`.
+- Publish buffered messages in chronological order by `ts`.
 - Backoff + retry with jitter (0–200ms) to prevent thundering herd.
 - Preserve ordering per device/session.
 
@@ -127,15 +126,11 @@ Message:
 {
   "schema_version": "1.0",
   "event_id": "018f1a84-bb0e-7d3f-b2e4-9e8b5f8e0001",
-  "event_type": "telemetry.reading",
-  "occurred_at": "2025-12-17T01:00:00Z",
-  "tenant_id": "t-001",
-  "farm_id": "f-001",
-  "barn_id": "b-001",
-  "device_id": "d-001",
-  "station_id": null,
-  "session_id": null,
   "trace_id": "trace-abc",
+  "event_type": "telemetry.reading",
+  "tenant_id": "t-001",
+  "device_id": "d-001",
+  "ts": "2025-12-17T01:00:00Z",
   "payload": { "value": 26.4, "unit": "C" }
 }
 ```
@@ -143,21 +138,17 @@ Message:
 ### Example 2: WeighVision session created
 
 Topic:
-`iot/weighvision/t-001/f-001/b-001/st-01/session/s-123/session.created`
+`iot/weighvision/t-001/f-001/b-001/st-01/session/s-123/weighvision.session.created`
 
 ```json
 {
   "schema_version": "1.0",
   "event_id": "018f1a84-bb0e-7d3f-b2e4-9e8b5f8e0200",
-  "event_type": "weighvision.session.created",
-  "occurred_at": "2025-12-17T01:05:00Z",
-  "tenant_id": "t-001",
-  "farm_id": "f-001",
-  "barn_id": "b-001",
-  "device_id": "wv-001",
-  "station_id": "st-01",
-  "session_id": "s-123",
   "trace_id": "trace-wv",
+  "event_type": "weighvision.session.created",
+  "tenant_id": "t-001",
+  "device_id": "wv-001",
+  "ts": "2025-12-17T01:05:00Z",
   "payload": { "batch_id": "batch-001" }
 }
 ```
@@ -171,15 +162,11 @@ Topic:
 {
   "schema_version": "1.0",
   "event_id": "018f1a84-bb0e-7d3f-b2e4-9e8b5f8e0900",
-  "event_type": "device.status",
-  "occurred_at": "2025-12-17T01:00:30Z",
-  "tenant_id": "t-001",
-  "farm_id": "f-001",
-  "barn_id": "b-001",
-  "device_id": "d-001",
-  "station_id": null,
-  "session_id": null,
   "trace_id": "trace-status",
+  "event_type": "device.status",
+  "tenant_id": "t-001",
+  "device_id": "d-001",
+  "ts": "2025-12-17T01:00:30Z",
   "payload": {
     "last_seen_at": "2025-12-17T01:00:30Z",
     "firmware_version": "1.2.3",

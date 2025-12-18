@@ -5,7 +5,8 @@
 ## Base & Documentation
 - Base path ทุกบริการ: `/api`
 - Swagger UI: `/api-docs` (โหลดจาก `openapi.yaml`)
-- Health check: `GET /api/health` → `OK`
+- Health check: `GET /api/health` → `OK` (Node.js และ Python ต้องมี)
+  - Python services: ต้องมี `/api/health` (สามารถเก็บ `/health` เป็น alias ได้)
 
 ## Standard Endpoints (ต้องมี/ควรมี)
 - **ต้องมี** `GET /api/health` → ใช้ได้ทั้ง uptime probe และ blocklist ใน APM
