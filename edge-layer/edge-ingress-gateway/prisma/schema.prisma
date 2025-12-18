@@ -1,0 +1,71 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model IngressDedupe {
+  tenant_id     String
+  event_id      String
+  first_seen_at DateTime @default(now()) @db.Timestamptz(6)
+  expires_at    DateTime @db.Timestamptz(6)
+  topic         String
+  hash          String?
+
+  @@id([tenant_id, event_id])
+  @@index([expires_at])
+  @@map("ingress_dedupe")
+}
+
+model DeviceAllowlist {
+  device_id  String
+  tenant_id  String
+  farm_id    String?
+  barn_id    String?
+  enabled    Boolean  @default(true)
+  notes      String?
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([tenant_id, device_id])
+  @@index([tenant_id, farm_id, barn_id])
+  @@map("device_allowlist")
+}
+
+model StationAllowlist {
+  station_id String
+  tenant_id  String
+  farm_id    String?
+  barn_id    String?
+  enabled    Boolean  @default(true)
+  notes      String?
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([tenant_id, station_id])
+  @@index([tenant_id, farm_id, barn_id])
+  @@map("station_allowlist")
+}
+
+model DeviceLastSeen {
+  device_id          String
+  tenant_id          String
+  last_seen_at       DateTime @db.Timestamptz(6)
+  last_topic         String
+  last_payload_hash  String?
+  updated_at         DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([tenant_id, device_id])
+  @@index([last_seen_at])
+  @@map("device_last_seen")
+}

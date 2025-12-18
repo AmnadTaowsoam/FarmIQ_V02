@@ -1,0 +1,83 @@
+openapi: 3.0.0
+info:
+  title: edge-ingress-gateway API
+  version: 1.0.0
+  description: Ops/admin endpoints for the FarmIQ Edge Ingress Gateway (MQTT-only device ingestion; no HTTP telemetry ingestion).
+servers:
+  - url: /
+paths:
+  /api/health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
+
+  /api/ready:
+    get:
+      summary: Readiness check (DB + MQTT connectivity)
+      responses:
+        '200':
+          description: Ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadyResponse'
+        '503':
+          description: Not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadyResponse'
+
+  /api/v1/ingress/stats:
+    get:
+      summary: Ingress processing counters and connectivity snapshot
+      responses:
+        '200':
+          description: Stats snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngressStatsSnapshot'
+
+components:
+  schemas:
+    ReadyResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ready
+        db:
+          type: string
+          example: up
+        mqtt:
+          type: boolean
+          example: true
+
+    IngressStatsSnapshot:
+      type: object
+      properties:
+        startedAt:
+          type: string
+          format: date-time
+        mqttConnected:
+          type: boolean
+        lastMessageAt:
+          type: string
+          nullable: true
+        counters:
+          type: object
+          additionalProperties:
+            type: integer
+        lastErrors:
+          type: object
+          additionalProperties:
+            type: string
+            nullable: true
