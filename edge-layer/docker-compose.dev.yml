@@ -1,0 +1,63 @@
+version: '3.8'
+
+# Development overrides for edge services
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  edge-ingress-gateway:
+    build:
+      target: development
+    volumes:
+      - ./edge-ingress-gateway/src:/app/src:ro
+      - ./edge-ingress-gateway/package.json:/app/package.json:ro
+    environment:
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+
+  edge-telemetry-timeseries:
+    build:
+      target: development
+    volumes:
+      - ./edge-telemetry-timeseries/src:/app/src:ro
+      - ./edge-telemetry-timeseries/package.json:/app/package.json:ro
+    environment:
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+
+  edge-weighvision-session:
+    build:
+      target: development
+    volumes:
+      - ./edge-weighvision-session/src:/app/src:ro
+      - ./edge-weighvision-session/package.json:/app/package.json:ro
+    environment:
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+
+  edge-media-store:
+    build:
+      target: development
+    volumes:
+      - ./edge-media-store/src:/app/src:ro
+      - ./edge-media-store/package.json:/app/package.json:ro
+    environment:
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+
+  edge-vision-inference:
+    volumes:
+      - ./edge-vision-inference/app:/app/app:ro
+    environment:
+      - LOG_LEVEL=DEBUG
+
+  edge-sync-forwarder:
+    build:
+      target: development
+    volumes:
+      - ./edge-sync-forwarder/src:/app/src:ro
+      - ./edge-sync-forwarder/package.json:/app/package.json:ro
+    environment:
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+
+

@@ -1,0 +1,161 @@
+openapi: 3.0.0
+info:
+  title: edge-weighvision-session API
+  version: 1.0.0
+  description: Service for managing WeighVision session lifecycle and bindings.
+
+servers:
+  - url: /api
+    description: Base path for all endpoints
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Healthy
+  /ready:
+    get:
+      summary: Readiness check
+      responses:
+        '200':
+          description: Ready
+
+  /v1/weighvision/sessions:
+    post:
+      summary: Create or upsert a session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSession'
+      responses:
+        '201':
+          description: Created
+        '400':
+          description: Invalid request
+
+  /v1/weighvision/sessions/{sessionId}:
+    get:
+      summary: Get session details
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Session details
+        '404':
+          description: Not found
+
+  /v1/weighvision/sessions/{sessionId}/bind-weight:
+    post:
+      summary: Bind a weight record to a session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BindWeight'
+      responses:
+        '200':
+          description: Weight bound
+        '400':
+          description: Invalid request
+
+  /v1/weighvision/sessions/{sessionId}/bind-media:
+    post:
+      summary: Bind a media object to a session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BindMedia'
+      responses:
+        '200':
+          description: Media bound (or pending reconciliation)
+        '400':
+          description: Invalid request
+
+  /v1/weighvision/sessions/{sessionId}/finalize:
+    post:
+      summary: Finalize a session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Session finalized
+        '404':
+          description: Not found
+
+components:
+  schemas:
+    CreateSession:
+      type: object
+      required:
+        - sessionId
+        - tenantId
+        - farmId
+        - barnId
+        - deviceId
+        - stationId
+        - startAt
+      properties:
+        sessionId: { type: string, format: uuid }
+        tenantId: { type: string, format: uuid }
+        farmId: { type: string, format: uuid }
+        barnId: { type: string, format: uuid }
+        deviceId: { type: string, format: uuid }
+        stationId: { type: string, format: uuid }
+        batchId: { type: string, format: uuid }
+        startAt: { type: string, format: date-time }
+
+    BindWeight:
+      type: object
+      required:
+        - tenantId
+        - weightKg
+        - occurredAt
+        - eventId
+      properties:
+        tenantId: { type: string, format: uuid }
+        weightKg: { type: number }
+        occurredAt: { type: string, format: date-time }
+        eventId: { type: string, format: uuid }
+
+    BindMedia:
+      type: object
+      required:
+        - tenantId
+        - mediaObjectId
+        - occurredAt
+        - eventId
+      properties:
+        tenantId: { type: string, format: uuid }
+        mediaObjectId: { type: string }
+        occurredAt: { type: string, format: date-time }
+        eventId: { type: string, format: uuid }

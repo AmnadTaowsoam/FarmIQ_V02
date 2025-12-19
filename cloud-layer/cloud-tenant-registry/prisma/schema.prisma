@@ -1,0 +1,151 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Multi-tenant master data models
+// All IDs use String type (UUID v7 should be generated in application code)
+
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  status    String   @default("active") // active, inactive, suspended
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  farms Farm[]
+
+  @@index([status])
+  @@map("tenants")
+}
+
+model Farm {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String
+  location  String?
+  status    String   @default("active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  barns  Barn[]
+  batches Batch[]
+  devices Device[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("farms")
+}
+
+model Barn {
+  id         String   @id @default(uuid())
+  tenantId   String
+  farmId     String
+  name       String
+  animalType String?  // e.g., "broiler", "layer", "breeder"
+  status     String   @default("active")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  farm    Farm    @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  batches Batch[]
+  devices Device[]
+  stations Station[]
+
+  @@unique([tenantId, farmId, name])
+  @@index([tenantId])
+  @@index([tenantId, farmId])
+  @@index([tenantId, farmId, status])
+  @@map("barns")
+}
+
+model Batch {
+  id        String    @id @default(uuid())
+  tenantId  String
+  farmId    String
+  barnId    String
+  species   String    // e.g., "chicken", "duck"
+  startDate DateTime?
+  endDate   DateTime?
+  status    String    @default("active") // active, completed, cancelled
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // Relations
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  farm   Farm   @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  barn   Barn   @relation(fields: [barnId], references: [id], onDelete: Cascade)
+  devices Device[]
+
+  @@index([tenantId])
+  @@index([tenantId, farmId])
+  @@index([tenantId, farmId, barnId])
+  @@index([tenantId, status])
+  @@map("batches")
+}
+
+model Device {
+  id          String   @id @default(uuid())
+  tenantId    String
+  farmId      String?
+  barnId      String?
+  batchId     String?
+  deviceType  String   // e.g., "sensor-gateway", "weighvision"
+  serialNo    String?  // Optional serial number
+  status      String   @default("active") // active, inactive, maintenance
+  metadata    Json?    // Additional device-specific metadata
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  farm   Farm?  @relation(fields: [farmId], references: [id], onDelete: SetNull)
+  barn   Barn?  @relation(fields: [barnId], references: [id], onDelete: SetNull)
+  batch  Batch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, serialNo])
+  @@index([tenantId])
+  @@index([tenantId, farmId])
+  @@index([tenantId, barnId])
+  @@index([tenantId, deviceType])
+  @@index([tenantId, status])
+  @@map("devices")
+}
+
+// Station model (for WeighVision stations within a barn)
+// Note: tenantId is stored for multi-tenant isolation but relation is through Farm/Barn
+model Station {
+  id          String   @id @default(uuid())
+  tenantId    String
+  farmId      String
+  barnId      String
+  name        String
+  stationType String?  // e.g., "weighing", "feeding"
+  status      String   @default("active")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations (tenantId is for indexing/isolation, not FK)
+  farm Farm @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  barn Barn @relation(fields: [barnId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, farmId, barnId, name])
+  @@index([tenantId])
+  @@index([tenantId, farmId, barnId])
+  @@index([tenantId, status])
+  @@map("stations")
+}

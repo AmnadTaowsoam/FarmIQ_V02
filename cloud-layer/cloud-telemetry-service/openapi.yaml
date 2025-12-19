@@ -1,0 +1,302 @@
+openapi: 3.0.0
+info:
+  title: Cloud Telemetry Service API
+  version: 1.0.0
+  description: Telemetry ingestion, storage, and query service for FarmIQ
+servers:
+  - url: http://localhost:5123
+    description: Local development
+paths:
+  /api/health:
+    get:
+      summary: Health check endpoint
+      tags: [Health]
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
+  /api/ready:
+    get:
+      summary: Readiness check endpoint
+      tags: [Health]
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ready
+        '503':
+          description: Service is not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/telemetry/readings:
+    get:
+      summary: Get telemetry readings
+      tags: [Telemetry]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tenantId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: farmId
+          in: query
+          schema:
+            type: string
+        - name: barnId
+          in: query
+          schema:
+            type: string
+        - name: deviceId
+          in: query
+          schema:
+            type: string
+        - name: metric
+          in: query
+          schema:
+            type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 1000
+            maximum: 10000
+      responses:
+        '200':
+          description: List of telemetry readings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TelemetryReading'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/telemetry/aggregates:
+    get:
+      summary: Get telemetry aggregates
+      tags: [Telemetry]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tenantId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: farmId
+          in: query
+          schema:
+            type: string
+        - name: barnId
+          in: query
+          schema:
+            type: string
+        - name: deviceId
+          in: query
+          schema:
+            type: string
+        - name: metric
+          in: query
+          schema:
+            type: string
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: bucket
+          in: query
+          schema:
+            type: string
+            enum: [5m, 1h, 1d]
+            default: 1h
+      responses:
+        '200':
+          description: List of telemetry aggregates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TelemetryAggregate'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/telemetry/metrics:
+    get:
+      summary: Get available metrics
+      tags: [Telemetry]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tenantId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: farmId
+          in: query
+          schema:
+            type: string
+        - name: barnId
+          in: query
+          schema:
+            type: string
+        - name: deviceId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of available metrics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  metrics:
+                    type: array
+                    items:
+                      type: string
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    TelemetryReading:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+        farmId:
+          type: string
+          nullable: true
+        barnId:
+          type: string
+          nullable: true
+        deviceId:
+          type: string
+        batchId:
+          type: string
+          nullable: true
+        metric:
+          type: string
+        value:
+          type: number
+          format: decimal
+        unit:
+          type: string
+          nullable: true
+        occurredAt:
+          type: string
+          format: date-time
+        traceId:
+          type: string
+          nullable: true
+        eventId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    TelemetryAggregate:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+        farmId:
+          type: string
+          nullable: true
+        barnId:
+          type: string
+          nullable: true
+        deviceId:
+          type: string
+        metric:
+          type: string
+        bucketStart:
+          type: string
+          format: date-time
+        bucketSize:
+          type: string
+          enum: [5m, 1h, 1d]
+        avgValue:
+          type: number
+          format: decimal
+        minValue:
+          type: number
+          format: decimal
+        maxValue:
+          type: number
+          format: decimal
+        count:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            traceId:
+              type: string

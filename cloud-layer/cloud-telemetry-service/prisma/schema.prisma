@@ -1,0 +1,59 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Telemetry raw data (from RabbitMQ telemetry.ingested events)
+model TelemetryRaw {
+  id         String   @id @default(uuid())
+  tenantId   String
+  farmId     String?
+  barnId     String?
+  deviceId   String
+  batchId    String?
+  metric     String   // e.g., "temperature", "humidity", "weight"
+  value      Decimal  @db.Decimal(10, 2)
+  unit       String?  // e.g., "C", "F", "%", "kg"
+  occurredAt DateTime
+  traceId    String?
+  eventId    String   // For deduplication (unique with tenantId)
+  createdAt  DateTime @default(now())
+
+  @@unique([tenantId, eventId])
+  @@index([tenantId, occurredAt(sort: Desc)])
+  @@index([tenantId, deviceId, metric, occurredAt(sort: Desc)])
+  @@index([tenantId, farmId, barnId, occurredAt(sort: Desc)])
+  @@map("telemetry_raw")
+}
+
+// Telemetry aggregates (computed from raw data)
+model TelemetryAgg {
+  id          String   @id @default(uuid())
+  tenantId    String
+  farmId      String?
+  barnId      String?
+  deviceId    String
+  metric      String
+  bucketStart DateTime // Start of aggregation window
+  bucketSize  String   // e.g., "5m", "1h", "1d"
+  avgValue    Decimal  @db.Decimal(10, 2)
+  minValue    Decimal  @db.Decimal(10, 2)
+  maxValue    Decimal  @db.Decimal(10, 2)
+  count       Int      // Number of samples in this bucket
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, farmId, barnId, deviceId, metric, bucketStart, bucketSize])
+  @@index([tenantId, bucketStart(sort: Desc)])
+  @@index([tenantId, farmId, barnId, bucketStart(sort: Desc)])
+  @@index([tenantId, deviceId, metric, bucketStart(sort: Desc)])
+  @@map("telemetry_agg")
+}

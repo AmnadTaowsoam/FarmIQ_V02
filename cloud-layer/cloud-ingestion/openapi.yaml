@@ -1,0 +1,108 @@
+openapi: 3.0.0
+info:
+  title: FarmIQ Ingestion Service
+  version: 1.1.0
+  description: Handles batch event ingestion from edge clusters.
+paths:
+  /api/v1/edge/batch:
+    post:
+      summary: Ingest a batch of events
+      description: Receives a batch of MQTT-enveloped events from an edge forwarder. Deduplicates and publishes to RabbitMQ.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchRequest'
+      responses:
+        '200':
+          description: Batch processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchResponse'
+        '400':
+          description: Invalid request
+  /api/health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+  /api/ready:
+    get:
+      summary: Readiness check
+      responses:
+        '200':
+          description: OK
+        '503':
+          description: Service Unavailable
+components:
+  schemas:
+    BatchRequest:
+      type: object
+      required: [tenant_id, events]
+      properties:
+        tenant_id:
+          type: string
+          format: uuid
+        edge_id:
+          type: string
+        sent_at:
+          type: string
+          format: date-time
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventEnvelope'
+    EventEnvelope:
+      type: object
+      required: [event_id, event_type, tenant_id, farm_id, barn_id, occurred_at, trace_id, schema_version, payload]
+      properties:
+        event_id:
+          type: string
+          format: uuid
+        event_type:
+          type: string
+        tenant_id:
+          type: string
+          format: uuid
+        farm_id:
+          type: string
+          format: uuid
+        barn_id:
+          type: string
+          format: uuid
+        device_id:
+          type: string
+        station_id:
+          type: string
+        session_id:
+          type: string
+        occurred_at:
+          type: string
+          format: date-time
+        trace_id:
+          type: string
+        schema_version:
+          type: string
+        payload:
+          type: object
+    BatchResponse:
+      type: object
+      properties:
+        accepted:
+          type: integer
+        duplicated:
+          type: integer
+        rejected:
+          type: integer
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              event_id:
+                type: string
+              error:
+                type: string

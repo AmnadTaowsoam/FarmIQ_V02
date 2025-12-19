@@ -1,0 +1,147 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # CLOUD SERVICES
+  # ============================================
+  cloud-identity-access:
+    build:
+      context: ./cloud-identity-access
+      dockerfile: Dockerfile
+    container_name: farmiq-cloud-identity-access
+    ports:
+      - "5120:3000"
+    environment:
+      - NODE_ENV=development
+      - APP_PORT=3000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DD_SERVICE=cloud-identity-access
+      - DD_ENV=development
+    networks:
+      - farmiq-net
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cloud-tenant-registry:
+    build:
+      context: ./cloud-tenant-registry
+      dockerfile: Dockerfile
+    container_name: farmiq-cloud-tenant-registry
+    ports:
+      - "5121:3000"
+    environment:
+      - NODE_ENV=development
+      - APP_PORT=3000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DD_SERVICE=cloud-tenant-registry
+      - DD_ENV=development
+    networks:
+      - farmiq-net
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cloud-ingestion:
+    build:
+      context: ./cloud-ingestion
+      dockerfile: Dockerfile
+    container_name: farmiq-cloud-ingestion
+    ports:
+      - "5122:3000"
+    environment:
+      - NODE_ENV=development
+      - APP_PORT=3000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
+      - DD_SERVICE=cloud-ingestion
+      - DD_ENV=development
+    networks:
+      - farmiq-net
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cloud-telemetry-service:
+    build:
+      context: ./cloud-telemetry-service
+      dockerfile: Dockerfile
+    container_name: farmiq-cloud-telemetry-service
+    ports:
+      - "5123:3000"
+    environment:
+      - NODE_ENV=development
+      - APP_PORT=3000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
+      - DD_SERVICE=cloud-telemetry-service
+      - DD_ENV=development
+    networks:
+      - farmiq-net
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cloud-analytics-service:
+    build:
+      context: ./cloud-analytics-service
+      dockerfile: Dockerfile
+    container_name: farmiq-cloud-analytics-service
+    ports:
+      - "5124:8000"
+    environment:
+      - LOG_LEVEL=INFO
+      - PORT=8000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
+      - DD_SERVICE=cloud-analytics-service
+      - DD_ENV=development
+    networks:
+      - farmiq-net
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cloud-api-gateway-bff:
+    build:
+      context: ./cloud-api-gateway-bff
+      dockerfile: Dockerfile
+    container_name: farmiq-cloud-api-gateway-bff
+    ports:
+      - "5125:3000"
+    environment:
+      - NODE_ENV=development
+      - APP_PORT=3000
+      - IDENTITY_BASE_URL=http://cloud-identity-access:3000
+      - REGISTRY_BASE_URL=http://cloud-tenant-registry:3000
+      - TELEMETRY_BASE_URL=http://cloud-telemetry-service:3000
+      - ANALYTICS_BASE_URL=http://cloud-analytics-service:8000
+      - WEIGHVISION_READMODEL_BASE_URL=http://cloud-weighvision-readmodel:3000
+      - DD_SERVICE=cloud-api-gateway-bff
+      - DD_ENV=development
+    depends_on:
+      - cloud-identity-access
+      - cloud-tenant-registry
+      - cloud-telemetry-service
+      - cloud-analytics-service
+    networks:
+      - farmiq-net
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  farmiq-net:
+    external: true

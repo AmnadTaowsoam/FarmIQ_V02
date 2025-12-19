@@ -1,0 +1,86 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model WeightSession {
+  id                  String   @id @default(uuid())
+  sessionId           String   @unique @map("session_id")
+  tenantId            String   @map("tenant_id")
+  farmId              String   @map("farm_id")
+  barnId              String   @map("barn_id")
+  deviceId            String   @map("device_id")
+  stationId           String   @map("station_id")
+  batchId             String?  @map("batch_id")
+  status              String   // created | finalized | cancelled
+  startAt             DateTime @map("start_at")
+  endAt               DateTime? @map("end_at")
+  initialWeightKg     Decimal? @db.Decimal(10, 2) @map("initial_weight_kg")
+  finalWeightKg       Decimal? @db.Decimal(10, 2) @map("final_weight_kg")
+  imageCount          Int      @default(0) @map("image_count")
+  inferenceResultId   String?  @map("inference_result_id")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  weights             SessionWeight[]
+
+  @@index([tenantId, sessionId])
+  @@map("weight_sessions")
+}
+
+model SessionWeight {
+  id              String   @id @default(uuid())
+  sessionId       String   @map("session_id")
+  tenantId        String   @map("tenant_id")
+  weightKg        Decimal  @db.Decimal(10, 2) @map("weight_kg")
+  occurredAt      DateTime @map("occurred_at")
+  eventId         String   @map("event_id")
+  traceId         String   @map("trace_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  session         WeightSession? @relation(fields: [sessionId], references: [sessionId])
+
+  @@unique([tenantId, eventId])
+  @@index([sessionId])
+  @@map("session_weights")
+}
+
+model SessionMediaBinding {
+  id              String   @id @default(uuid())
+  sessionId       String   @map("session_id")
+  tenantId        String   @map("tenant_id")
+  mediaObjectId   String   @map("media_object_id")
+  occurredAt      DateTime @map("occurred_at")
+  eventId         String   @map("event_id")
+  traceId         String   @map("trace_id")
+  isBound         Boolean  @default(false) @map("is_bound")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@unique([tenantId, eventId])
+  @@unique([sessionId, mediaObjectId])
+  @@index([sessionId])
+  @@map("session_media_bindings")
+}
+
+model Outbox {
+  id          String   @id @default(uuid())
+  eventType   String   @map("event_type")
+  payload     Json
+  traceId     String   @map("trace_id")
+  tenantId    String   @map("tenant_id")
+  processed   Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("outbox")
+}

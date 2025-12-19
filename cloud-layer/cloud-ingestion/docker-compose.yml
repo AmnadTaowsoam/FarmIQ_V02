@@ -1,0 +1,32 @@
+# services:
+#   app:
+#     build: .
+#     ports:
+#       - "3000:3000"
+#     environment:
+#       - NODE_ENV
+#       - DATABASE_URL
+#     depends_on:
+#       - db
+ 
+#   k6:
+#     image: grafana/k6
+#     volumes:
+#       - ./scripts/loadTest.js:/scripts/loadTest.js  # Updated to reflect the new folder structure
+#     entrypoint: ["k6", "run", "/scripts/loadTest.js"]  # Updated to reflect the new folder structure
+#     depends_on:
+#       - app  # Ensure app service is running before k6 starts
+ 
+#   db:
+#     image: postgres:latest
+#     environment:
+#       - POSTGRES_USER
+#       - POSTGRES_PASSWORD
+#       - POSTGRES_DB
+#     ports:
+#       - "5432:5432"
+#     volumes:
+#       - pgdata:/var/lib/postgresql/data
+ 
+# volumes:
+#   pgdata:

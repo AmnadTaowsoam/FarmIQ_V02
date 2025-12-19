@@ -1,0 +1,51 @@
+apiVersion: backstage.io/v1beta2
+kind: Template
+metadata:
+  name: nodejs-template
+  title: Node.js Backend Project Template
+  description: Template for creating a new Node.js backend project.
+  annotations:
+    dev.azure.com/project-slug: betagro-dev/nodejs-boilerplate
+spec:
+  owner: Developer
+  type: service
+  parameters:
+    - title: Project Name
+      description: The name of the project
+      type: string
+      required: true
+    - title: Repository Name
+      description: The name of the new repository
+      type: string
+      required: true
+  steps:
+    - id: fetch-repo
+      name: Fetch Node.js Boilerplate
+      action: git:clone
+      input:
+        url: 'https://dev.azure.com/betagro-dev/nodejs-boilerplate.git'
+        targetPath: '{{ parameters.repoName }}'
+        branch: main
+    - id: init-git
+      name: Initialize Git Repository
+      action: git:init
+      input:
+        workingDirectory: '{{ parameters.repoName }}'
+    - id: install-dependencies
+      name: Install Dependencies
+      action: npm:install
+      input:
+        workingDirectory: '{{ parameters.repoName }}'
+    - id: create-repo
+      name: Create a new repository
+      action: azure:repo
+      input:
+        repoName: '{{ parameters.repoName }}'
+        description: 'A new Node.js backend project'
+    - id: push-code
+      name: Push Code to New Repository
+      action: git:push
+      input:
+        remote: origin
+        branch: main
+        workingDirectory: '{{ parameters.repoName }}'

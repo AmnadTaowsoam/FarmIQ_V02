@@ -1,0 +1,551 @@
+openapi: 3.0.0
+info:
+  title: Cloud Tenant Registry API
+  version: 1.0.0
+  description: Multi-tenant master data management service for FarmIQ
+servers:
+  - url: http://localhost:5121/api
+    description: Local development server
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      tags: [Health]
+      responses:
+        '200':
+          description: Service is healthy
+  /ready:
+    get:
+      summary: Readiness check endpoint
+      tags: [Health]
+      responses:
+        '200':
+          description: Service is ready
+        '503':
+          description: Service is not ready
+  /v1/tenants:
+    get:
+      summary: Get all tenants
+      tags: [Tenants]
+      responses:
+        '200':
+          description: List of tenants
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tenant'
+    post:
+      summary: Create a new tenant
+      tags: [Tenants]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTenantRequest'
+      responses:
+        '201':
+          description: Tenant created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tenant'
+        '400':
+          description: Validation error
+        '409':
+          description: Conflict
+  /v1/tenants/{id}:
+    get:
+      summary: Get tenant by ID
+      tags: [Tenants]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Tenant details
+        '404':
+          description: Tenant not found
+    patch:
+      summary: Update tenant
+      tags: [Tenants]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTenantRequest'
+      responses:
+        '200':
+          description: Tenant updated
+        '404':
+          description: Tenant not found
+    delete:
+      summary: Delete tenant
+      tags: [Tenants]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Tenant deleted
+        '404':
+          description: Tenant not found
+  /v1/farms:
+    get:
+      summary: Get all farms for tenant
+      tags: [Farms]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tenantId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of farms
+    post:
+      summary: Create a new farm
+      tags: [Farms]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFarmRequest'
+      responses:
+        '201':
+          description: Farm created
+  /v1/farms/{id}:
+    get:
+      summary: Get farm by ID
+      tags: [Farms]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: tenantId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Farm details
+  /v1/barns:
+    get:
+      summary: Get all barns for tenant
+      tags: [Barns]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tenantId
+          in: query
+          schema:
+            type: string
+        - name: farmId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of barns
+    post:
+      summary: Create a new barn
+      tags: [Barns]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBarnRequest'
+      responses:
+        '201':
+          description: Barn created
+  /v1/batches:
+    get:
+      summary: Get all batches for tenant
+      tags: [Batches]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tenantId
+          in: query
+          schema:
+            type: string
+        - name: farmId
+          in: query
+          schema:
+            type: string
+        - name: barnId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of batches
+    post:
+      summary: Create a new batch
+      tags: [Batches]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBatchRequest'
+      responses:
+        '201':
+          description: Batch created
+  /v1/devices:
+    get:
+      summary: Get all devices for tenant
+      tags: [Devices]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tenantId
+          in: query
+          schema:
+            type: string
+        - name: farmId
+          in: query
+          schema:
+            type: string
+        - name: barnId
+          in: query
+          schema:
+            type: string
+        - name: batchId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of devices
+    post:
+      summary: Create a new device
+      tags: [Devices]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDeviceRequest'
+      responses:
+        '201':
+          description: Device created
+        '409':
+          description: Conflict (duplicate serialNumber)
+  /v1/stations:
+    get:
+      summary: Get all stations for tenant
+      tags: [Stations]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tenantId
+          in: query
+          schema:
+            type: string
+        - name: farmId
+          in: query
+          schema:
+            type: string
+        - name: barnId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of stations
+    post:
+      summary: Create a new station
+      tags: [Stations]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateStationRequest'
+      responses:
+        '201':
+          description: Station created
+  /v1/stations/{id}:
+    get:
+      summary: Get station by ID
+      tags: [Stations]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: tenantId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Station details
+        '404':
+          description: Station not found
+    patch:
+      summary: Update station
+      tags: [Stations]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateStationRequest'
+      responses:
+        '200':
+          description: Station updated
+    delete:
+      summary: Delete station
+      tags: [Stations]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: tenantId
+          in: query
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Station deleted
+  /v1/topology:
+    get:
+      summary: Get complete topology for tenant (nested structure)
+      tags: [Topology]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tenantId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Complete tenant topology
+        '404':
+          description: Tenant not found
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Tenant:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive, suspended]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateTenantRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive, suspended]
+    UpdateTenantRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive, suspended]
+    Farm:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        location:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive]
+    CreateFarmRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        location:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive]
+    CreateBarnRequest:
+      type: object
+      required:
+        - name
+        - farmId
+      properties:
+        name:
+          type: string
+        farmId:
+          type: string
+          format: uuid
+        type:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive]
+    CreateBatchRequest:
+      type: object
+      required:
+        - species
+        - farmId
+        - barnId
+      properties:
+        species:
+          type: string
+        farmId:
+          type: string
+          format: uuid
+        barnId:
+          type: string
+          format: uuid
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [active, completed, cancelled]
+    CreateDeviceRequest:
+      type: object
+      required:
+        - deviceType
+      properties:
+        deviceType:
+          type: string
+        serialNo:
+          type: string
+        farmId:
+          type: string
+          format: uuid
+        barnId:
+          type: string
+          format: uuid
+        batchId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [active, inactive, maintenance]
+        metadata:
+          type: object
+    CreateStationRequest:
+      type: object
+      required:
+        - name
+        - farmId
+        - barnId
+      properties:
+        name:
+          type: string
+        farmId:
+          type: string
+          format: uuid
+        barnId:
+          type: string
+          format: uuid
+        stationType:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive]
+    UpdateStationRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        stationType:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive]
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            traceId:
+              type: string

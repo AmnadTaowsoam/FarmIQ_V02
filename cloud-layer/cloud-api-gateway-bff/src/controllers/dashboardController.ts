@@ -1,0 +1,166 @@
+import { Request, Response } from 'express'
+import { getTenantIdFromRequest } from '../utils/tenantScope'
+import {
+  fetchOverview,
+  fetchFarmDashboard,
+  fetchBarnDashboard,
+  fetchAlerts,
+} from '../services/dashboardService'
+import { logger } from '../utils/logger'
+
+function buildDownstreamHeaders(req: Request, tenantId: string): Record<string, string> {
+  const requestId = (req as any).id || (req.headers['x-request-id'] as string) || ''
+  const traceId =
+    (req.headers['x-trace-id'] as string) ||
+    (req.headers['trace_id'] as string) ||
+    requestId ||
+    ''
+
+  const headers: Record<string, string> = {
+    'x-request-id': requestId,
+    'x-trace-id': traceId,
+    'x-tenant-id': tenantId,
+  }
+
+  if (req.headers.authorization) {
+    headers.authorization = req.headers.authorization as string
+  }
+
+  return headers
+}
+
+export async function getOverview(req: Request, res: Response) {
+  try {
+    const tenantId = getTenantIdFromRequest(res, req.query.tenantId as string)
+    if (!tenantId) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'tenantId is required',
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+    }
+
+    const headers = buildDownstreamHeaders(req, tenantId)
+    const data = await fetchOverview({ tenantId, headers })
+    return res.json(data)
+  } catch (error) {
+    logger.error('Error in getOverview', { error })
+    return res.status(502).json({
+      error: {
+        code: 'DOWNSTREAM_ERROR',
+        message: 'Failed to build overview from downstream services',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+  }
+}
+
+export async function getFarmDashboard(req: Request, res: Response) {
+  try {
+    const tenantId = getTenantIdFromRequest(res, req.query.tenantId as string)
+    if (!tenantId) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'tenantId is required',
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+    }
+
+    const farmId = req.params.farmId
+    if (!farmId) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'farmId is required',
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+    }
+
+    const headers = buildDownstreamHeaders(req, tenantId)
+    const data = await fetchFarmDashboard({ tenantId, farmId, headers })
+    return res.json(data)
+  } catch (error) {
+    logger.error('Error in getFarmDashboard', { error })
+    return res.status(502).json({
+      error: {
+        code: 'DOWNSTREAM_ERROR',
+        message: 'Failed to build farm dashboard from downstream services',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+  }
+}
+
+export async function getBarnDashboard(req: Request, res: Response) {
+  try {
+    const tenantId = getTenantIdFromRequest(res, req.query.tenantId as string)
+    if (!tenantId) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'tenantId is required',
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+    }
+
+    const barnId = req.params.barnId
+    if (!barnId) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'barnId is required',
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+    }
+
+    const headers = buildDownstreamHeaders(req, tenantId)
+    const data = await fetchBarnDashboard({ tenantId, barnId, headers })
+    return res.json(data)
+  } catch (error) {
+    logger.error('Error in getBarnDashboard', { error })
+    return res.status(502).json({
+      error: {
+        code: 'DOWNSTREAM_ERROR',
+        message: 'Failed to build barn dashboard from downstream services',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+  }
+}
+
+export async function getAlerts(req: Request, res: Response) {
+  try {
+    const tenantId = getTenantIdFromRequest(res, req.query.tenantId as string)
+    if (!tenantId) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'tenantId is required',
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+    }
+
+    const headers = buildDownstreamHeaders(req, tenantId)
+    const data = await fetchAlerts({ tenantId, headers })
+    return res.json(data)
+  } catch (error) {
+    logger.error('Error in getAlerts', { error })
+    return res.status(502).json({
+      error: {
+        code: 'DOWNSTREAM_ERROR',
+        message: 'Failed to fetch alerts from downstream services',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+  }
+}
+
+

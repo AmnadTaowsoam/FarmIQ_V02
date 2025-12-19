@@ -1,0 +1,63 @@
+version: '3.8'
+
+# Development overrides for cloud services
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  cloud-identity-access:
+    build:
+      target: development
+    volumes:
+      - ./cloud-identity-access/src:/app/src:ro
+      - ./cloud-identity-access/package.json:/app/package.json:ro
+    environment:
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+
+  cloud-tenant-registry:
+    build:
+      target: development
+    volumes:
+      - ./cloud-tenant-registry/src:/app/src:ro
+      - ./cloud-tenant-registry/package.json:/app/package.json:ro
+    environment:
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+
+  cloud-ingestion:
+    build:
+      target: development
+    volumes:
+      - ./cloud-ingestion/src:/app/src:ro
+      - ./cloud-ingestion/package.json:/app/package.json:ro
+    environment:
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+
+  cloud-telemetry-service:
+    build:
+      target: development
+    volumes:
+      - ./cloud-telemetry-service/src:/app/src:ro
+      - ./cloud-telemetry-service/package.json:/app/package.json:ro
+    environment:
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+
+  cloud-analytics-service:
+    volumes:
+      - ./cloud-analytics-service/app:/app/app:ro
+    environment:
+      - LOG_LEVEL=DEBUG
+
+  cloud-api-gateway-bff:
+    build:
+      target: development
+    volumes:
+      - ./cloud-api-gateway-bff/src:/app/src:ro
+      - ./cloud-api-gateway-bff/package.json:/app/package.json:ro
+    environment:
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+
+

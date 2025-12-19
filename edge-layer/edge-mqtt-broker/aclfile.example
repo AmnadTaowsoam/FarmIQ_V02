@@ -1,0 +1,11 @@
+# FarmIQ MQTT ACL Example
+
+# Pattern-based ACLs for multi-tenancy
+topic readwrite iot/telemetry/%c/#
+topic readwrite iot/event/%c/#
+topic readwrite iot/weighvision/%c/#
+topic readwrite iot/status/%c/#
+
+# Admin pattern
+user admin
+topic readwrite #
