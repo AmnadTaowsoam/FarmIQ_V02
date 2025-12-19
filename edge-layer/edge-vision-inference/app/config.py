@@ -1,42 +1,48 @@
-# utils/config.py
-from dotenv import load_dotenv
+"""Configuration for edge-vision-inference service."""
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 
-# 1. หาโฟลเดอร์ services (สองระดับเหนือไฟล์นี้)
-base_services = Path(__file__).resolve().parents[2]
-
-# 2. โหลดค่าจาก .env.common
-common_env = base_services / ".env"
-if common_env.exists():
-    load_dotenv(dotenv_path=common_env)
-    print(f"Loaded common env: {common_env}")
+# Load .env file if exists
+env_path = Path(__file__).parent.parent.parent / ".env"
+if env_path.exists():
+    load_dotenv(dotenv_path=env_path)
 
 class Config:
-    # Logging and Timeouts
-    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "DEBUG")
-    CONNECTION_TIMEOUT: int = int(os.getenv("CONNECTION_TIMEOUT", "10"))
-    READ_TIMEOUT: int = int(os.getenv("READ_TIMEOUT", "30"))
-
-    # Service runtime
-    MODEL_VERSION: str = os.getenv("MODEL_VERSION", "0.0")
-    UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", "/tmp")
-    MODEL_PATH: str = os.getenv("MODEL_PATH", "")
+    """Application configuration."""
+    
+    # Server
     PORT: int = int(os.getenv("PORT", "8000"))
-
-    # Redis Configuration
-    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379")
-    REDIS_LOG_CHANNEL: str = os.getenv("REDIS_LOG_CHANNEL", "microplate:vision-inference:logs")
-    REDIS_ERROR_CHANNEL: str = os.getenv("REDIS_ERROR_CHANNEL", "microplate:vision-inference:errors")
-
-    # Service URLs
-    IMAGE_SERVICE_URL: str = os.getenv("IMAGE_SERVICE_URL", "http://image-ingestion-service:6402")
-    API_BASE_URL: str = os.getenv("API_BASE_URL", "http://localhost:6400")
-    PREDICTION_DB_SERVICE_URL: str = os.getenv("PREDICTION_DB_SERVICE_URL", "http://prediction-db-service:6404")
-
-    # Processing Configuration
-    MAX_CONCURRENT_INFERENCES: int = int(os.getenv("MAX_CONCURRENT_INFERENCES", "5"))
+    HOST: str = os.getenv("HOST", "0.0.0.0")
+    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
+    
+    # Database
+    DATABASE_URL: str = os.getenv(
+        "DATABASE_URL",
+        "postgresql://farmiq:farmiq_dev@postgres:5432/farmiq"
+    )
+    
+    # Media Storage (PVC path)
+    MEDIA_STORAGE_PATH: str = os.getenv("MEDIA_STORAGE_PATH", "/data/media")
+    
+    # Model Configuration
+    MODEL_PATH: str = os.getenv("MODEL_PATH", "")
+    MODEL_VERSION: str = os.getenv("MODEL_VERSION", "v1.0.0")
     CONFIDENCE_THRESHOLD: float = float(os.getenv("CONFIDENCE_THRESHOLD", "0.5"))
     NMS_THRESHOLD: float = float(os.getenv("NMS_THRESHOLD", "0.4"))
-    ENABLE_GPU: bool = os.getenv("ENABLE_GPU", "false").lower() == "true"
-    GPU_DEVICE_ID: int = int(os.getenv("GPU_DEVICE_ID", "0"))
+    
+    # Service URLs
+    WEIGHVISION_SESSION_URL: str = os.getenv(
+        "WEIGHVISION_SESSION_URL",
+        "http://edge-weighvision-session:3000"
+    )
+    
+    # Datadog
+    DD_SERVICE: str = os.getenv("DD_SERVICE", "edge-vision-inference")
+    DD_ENV: str = os.getenv("DD_ENV", "development")
+    
+    @staticmethod
+    def new_id() -> str:
+        """Generate a new UUID v7-like ID (simplified for MVP)."""
+        import uuid
+        return str(uuid.uuid4())

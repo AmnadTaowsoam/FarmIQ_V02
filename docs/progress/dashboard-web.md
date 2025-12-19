@@ -4,7 +4,7 @@
 **Layer**: `ui`  
 **Status**: `done`  
 **Owner**: `Antigravity`  
-**Last Updated**: `2025-12-18`
+**Last Updated**: `2025-12-19`
 
 ---
 
@@ -28,6 +28,10 @@ The primary web interface for FarmIQ, featuring a premium dashboard for telemetr
 ### 3. Key Pages
 - **Login**: Split-screen design with gradient backgrounds.
 - **Overview**: Aggregated KPI cards and chart visualizations (Recharts).
+- **Admin Console**: dedicated administration area.
+  - **Tenants**: List, search, and create capabilities.
+  - **Farms**: Topology management.
+  - **Devices**: Provisioning interface.
 - **Navigation**: Sidebar with active states and user profile summary.
 
 ---
@@ -57,7 +61,7 @@ npm run start:dev
 - [x] Create DashboardLayout (Sidebar, Header)
 - [x] Implement Login Page
 - [x] Implement Overview Page (Charts + KPI)
-- [x] Placeholder Pages (Farms, WeighVision, Admin)
+- [x] Implement Admin Console (Tenants, Farms, Devices)
 - [x] Verify Build
 
 ---

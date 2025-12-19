@@ -1,6 +1,6 @@
 Purpose: Progress report and evidence checklist for `cloud-analytics-service`.  
 Owner: FarmIQ Cloud Team  
-Last updated: 2025-12-18  
+Last updated: 2025-12-19  
 
 ---
 
@@ -39,14 +39,35 @@ Key vars:
 ## Evidence steps (docker-compose)
 
 ```powershell
+# Build and start service
 cd cloud-layer
 docker compose build cloud-analytics-service
 docker compose up -d cloud-analytics-service
 
+# Health checks
 curl http://localhost:5124/api/health
 curl http://localhost:5124/api/ready
+
+# API documentation
 curl http://localhost:5124/api-docs
+
+# Query endpoints (example)
+curl "http://localhost:5124/api/v1/analytics/kpis?tenantId=tenant-123"
+curl "http://localhost:5124/api/v1/analytics/anomalies?tenantId=tenant-123"
+curl "http://localhost:5124/api/v1/analytics/forecasts?tenantId=tenant-123"
 ```
+
+## Tests
+
+Run unit tests:
+```powershell
+cd cloud-layer/cloud-analytics-service
+pytest tests/
+```
+
+Test coverage includes:
+- `test_telemetry_ingested_produces_kpi_and_forecast` - Verifies telemetry events produce KPI and forecast results
+- `test_inference_completed_updates_session_state` - Verifies inference events update session state
 
 ## Notes on RabbitMQ bindings
 

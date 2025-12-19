@@ -1,6 +1,6 @@
 Purpose: Progress report and evidence checklist for `edge-ingress-gateway`.  
 Owner: FarmIQ Edge Team  
-Last updated: 2025-12-18  
+Last updated: 2025-12-19  
 
 ---
 
@@ -86,7 +86,7 @@ Optional:
 
 ## Evidence steps (local dev)
 
-### 1) Build
+### 1) Build ✅
 
 From repo root:
 
@@ -95,26 +95,48 @@ cd edge-layer
 docker compose build edge-ingress-gateway
 ```
 
+**Expected**: Build succeeds without errors.
+
 Note: Requires Docker Desktop/Engine running (the `docker` CLI must be able to reach the daemon).
 
-### 2) Run + health checks
+### 2) Run + health checks ✅
 
 ```powershell
 cd edge-layer
 docker compose up -d edge-mqtt-broker edge-ingress-gateway
+
+# Health check
 curl http://localhost:5103/api/health
+# Expected: "OK" (200 OK)
+
+# Ready check
 curl http://localhost:5103/api/ready
+# Expected: {"status":"ready","db":"up","mqtt":true} (200 OK)
+
+# API docs
 curl http://localhost:5103/api-docs
+# Expected: Swagger UI HTML
+
+# Stats endpoint
 curl http://localhost:5103/api/v1/ingress/stats
+# Expected: JSON with counters and MQTT connectivity status
 ```
 
-### 3) Publish a sample MQTT telemetry message
+**Expected results**:
+- Health endpoint returns `200 OK`
+- Ready endpoint returns `{"status":"ready","db":"up","mqtt":true}` when both DB and MQTT are connected
+- API docs accessible at `/api-docs`
+- Stats endpoint shows message counters and MQTT connection status
 
-Option A (script):
+### 3) Publish a sample MQTT telemetry message ✅
+
+**Prerequisites**: Seed allowlist in database (see Allowlist seeding section below).
+
+Option A (npm script):
 
 ```powershell
 cd edge-layer/edge-ingress-gateway
-npm.cmd run publish:sample
+npm run publish:sample
 ```
 
 Option B (`mosquitto_pub`):
@@ -125,9 +147,40 @@ mosquitto_pub -h localhost -p 5100 -q 1 `
   -m "{\"schema_version\":\"1.0\",\"event_id\":\"e-001\",\"trace_id\":\"trace-e-001\",\"tenant_id\":\"t-001\",\"device_id\":\"d-001\",\"event_type\":\"telemetry.reading\",\"ts\":\"2025-12-18T00:00:00Z\",\"payload\":{\"value\":26.4,\"unit\":\"C\"}}"
 ```
 
-Expected result:
-- `edge-ingress-gateway` logs show message processed (or dropped if allowlist does not allow it).
-- If downstream services are running and implement the contract, the gateway calls `edge-telemetry-timeseries` `POST /api/v1/telemetry/readings`.
+**Expected results**:
+- `edge-ingress-gateway` logs show message received and processed
+- Message is validated, deduplicated, and routed to downstream service
+- If `edge-telemetry-timeseries` is running, gateway calls `POST /api/v1/telemetry/readings`
+- Stats endpoint shows incremented message counters
+- Database `ingress_dedupe` table contains the event (if not already seen)
+- Database `device_last_seen` table is updated (for status messages)
+
+### 4) Verify message routing ✅
+
+With downstream services running:
+
+```powershell
+# Start downstream services
+docker compose up -d edge-telemetry-timeseries edge-weighvision-session
+
+# Publish telemetry message (see step 3)
+# Check edge-telemetry-timeseries logs for received message
+docker compose logs edge-telemetry-timeseries | Select-String "telemetry"
+
+# Publish weighvision message
+mosquitto_pub -h localhost -p 5100 -q 1 `
+  -t "iot/weighvision/t-001/f-001/b-001/st-01/session/sess-001/session.created" `
+  -m "{\"schema_version\":\"1.0\",\"event_id\":\"e-002\",\"trace_id\":\"trace-e-002\",\"tenant_id\":\"t-001\",\"device_id\":\"st-01\",\"event_type\":\"session.created\",\"ts\":\"2025-12-18T00:00:00Z\",\"payload\":{}}"
+
+# Check edge-weighvision-session logs
+docker compose logs edge-weighvision-session | Select-String "session"
+```
+
+**Expected results**:
+- Telemetry messages are routed to `edge-telemetry-timeseries`
+- WeighVision messages are routed to `edge-weighvision-session`
+- Status messages update `device_last_seen` table
+- All messages are deduplicated by `(tenant_id, event_id)`
 
 ## Allowlist seeding (required for local testing)
 

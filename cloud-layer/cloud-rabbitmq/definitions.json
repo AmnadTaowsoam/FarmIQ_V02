@@ -1,0 +1,175 @@
+{
+  "rabbit_version": "3.13.0",
+  "rabbitmq_version": "3.13.0",
+  "product_name": "RabbitMQ",
+  "product_version": "3.13.0",
+  "users": [],
+  "vhosts": [
+    {
+      "name": "/"
+    }
+  ],
+  "permissions": [
+    {
+      "user": "farmiq",
+      "vhost": "/",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
+  "topic_permissions": [],
+  "parameters": [],
+  "global_parameters": [
+    {
+      "name": "cluster_name",
+      "value": "farmiq-cloud"
+    }
+  ],
+  "policies": [],
+  "queues": [
+    {
+      "name": "farmiq.cloud-telemetry-service.ingest.queue",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 86400000,
+        "x-dead-letter-exchange": "farmiq.dlq.exchange"
+      }
+    },
+    {
+      "name": "farmiq.cloud-telemetry-service.agg.queue",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 86400000,
+        "x-dead-letter-exchange": "farmiq.dlq.exchange"
+      }
+    },
+    {
+      "name": "farmiq.cloud-analytics-service.kpi.queue",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 86400000,
+        "x-dead-letter-exchange": "farmiq.dlq.exchange"
+      }
+    },
+    {
+      "name": "farmiq.dlq.queue",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "farmiq.telemetry.exchange",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "farmiq.weighvision.exchange",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "farmiq.media.exchange",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "farmiq.sync.exchange",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "farmiq.dlq.exchange",
+      "vhost": "/",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "bindings": [
+    {
+      "source": "farmiq.telemetry.exchange",
+      "vhost": "/",
+      "destination": "farmiq.cloud-telemetry-service.ingest.queue",
+      "destination_type": "queue",
+      "routing_key": "telemetry.ingested",
+      "arguments": {}
+    },
+    {
+      "source": "farmiq.telemetry.exchange",
+      "vhost": "/",
+      "destination": "farmiq.cloud-telemetry-service.agg.queue",
+      "destination_type": "queue",
+      "routing_key": "telemetry.aggregated",
+      "arguments": {}
+    },
+    {
+      "source": "farmiq.telemetry.exchange",
+      "vhost": "/",
+      "destination": "farmiq.cloud-analytics-service.kpi.queue",
+      "destination_type": "queue",
+      "routing_key": "telemetry.ingested",
+      "arguments": {}
+    },
+    {
+      "source": "farmiq.telemetry.exchange",
+      "vhost": "/",
+      "destination": "farmiq.cloud-analytics-service.kpi.queue",
+      "destination_type": "queue",
+      "routing_key": "telemetry.aggregated",
+      "arguments": {}
+    },
+    {
+      "source": "farmiq.weighvision.exchange",
+      "vhost": "/",
+      "destination": "farmiq.cloud-analytics-service.kpi.queue",
+      "destination_type": "queue",
+      "routing_key": "weighvision.session.finalized",
+      "arguments": {}
+    },
+    {
+      "source": "farmiq.weighvision.exchange",
+      "vhost": "/",
+      "destination": "farmiq.cloud-analytics-service.kpi.queue",
+      "destination_type": "queue",
+      "routing_key": "inference.completed",
+      "arguments": {}
+    },
+    {
+      "source": "farmiq.dlq.exchange",
+      "vhost": "/",
+      "destination": "farmiq.dlq.queue",
+      "destination_type": "queue",
+      "routing_key": "farmiq.dlq.queue",
+      "arguments": {}
+    }
+  ]
+}
+
