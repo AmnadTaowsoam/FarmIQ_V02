@@ -26,14 +26,13 @@
     "node": true,
     "mocha": true
   },
+  "parser": "@typescript-eslint/parser",
   "parserOptions": {
     "ecmaVersion": 2020,
     "sourceType": "module",
     "ecmaFeatures": {
       "jsx": true
-    },
-    "parser": "@typescript-eslint/parser",
-    "project": "./tsconfig.json"
+    }
   },
   "settings": {
     "import/resolver": {

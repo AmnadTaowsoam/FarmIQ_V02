@@ -90,8 +90,9 @@ export async function createTenantHandler(req: Request, res: Response) {
 export async function updateTenantHandler(req: Request, res: Response) {
   try {
     const { id } = req.params
-    const result = await updateTenant(id, req.body)
-    if (result.count === 0) {
+    await updateTenant(id, req.body)
+    const updated = await getTenantById(id)
+    if (!updated) {
       return res.status(404).json({
         error: {
           code: 'NOT_FOUND',
@@ -100,9 +101,18 @@ export async function updateTenantHandler(req: Request, res: Response) {
         },
       })
     }
-    const updated = await getTenantById(id)
     res.json(updated)
-  } catch (error) {
+  } catch (error: any) {
+    if (error.code === 'P2025') {
+      // Prisma record not found
+      return res.status(404).json({
+        error: {
+          code: 'NOT_FOUND',
+          message: `Tenant with id ${req.params.id} not found`,
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+    }
     logger.error('Error in updateTenantHandler:', error)
     res.status(500).json({
       error: {
@@ -118,8 +128,8 @@ export async function updateTenantHandler(req: Request, res: Response) {
  * Delete tenant
  */
 export async function deleteTenantHandler(req: Request, res: Response) {
+  const { id } = req.params
   try {
-    const { id } = req.params
     await deleteTenant(id)
     res.status(204).send()
   } catch (error: any) {

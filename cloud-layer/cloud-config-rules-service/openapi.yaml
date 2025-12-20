@@ -1,0 +1,177 @@
+openapi: 3.0.0
+info:
+  title: Cloud Config Rules Service API
+  version: 1.0.0
+  description: FarmIQ Cloud Config Rules Service - Tenant configuration, thresholds, and target curves
+servers:
+  - url: http://localhost:5126
+    description: Development server
+paths:
+  /api/health:
+    get:
+      summary: Health check
+      tags: [Health]
+      responses:
+        '200':
+          description: Service is healthy
+  /api/ready:
+    get:
+      summary: Readiness check
+      tags: [Health]
+      responses:
+        '200':
+          description: Service is ready
+        '503':
+          description: Service is not ready
+  /api/v1/config/context:
+    get:
+      summary: Get effective config for context
+      tags: [Config]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tenant_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: farm_id
+          in: query
+          schema:
+            type: string
+        - name: barn_id
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Effective config
+  /api/v1/config/thresholds:
+    get:
+      summary: Get thresholds
+      tags: [Config]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tenant_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: farm_id
+          in: query
+          schema:
+            type: string
+        - name: barn_id
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of thresholds
+    put:
+      summary: Upsert threshold
+      tags: [Config]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - tenant_id
+                - metric
+                - op
+                - value
+              properties:
+                tenant_id:
+                  type: string
+                farm_id:
+                  type: string
+                barn_id:
+                  type: string
+                metric:
+                  type: string
+                op:
+                  type: string
+                  enum: [gt, lt, gte, lte, eq]
+                value:
+                  type: number
+                duration_sec:
+                  type: number
+                severity:
+                  type: string
+                  enum: [info, warning, critical]
+                enabled:
+                  type: boolean
+      responses:
+        '200':
+          description: Updated threshold
+  /api/v1/config/targets:
+    get:
+      summary: Get target curves
+      tags: [Config]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tenant_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: farm_id
+          in: query
+          schema:
+            type: string
+        - name: barn_id
+          in: query
+          schema:
+            type: string
+        - name: species
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of target curves
+    put:
+      summary: Upsert target curve
+      tags: [Config]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - tenant_id
+                - day
+              properties:
+                tenant_id:
+                  type: string
+                farm_id:
+                  type: string
+                barn_id:
+                  type: string
+                species:
+                  type: string
+                day:
+                  type: number
+                target_weight:
+                  type: number
+                target_fcr:
+                  type: number
+      responses:
+        '200':
+          description: Updated target curve
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+

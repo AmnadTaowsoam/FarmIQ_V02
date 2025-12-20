@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import { logger } from '../utils/logger'
+import { newUuidV7 } from '../utils/uuid'
 
 const prisma = new PrismaClient()
 
@@ -59,6 +60,7 @@ export async function createTenant(data: {
     logger.info('Creating tenant:', data)
     return await prisma.tenant.create({
       data: {
+        id: newUuidV7(),
         name: data.name,
         status: data.status || 'active',
       },

@@ -18,14 +18,18 @@ model User {
   id        String   @id @default(uuid())
   email     String   @unique
   password  String
-  tenantId  String?  // Optional for platform_admin
+  tenantId  String?  @map("tenant_id") // Optional for platform_admin
   roles     Role[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
 }
 
 model Role {
   id    String @id @default(uuid())
   name  String @unique // platform_admin, tenant_admin, farm_manager, house_operator, viewer, device_agent
   users User[]
+
+  @@map("roles")
 }

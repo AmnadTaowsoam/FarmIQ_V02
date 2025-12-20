@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import { logger } from '../utils/logger'
+import { newUuidV7 } from '../utils/uuid'
 
 const prisma = new PrismaClient()
 
@@ -72,6 +73,7 @@ export async function createBatch(
     logger.info(`Creating batch for tenant ${tenantId}, farm ${farmId}, barn ${barnId}:`, data)
     return await prisma.batch.create({
       data: {
+        id: newUuidV7(),
         tenantId,
         farmId,
         barnId,

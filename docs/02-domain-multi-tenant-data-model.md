@@ -12,10 +12,11 @@ FarmIQ is a **multi-tenant** platform with the following canonical hierarchy:
 - **Tenant**: A customer organization (e.g., a company).
 - **Farm**: A farm site under a tenant.
 - **Barn**: A physical barn/building within a farm.
+- **Station**: A station within a barn (e.g., WeighVision station).
 - **Batch / Species**: A grouping of animals (e.g., production batch) and their species.
 - **Device**: A physical device deployed in a barn (e.g., sensor gateway, WeighVision device).
 
-Every resource and event must be scoped by at least `tenant_id`, and typically by `farm_id`, `barn_id`, and `device_id`.
+Every resource and event must be scoped by at least `tenant_id`, and typically by `farm_id`, `barn_id`, and `device_id` (and `station_id` for WeighVision flows).
 
 ---
 
@@ -25,7 +26,7 @@ Every resource and event must be scoped by at least `tenant_id`, and typically b
 
 - All high-write tables MUST use **UUID v7** for primary keys in line with in-house standards.
 - Recommended ID fields:
-  - `tenant_id`, `farm_id`, `barn_id`, `batch_id`, `device_id`, `session_id`, `event_id`.
+  - `tenant_id`, `farm_id`, `barn_id`, `station_id`, `batch_id`, `device_id`, `session_id`, `event_id`.
 - Composite uniqueness where relevant:
   - `(tenant_id, external_reference)` for mapping to external systems.
   - `(tenant_id, device_id, occurred_at)` for telemetry deduplication and indexing.
@@ -49,6 +50,14 @@ Every resource and event must be scoped by at least `tenant_id`, and typically b
   - `farm_id (fk farm.id)`
   - `name`
   - `type`
+
+- `station`
+  - `id (uuidv7, pk)`
+  - `tenant_id (fk tenant.id)`
+  - `farm_id (fk farm.id)`
+  - `barn_id (fk barn.id)`
+  - `name`
+  - `station_type`
 
 - `batch`
   - `id (uuidv7, pk)`
@@ -77,7 +86,7 @@ Every resource and event must be scoped by at least `tenant_id`, and typically b
 
 - `weight_session_cloud`
   - `id (uuidv7, pk)` (session_id)
-  - `tenant_id`, `farm_id`, `barn_id`, `device_id`, `batch_id (nullable)`
+  - `tenant_id`, `farm_id`, `barn_id`, `device_id`, `station_id`, `batch_id (nullable)`
   - `status` (created, finalized, cancelled)
   - `start_at`, `end_at`
 
@@ -119,7 +128,7 @@ Detailed table-level discussions for edge are in `edge-layer/02-edge-storage-buf
 - `sync_outbox`
 - `sync_state`
 
-All tables MUST include `tenant_id` and relevant hierarchy fields (farm/barn/device) so that events can be reconciled with cloud master data.
+All tables MUST include `tenant_id` and relevant hierarchy fields (farm/barn/station/device) so that events can be reconciled with cloud master data.
 
 ---
 
@@ -164,6 +173,7 @@ erDiagram
   FARM ||--o{ BARN : "has"
   BARN ||--o{ BATCH : "hosts"
   BARN ||--o{ DEVICE : "contains"
+  BARN ||--o{ STATION : "contains"
   BATCH ||--o{ DEVICE : "assigned_to"
   DEVICE ||--o{ TELEMETRY_CLOUD : "emits"
   DEVICE ||--o{ WEIGHT_SESSION_CLOUD : "creates"
@@ -184,6 +194,14 @@ erDiagram
     uuidv7 id
     uuidv7 tenant_id
     uuidv7 farm_id
+    string name
+  }
+
+  STATION {
+    uuidv7 id
+    uuidv7 tenant_id
+    uuidv7 farm_id
+    uuidv7 barn_id
     string name
   }
 
@@ -213,6 +231,7 @@ erDiagram
     uuidv7 id
     uuidv7 tenant_id
     uuidv7 device_id
+    uuidv7 station_id
     datetime start_at
     datetime end_at
   }

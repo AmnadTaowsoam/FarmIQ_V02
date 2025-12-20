@@ -6,7 +6,7 @@
 
 generator client {
   provider = "prisma-client-js"
-  binaryTargets = ["native", "debian-openssl-3.0.x"]
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -68,4 +68,13 @@ model DeviceLastSeen {
   @@id([tenant_id, device_id])
   @@index([last_seen_at])
   @@map("device_last_seen")
+}
+
+model Example {
+  id        Int @id @default(autoincrement())
+  name      String
+  email     String
+  age       Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

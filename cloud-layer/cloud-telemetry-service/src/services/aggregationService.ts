@@ -1,5 +1,6 @@
 import { PrismaClient, Prisma } from '@prisma/client'
 import { logger } from '../utils/logger'
+import { newUuidV7 } from '../utils/uuid'
 
 const prisma = new PrismaClient()
 
@@ -127,6 +128,7 @@ export async function upsertAggregate(data: {
         count: data.count,
       },
       create: {
+        id: newUuidV7(),
         tenantId: data.tenantId,
         farmId: data.farmId || null,
         barnId: data.barnId || null,

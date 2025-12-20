@@ -1,0 +1,53 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Threshold rules for anomaly detection and alerts
+model ThresholdRule {
+  id          String   @id @default(uuid())
+  tenantId    String
+  farmId      String?
+  barnId      String?
+  metric      String   // e.g., "temperature", "humidity", "weight"
+  op          String   // e.g., "gt", "lt", "gte", "lte", "eq"
+  value       Decimal  @db.Decimal(10, 2)
+  durationSec Int?     // Duration in seconds before rule triggers (optional)
+  severity    String   @default("warning") // "info", "warning", "critical"
+  enabled     Boolean  @default(true)
+  updatedBy   String
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, farmId, barnId, metric])
+  @@index([tenantId, enabled])
+  @@map("config_threshold_rules")
+}
+
+// Target curves for weight growth and FCR targets
+model TargetCurve {
+  id           String   @id @default(uuid())
+  tenantId     String
+  farmId       String?
+  barnId       String?
+  species      String?  // e.g., "broiler", "layer"
+  day          Int      // Day number (1, 2, 3, ...)
+  targetWeight Decimal? @db.Decimal(10, 2) // Target weight in kg
+  targetFcr    Decimal? @db.Decimal(10, 2) // Target FCR
+  updatedBy    String
+  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now())
+
+  @@unique([tenantId, farmId, barnId, species, day], name: "unique_target_curve")
+  @@index([tenantId, farmId, barnId, species])
+  @@map("config_target_curves")
+}
+

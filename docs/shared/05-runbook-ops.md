@@ -1,7 +1,7 @@
 Purpose: Provide practical incident playbooks and operational checks for FarmIQ (edge + cloud).  
 Scope: Common incidents (edge offline, RabbitMQ backlog, sync stuck, inference failures, disk full, DB issues) and Datadog triage steps.  
 Owner: FarmIQ Operations  
-Last updated: 2025-12-17  
+Last updated: 2025-12-20  
 
 ---
 
@@ -93,11 +93,13 @@ Last updated: 2025-12-17
 
 - `sync_outbox` pending rows increase.
 - `edge-sync-forwarder` shows repeated failures or no progress.
+- `GET /api/v1/sync/state` shows growing `pending_count` or `oldest_pending_age_seconds` > 1 hour.
 
 ### Immediate actions
 
 - Check if cloud ingress is reachable and auth is valid.
 - Confirm DB health on edge (connection pool, disk).
+- Inspect stuck claims: Query `SELECT COUNT(*), claimed_by FROM sync_outbox WHERE status = 'claimed' AND lease_expires_at < NOW() GROUP BY claimed_by;`
 - If backpressure is intentional:
   - Validate `sync_state.paused_until`.
 
@@ -110,11 +112,68 @@ Last updated: 2025-12-17
 - **Logs**
   - Look for validation errors (schema mismatch) and auth errors (401/403).
 
+### SQL Investigation Queries
+
+**Check outbox status distribution**:
+```sql
+SELECT status, COUNT(*) as count, 
+       MIN(next_attempt_at) as oldest_next_attempt,
+       MAX(attempt_count) as max_attempts
+FROM sync_outbox
+GROUP BY status;
+```
+
+**Find stuck claimed rows (lease expired)**:
+```sql
+SELECT claimed_by, COUNT(*) as stuck_count,
+       MIN(lease_expires_at) as oldest_expiry
+FROM sync_outbox
+WHERE status = 'claimed' AND lease_expires_at < NOW()
+GROUP BY claimed_by;
+```
+
+**Check DLQ entries**:
+```sql
+SELECT COUNT(*) as dlq_count,
+       dlq_reason,
+       MIN(failed_at) as oldest_failure
+FROM sync_outbox
+WHERE status = 'dlq'
+GROUP BY dlq_reason;
+```
+
+### Recovery Actions
+
+**Unclaim stuck rows** (if lease expired but row not processed):
+```bash
+curl -X POST http://edge-sync-forwarder:3000/api/v1/sync/unclaim-stuck \
+  -H "Content-Type: application/json" \
+  -d '{"olderThanSeconds": 300}'
+```
+This resets `status = 'pending'` and clears lease fields for claimed rows whose lease expired.
+
+**Redrive DLQ entries** (after fixing root cause):
+```bash
+# Redrive all DLQ entries
+curl -X POST http://edge-sync-forwarder:3000/api/v1/sync/redrive \
+  -H "Content-Type: application/json" \
+  -d '{"allDlq": true}'
+
+# Or redrive specific IDs
+curl -X POST http://edge-sync-forwarder:3000/api/v1/sync/redrive \
+  -H "Content-Type: application/json" \
+  -d '{"ids": ["uuid1", "uuid2"]}'
+```
+
+**Note**: Redrive requires `INTERNAL_ADMIN_ENABLED=true` environment variable.
+
 ### Verification steps
 
 - Confirm `cloud-ingestion` dedupe is working:
   - Dedupe hit rate may rise after retries; should not cause failures.
-- After fix, confirm pending backlog drains steadily.
+- After fix, confirm pending backlog drains steadily:
+  - Monitor `GET /api/v1/sync/state` and verify `pending_count` decreases.
+- Verify DLQ is empty after redrive (or investigate remaining entries).
 
 ---
 

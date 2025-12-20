@@ -25,14 +25,19 @@ The primary web interface for FarmIQ, featuring a premium dashboard for telemetr
 - **Glassmorphism**: Sidebar and cards feature frosted glass effects.
 - **Responsive**: Flexbox and Grid layouts adaptation.
 
-### 3. Key Pages
-- **Login**: Split-screen design with gradient backgrounds.
-- **Overview**: Aggregated KPI cards and chart visualizations (Recharts).
-- **Admin Console**: dedicated administration area.
-  - **Tenants**: List, search, and create capabilities.
-  - **Farms**: Topology management.
-  - **Devices**: Provisioning interface.
-- **Navigation**: Sidebar with active states and user profile summary.
+### 3. Key Pages (All Spec Pages)
+- **Context Selection**: Tenant/Farm/Barn selection wired to registry APIs.
+- **Overview**: KPI cards + alert summary + trend chart.
+- **Registry**: Farms/Barns/Devices list + detail pages.
+- **Telemetry**: Readings and trend charts (time-range aware).
+- **WeighVision**: Sessions list + detail + analytics + distribution.
+- **Feeding**: Daily feed intake + FCR/forecast.
+- **Sensors**: Matrix + trend/correlation views.
+- **AI Insights**: Anomalies, recommendations, scenario planner.
+- **Ops**: Data quality + ops health views.
+- **Admin**: Tenants, devices, users, audit log.
+- **Reports**: Generate + status tracking.
+- **Error Pages**: 403/404/500 + maintenance.
 
 ---
 
@@ -61,7 +66,8 @@ npm run start:dev
 - [x] Create DashboardLayout (Sidebar, Header)
 - [x] Implement Login Page
 - [x] Implement Overview Page (Charts + KPI)
-- [x] Implement Admin Console (Tenants, Farms, Devices)
+- [x] Implement all 27 dashboard pages per `02-page-specs.md`
+- [x] Wire BFF APIs for all pages (no mock fallbacks)
 - [x] Verify Build
 
 ---

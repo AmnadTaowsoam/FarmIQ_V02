@@ -1,0 +1,87 @@
+openapi: 3.1.0
+info:
+  title: FarmIQ Edge Observability Agent
+  version: 1.0.0
+  description: Aggregated ops status for edge services.
+servers:
+  - url: /
+paths:
+  /api/health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+  /api/ready:
+    get:
+      summary: Readiness check
+      responses:
+        '200':
+          description: Ready
+  /api/v1/ops/edge/status:
+    get:
+      summary: Aggregated edge status
+      responses:
+        '200':
+          description: Status snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EdgeStatusResponse'
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      responses:
+        '200':
+          description: Metrics
+components:
+  schemas:
+    EdgeStatusResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            overall:
+              type: string
+            last_check_at:
+              type: string
+              format: date-time
+            services:
+              type: array
+              items:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  base_url:
+                    type: string
+                  health_ok:
+                    type: boolean
+                  ready_ok:
+                    type: boolean
+                  latency_ms:
+                    type: number
+                  last_check_at:
+                    type: string
+                    format: date-time
+            resources:
+              type: object
+              properties:
+                cpu_load_1m:
+                  type: number
+                cpu_load_5m:
+                  type: number
+                cpu_load_15m:
+                  type: number
+                memory_free_bytes:
+                  type: number
+                memory_total_bytes:
+                  type: number
+                disk_free_bytes:
+                  type: number
+                disk_total_bytes:
+                  type: number
+            sync_state:
+              type: object
+              nullable: true

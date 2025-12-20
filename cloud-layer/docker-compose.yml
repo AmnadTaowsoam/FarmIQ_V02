@@ -4,6 +4,25 @@ services:
   # ============================================
   # CLOUD INFRASTRUCTURE
   # ============================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: farmiq-cloud-postgres
+    ports:
+      - "5140:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-farmiq}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-farmiq_dev}
+      - POSTGRES_DB=${POSTGRES_DB:-farmiq}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - farmiq-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-farmiq}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
     container_name: farmiq-cloud-rabbitmq
@@ -34,6 +53,7 @@ services:
     build:
       context: ./cloud-identity-access
       dockerfile: Dockerfile
+      target: production
     container_name: farmiq-cloud-identity-access
     ports:
       - "5120:3000"
@@ -55,6 +75,7 @@ services:
     build:
       context: ./cloud-tenant-registry
       dockerfile: Dockerfile
+      target: production
     container_name: farmiq-cloud-tenant-registry
     ports:
       - "5121:3000"
@@ -76,6 +97,7 @@ services:
     build:
       context: ./cloud-ingestion
       dockerfile: Dockerfile
+      target: production
     container_name: farmiq-cloud-ingestion
     ports:
       - "5122:3000"
@@ -98,6 +120,7 @@ services:
     build:
       context: ./cloud-telemetry-service
       dockerfile: Dockerfile
+      target: production
     container_name: farmiq-cloud-telemetry-service
     ports:
       - "5123:3000"
@@ -138,10 +161,61 @@ services:
       timeout: 5s
       retries: 5
 
+  cloud-config-rules-service:
+    build:
+      context: ./cloud-config-rules-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: farmiq-cloud-config-rules-service
+    ports:
+      - "5126:3000"
+    environment:
+      - NODE_ENV=development
+      - APP_PORT=3000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DD_SERVICE=cloud-config-rules-service
+      - DD_ENV=development
+    networks:
+      - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cloud-audit-log-service:
+    build:
+      context: ./cloud-audit-log-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: farmiq-cloud-audit-log-service
+    ports:
+      - "5127:3000"
+    environment:
+      - NODE_ENV=development
+      - APP_PORT=3000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DD_SERVICE=cloud-audit-log-service
+      - DD_ENV=development
+    networks:
+      - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   cloud-api-gateway-bff:
     build:
       context: ./cloud-api-gateway-bff
       dockerfile: Dockerfile
+      target: production
     container_name: farmiq-cloud-api-gateway-bff
     ports:
       - "5125:3000"
@@ -153,6 +227,10 @@ services:
       - TELEMETRY_BASE_URL=http://cloud-telemetry-service:3000
       - ANALYTICS_BASE_URL=http://cloud-analytics-service:8000
       - WEIGHVISION_READMODEL_BASE_URL=http://cloud-weighvision-readmodel:3000
+      - CONFIG_RULES_BASE_URL=http://cloud-config-rules-service:3000
+      - AUDIT_LOG_BASE_URL=http://cloud-audit-log-service:3000
+      - NOTIFICATION_BASE_URL=http://cloud-notification-service:3000
+      - REPORTING_EXPORT_BASE_URL=http://cloud-reporting-export-service:3000
       - DD_SERVICE=cloud-api-gateway-bff
       - DD_ENV=development
     depends_on:
@@ -160,6 +238,8 @@ services:
       - cloud-tenant-registry
       - cloud-telemetry-service
       - cloud-analytics-service
+      - cloud-config-rules-service
+      - cloud-audit-log-service
     networks:
       - farmiq-net
     healthcheck:
@@ -173,4 +253,5 @@ networks:
     external: true
 
 volumes:
+  postgres_data:
   rabbitmq_data:

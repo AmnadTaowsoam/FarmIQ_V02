@@ -8,11 +8,15 @@ let channel: amqp.Channel | null = null
 
 export async function connectRabbitMQ() {
   try {
-    connection = await amqp.connect(RABBITMQ_URL)
-    channel = await connection.createChannel()
+    const conn = await amqp.connect(RABBITMQ_URL) as any
+    connection = conn as amqp.Connection
+    if (!connection) {
+      throw new Error('Failed to establish RabbitMQ connection')
+    }
+    channel = await (connection as any).createChannel()
     logger.info('Connected to RabbitMQ', { service: 'cloud-telemetry-service' })
 
-    connection.on('error', (err) => {
+    connection.on('error', (err: Error) => {
       logger.error('RabbitMQ connection error', { error: err, service: 'cloud-telemetry-service' })
     })
 
@@ -105,7 +109,7 @@ export async function setupTelemetryConsumer(
 export async function closeRabbitMQ() {
   try {
     if (channel) await channel.close()
-    if (connection) await connection.close()
+    if (connection) await (connection as any).close()
     logger.info('RabbitMQ connection closed gracefully', { service: 'cloud-telemetry-service' })
   } catch (error) {
     logger.error('Error closing RabbitMQ connection', { error, service: 'cloud-telemetry-service' })

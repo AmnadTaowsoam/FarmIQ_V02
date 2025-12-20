@@ -1,0 +1,12 @@
+apiVersion: backstage.io/v1beta2
+kind: Component
+metadata:
+  name: cloud-audit-log-service
+  description: FarmIQ Cloud Audit Log Service - Immutable audit trail for all user actions and system events
+  annotations:
+    dev.azure.com/project-slug: betagro-dev/farmiq
+spec:
+  type: service
+  lifecycle: production
+  owner: cloud-layer-team
+

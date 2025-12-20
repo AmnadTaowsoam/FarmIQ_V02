@@ -6,6 +6,10 @@ export interface ServiceBaseUrls {
   telemetryBaseUrl: string
   analyticsBaseUrl: string
   weighvisionReadModelBaseUrl: string
+  configRulesBaseUrl: string
+  auditLogBaseUrl: string
+  notificationBaseUrl: string
+  reportingExportBaseUrl: string
 }
 
 export function getServiceBaseUrls(): ServiceBaseUrls {
@@ -33,22 +37,42 @@ export function getServiceBaseUrls(): ServiceBaseUrls {
     process.env.WEIGHVISION_READMODEL_BASE_URL ||
     'http://cloud-weighvision-readmodel:3000'
 
+  const configRulesBaseUrl =
+    process.env.CONFIG_RULES_BASE_URL ||
+    'http://cloud-config-rules-service:3000'
+
+  const auditLogBaseUrl =
+    process.env.AUDIT_LOG_BASE_URL ||
+    'http://cloud-audit-log-service:3000'
+
+  const notificationBaseUrl =
+    process.env.NOTIFICATION_BASE_URL ||
+    'http://cloud-notification-service:3000'
+
+  const reportingExportBaseUrl =
+    process.env.REPORTING_EXPORT_BASE_URL ||
+    'http://cloud-reporting-export-service:3000'
+
   return {
     identityBaseUrl,
     registryBaseUrl,
     telemetryBaseUrl,
     analyticsBaseUrl,
     weighvisionReadModelBaseUrl,
+    configRulesBaseUrl,
+    auditLogBaseUrl,
+    notificationBaseUrl,
+    reportingExportBaseUrl,
   }
 }
 
 interface DownstreamOptions {
-  method?: 'GET' | 'POST'
+  method?: 'GET' | 'POST' | 'PUT'
   headers: Record<string, string>
   body?: unknown
 }
 
-async function callDownstreamJson<T>(
+export async function callDownstreamJson<T>(
   url: string,
   options: DownstreamOptions
 ): Promise<{ ok: boolean; status: number; data?: T }> {

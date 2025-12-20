@@ -25,7 +25,21 @@ Last updated: 2025-12-19 09:45 (Doc Captain)
 | cloud-telemetry-service | cloud | 5123 | OK | OK | done | CursorAI |
 | cloud-analytics-service | cloud | 5124 | OK | OK | done | Antigravity |
 | cloud-api-gateway-bff | cloud | 5125 | OK | OK | done | CursorAI |
+| cloud-config-rules-service | cloud | 5126 | OK | OK | done | CursorAI |
+| cloud-audit-log-service | cloud | 5127 | OK | OK | done | CursorAI |
+| cloud-notification-service | cloud | 5128 | OK | OK | todo | CursorAI |
+| cloud-reporting-export-service | cloud | 5129 | OK | OK | todo | CursorAI |
 | dashboard-web | ui | 5130 | OK | OK | done | Antigravity |
+
+### Contracts Freeze
+
+- CONTRACTS_FROZEN: true
+- Spec: `docs/shared/openapi/cloud-bff.yaml` v1.2.0
+- Spec hash (sha256): `55b08cdd483d930127122c89a860cb6967662a5f7129dee10c777af8a73e0090`
+- DOCS_FROZEN: ✅ TRUE (2025-01-20) - All documentation consistent and up-to-date
+- Validation:
+  - `pnpm dlx @redocly/cli lint docs/shared/openapi/cloud-bff.yaml`
+  - `pnpm -C packages/contracts generate`
 
 ### Definition of Done
 
@@ -73,6 +87,7 @@ Each service must meet these criteria before marking as "done":
 - [x] Expose ops endpoints only:
   - GET /api/health, GET /api/ready, GET /api-docs
   - GET /api/v1/ingress/stats (rates, last_seen)
+- [x] Media presign passthrough only (no byte proxy); `/api/v1/media/images` returns 410 Gone
 - [x] Logging: Winston JSON + traceId/requestId propagation
 - [x] Tests: unit test validate+dedupe, integration test subscribe+route (mock services)
 - [x] Evidence: docker build ok, curl /api/health ok, sample MQTT message routes correctly
@@ -119,6 +134,12 @@ Each service must meet these criteria before marking as "done":
 - [x] Emit outbox event: media.stored (includes objectId + path + sessionId)
 - [x] Trigger inference job (single path): call edge-vision-inference POST /api/v1/inference/jobs
 - [x] Tests + Evidence + docs/progress/edge-media-store.md
+- [x] Evidence:
+  - `pnpm -C edge-layer/edge-media-store test`
+  - `pnpm -C edge-layer/edge-media-store build`
+  - `pnpm -C edge-layer/edge-ingress-gateway test`
+  - `curl -X POST http://localhost:5106/api/v1/media/images/presign -H "Content-Type: application/json" -H "x-tenant-id: t-1" -d "{\"tenant_id\":\"t-1\",\"farm_id\":\"f-1\",\"barn_id\":\"b-1\",\"device_id\":\"d-1\",\"content_type\":\"image/jpeg\",\"filename\":\"frame.jpg\"}"`
+  - `curl -X PUT "<upload_url>" -H "Content-Type: image/jpeg" --data-binary @file.jpg`
 
 ### EDGE: edge-vision-inference (Python)
 - [x] Scaffold from Backend-python boilerplate (FastAPI)
@@ -144,8 +165,20 @@ Each service must meet these criteria before marking as "done":
 - [x] Ops endpoints:
   - [x] GET /api/v1/sync/state
   - [x] POST /api/v1/sync/trigger
+- [x] Claim/lease with `FOR UPDATE SKIP LOCKED` (multi-replica safe)
+- [x] DLQ table + redrive endpoint (`POST /api/v1/sync/dlq/redrive`)
 - [x] Alerts signals: backlog size, last sync age, failures
 - [x] Tests + Evidence + docs/progress/edge-sync-forwarder.md
+  - Evidence:
+    - `pnpm -C edge-layer/edge-sync-forwarder test`
+    - `pnpm -C edge-layer/edge-sync-forwarder build`
+    - `curl http://localhost:5108/api/v1/sync/state`
+    - `curl -X POST http://localhost:5108/api/v1/sync/trigger`
+    - `curl -X POST http://localhost:5108/api/v1/sync/dlq/redrive -H "Content-Type: application/json" -d "{\"reason\":\"retry after fix\",\"limit\":50}"`
+  - SQL checks:
+    - `SELECT status, COUNT(*) FROM sync_outbox GROUP BY status;`
+    - `SELECT COUNT(*) FROM sync_outbox_dlq;`
+  - Scaling note: safe to run multiple replicas (claim/lease + SKIP LOCKED prevents double-send).
 
 ---
 
@@ -419,6 +452,28 @@ Each service must meet these criteria before marking as "done":
   - Removed "Locks/Reservations" requirement to enable parallel development.
   - Permitted service owners to update `STATUS.md` checklists directly.
   - Retained Doc Captain role for `00-api-catalog.md` sync and final verification.
+
+### 2025-01-20
+- **New Cloud Services Added (BE Captain - CursorAI)**:
+  - ✅ Created cloud-config-rules-service (port 5126) - Complete with all endpoints
+  - ✅ Created cloud-audit-log-service (port 5127) - Complete with all endpoints
+  - ⚠️ cloud-notification-service (port 5128) - Structure created, needs implementation
+  - ⚠️ cloud-reporting-export-service (port 5129) - Structure created, needs implementation
+  - ✅ Wired config-rules and audit-log into BFF (services, routes, controllers)
+  - ✅ Updated docker-compose.yml with new services
+  - ✅ Updated docs/shared/00-api-catalog.md with new services
+  - ✅ Updated docs/STATUS.md with service status
+  - ✅ Created evidence report: evidence/reports/cloud-layer-release.md
+  - ✅ **DOCS_FROZEN = TRUE** - All documentation consistent and up-to-date
+
+- **Dashboard Documentation Pack Finalized (Doc Captain)**:
+  - Normalized all 10 dashboard documentation files
+  - Standardized terminology (Tenant/Farm/Barn/Batch/Species/Device/Session)
+  - Marked all BFF endpoints as EXISTING (4) or NEW (24)
+  - Created comprehensive Docs Freeze Summary
+  - Updated all "Last updated" dates to 2025-01-20
+  - Documentation pack is now single source of truth for dashboard implementation
+  - **Status**: ✅ Documentation = DONE
 
 ### 2025-12-18 (Round 3)
 - **Doc Captain Cleanup (Antigravity)**:

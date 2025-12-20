@@ -21,6 +21,7 @@
                     "migrate:up":  "npx prisma migrate dev --name init",
                     "prisma:generate":  "npx prisma generate",
                     "migrate:undo":  "npx prisma migrate reset --force",
+                    "seed":  "ts-node prisma/seed.ts",
                     "coverage":  "npx nyc report --reporter=html \u0026\u0026 npx opener coverage/index.html",
                     "generate-api-types":  "openapi-typescript openapi.yaml -o src/api-types.ts"
                 },
@@ -90,6 +91,9 @@
                             "ts-mocha":  "^10.0.0",
                             "ts-node":  "^10.9.2",
                             "tsconfig-paths":  "^4.2.0",
-                            "typescript":  "^5.4.5"
-                        }
+        "typescript":  "^5.4.5"
+                    },
+    "prisma": {
+        "seed": "ts-node prisma/seed.ts"
+    }
 }

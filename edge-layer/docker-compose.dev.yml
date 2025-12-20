@@ -4,60 +4,243 @@ version: '3.8'
 # Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 
 services:
+  # ============================================
+  # EDGE INFRASTRUCTURE
+  # ============================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: farmiq-edge-postgres
+    ports:
+      - "5141:5432"  # Different port from cloud (5140)
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-farmiq}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-farmiq_dev}
+      - POSTGRES_DB=${POSTGRES_DB:-farmiq}
+    volumes:
+      - edge_postgres_data:/var/lib/postgresql/data
+    networks:
+      - farmiq-edge-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-farmiq}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: farmiq-edge-minio
+    ports:
+      - "9000:9000"  # MinIO API
+      - "9001:9001"  # MinIO Console
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - edge_minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - farmiq-edge-net
+    healthcheck:
+      test: ["CMD", "stat", "/data"]
+      interval: 30s
+      timeout: 20s
+      start_period: 40s
+      retries: 3
+
+  # ============================================
+  # EDGE SERVICES
+  # ============================================
+  edge-mqtt-broker:
+    build:
+      context: ./edge-mqtt-broker
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5100:1883"
+    volumes:
+      - ./edge-mqtt-broker/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - edge_mqtt_data:/mosquitto/data
+      - edge_mqtt_log:/mosquitto/log
+    networks:
+      - farmiq-edge-net
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-h", "localhost", "-t", "$$SYS/health", "-C", "1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
   edge-ingress-gateway:
     build:
-      target: development
+      context: ./edge-ingress-gateway
+      dockerfile: Dockerfile.dev
     volumes:
       - ./edge-ingress-gateway/src:/app/src:ro
       - ./edge-ingress-gateway/package.json:/app/package.json:ro
     environment:
       - NODE_ENV=development
+      - APP_PORT=3000
       - LOG_LEVEL=debug
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - MQTT_BROKER_URL=mqtt://edge-mqtt-broker:1883
+      - EDGE_TELEMETRY_TIMESERIES_URL=http://edge-telemetry-timeseries:3000
+      - EDGE_WEIGHVISION_SESSION_URL=http://edge-weighvision-session:3000
+      - DOWNSTREAM_TIMEOUT_MS=5000
+      - DEDUPE_TTL_MS=259200000
+      - DEDUPE_CLEANUP_INTERVAL_MS=60000
+    networks:
+      - farmiq-edge-net
 
   edge-telemetry-timeseries:
     build:
-      target: development
+      context: ./edge-telemetry-timeseries
+      dockerfile: Dockerfile.dev
     volumes:
       - ./edge-telemetry-timeseries/src:/app/src:ro
       - ./edge-telemetry-timeseries/package.json:/app/package.json:ro
     environment:
       - NODE_ENV=development
+      - APP_PORT=3000
       - LOG_LEVEL=debug
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+    networks:
+      - farmiq-edge-net
 
   edge-weighvision-session:
     build:
-      target: development
+      context: ./edge-weighvision-session
+      dockerfile: Dockerfile.dev
     volumes:
       - ./edge-weighvision-session/src:/app/src:ro
       - ./edge-weighvision-session/package.json:/app/package.json:ro
     environment:
       - NODE_ENV=development
+      - APP_PORT=3000
       - LOG_LEVEL=debug
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+    networks:
+      - farmiq-edge-net
 
   edge-media-store:
     build:
-      target: development
+      context: ./edge-media-store
+      dockerfile: Dockerfile.dev
     volumes:
       - ./edge-media-store/src:/app/src:ro
       - ./edge-media-store/package.json:/app/package.json:ro
+      - ../../data/edge-media:/data/media
     environment:
       - NODE_ENV=development
+      - APP_PORT=3000
       - LOG_LEVEL=debug
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - MEDIA_STORAGE_PATH=/data/media
+      - MEDIA_ENDPOINT=${MEDIA_ENDPOINT:-http://minio:9000}
+      - MEDIA_ACCESS_KEY=${MEDIA_ACCESS_KEY:-minioadmin}
+      - MEDIA_SECRET_KEY=${MEDIA_SECRET_KEY:-minioadmin}
+      - MEDIA_REGION=${MEDIA_REGION:-us-east-1}
+      - MEDIA_BUCKET=${MEDIA_BUCKET:-farmiq-media}
+    networks:
+      - farmiq-edge-net
 
   edge-vision-inference:
+    build:
+      context: ./edge-vision-inference
+      dockerfile: Dockerfile.dev
     volumes:
       - ./edge-vision-inference/app:/app/app:ro
+      - ../../data/edge-media:/data/media:ro
     environment:
       - LOG_LEVEL=DEBUG
+      - PORT=8000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - MEDIA_STORAGE_PATH=/data/media
+    networks:
+      - farmiq-edge-net
 
   edge-sync-forwarder:
     build:
-      target: development
+      context: ./edge-sync-forwarder
+      dockerfile: Dockerfile.dev
     volumes:
       - ./edge-sync-forwarder/src:/app/src:ro
       - ./edge-sync-forwarder/package.json:/app/package.json:ro
     environment:
       - NODE_ENV=development
+      - APP_PORT=3000
       - LOG_LEVEL=debug
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - CLOUD_INGESTION_URL=http://host.docker.internal:5122/api/v1/edge/batch
+    networks:
+      - farmiq-edge-net
 
+  edge-policy-sync:
+    build:
+      context: ./edge-policy-sync
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./edge-policy-sync/src:/app/src:ro
+      - ./edge-policy-sync/package.json:/app/package.json:ro
+    environment:
+      - NODE_ENV=development
+      - APP_PORT=3000
+      - LOG_LEVEL=debug
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - BFF_BASE_URL=http://host.docker.internal:5125
+      - EDGE_CLOUD_TOKEN=${EDGE_CLOUD_TOKEN:-}
+      - POLICY_SYNC_INTERVAL_SECONDS=60
+      - POLICY_SYNC_BACKOFF_CAP_SECONDS=600
+      - POLICY_SYNC_TIMEOUT_SECONDS=10
+      - EDGE_CONTEXTS=${EDGE_CONTEXTS:-[]}
+    networks:
+      - farmiq-edge-net
 
+  edge-retention-janitor:
+    build:
+      context: ./edge-retention-janitor
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./edge-retention-janitor/src:/app/src:ro
+      - ./edge-retention-janitor/package.json:/app/package.json:ro
+      - ../../data/edge-media:/data/media
+    environment:
+      - NODE_ENV=development
+      - APP_PORT=3000
+      - LOG_LEVEL=debug
+      - MEDIA_BASE_PATH=/data/media
+      - MEDIA_RETENTION_DAYS=7
+      - MIN_FREE_DISK_GB=5
+      - JANITOR_INTERVAL_SECONDS=21600
+      - JANITOR_DRY_RUN=true
+    networks:
+      - farmiq-edge-net
+
+  edge-observability-agent:
+    build:
+      context: ./edge-observability-agent
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./edge-observability-agent/src:/app/src:ro
+      - ./edge-observability-agent/package.json:/app/package.json:ro
+      - ../../data/edge-media:/data
+    environment:
+      - NODE_ENV=development
+      - APP_PORT=3000
+      - LOG_LEVEL=debug
+      - OBS_POLL_INTERVAL_SECONDS=30
+      - DISK_PATH=/data
+      - EDGE_INGRESS_URL=http://edge-ingress-gateway:3000
+      - EDGE_TELEMETRY_URL=http://edge-telemetry-timeseries:3000
+      - EDGE_WEIGHVISION_URL=http://edge-weighvision-session:3000
+      - EDGE_VISION_URL=http://edge-vision-inference:8000
+      - EDGE_MEDIA_URL=http://edge-media-store:3000
+      - EDGE_SYNC_URL=http://edge-sync-forwarder:3000
+    networks:
+      - farmiq-edge-net
+
+networks:
+  farmiq-edge-net:
+    driver: bridge
+
+volumes:
+  edge_postgres_data:
+  edge_mqtt_data:
+  edge_mqtt_log:
+  edge_minio_data:

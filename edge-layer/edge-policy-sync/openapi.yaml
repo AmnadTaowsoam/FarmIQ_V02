@@ -1,0 +1,127 @@
+openapi: 3.1.0
+info:
+  title: FarmIQ Edge Policy Sync
+  version: 1.0.0
+  description: Offline config cache for edge services.
+servers:
+  - url: /
+paths:
+  /api/health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+  /api/ready:
+    get:
+      summary: Readiness check
+      responses:
+        '200':
+          description: Ready
+  /api/v1/edge-config/effective:
+    get:
+      summary: Get effective config for a context
+      parameters:
+        - name: tenantId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: farmId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: barnId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Effective config
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EffectiveConfigResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/edge-config/state:
+    get:
+      summary: Get sync state
+      responses:
+        '200':
+          description: Sync state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncStateResponse'
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      responses:
+        '200':
+          description: Metrics
+components:
+  schemas:
+    EffectiveConfigResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            tenant_id:
+              type: string
+            farm_id:
+              type: string
+            barn_id:
+              type: string
+            config_json:
+              type: object
+            hash:
+              type: string
+              nullable: true
+            fetched_at:
+              type: string
+              format: date-time
+            source_etag:
+              type: string
+              nullable: true
+    SyncStateResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            last_success_at:
+              type: string
+              format: date-time
+              nullable: true
+            last_error_at:
+              type: string
+              format: date-time
+              nullable: true
+            last_error:
+              type: string
+              nullable: true
+            consecutive_failures:
+              type: integer
+            cache_entries:
+              type: integer
+            lag_seconds:
+              type: number
+              nullable: true
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string

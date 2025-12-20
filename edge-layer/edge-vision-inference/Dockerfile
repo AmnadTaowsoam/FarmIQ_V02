@@ -25,6 +25,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
+# Run prisma generation if schema exists
+RUN if [ -f prisma/schema.prisma ]; then npx prisma generate; fi
+
 # Copy AI model directory (ensure the file best_yolov11x_microplate_final.pt is included)
 COPY app/best_model /app/models/yolo
 
@@ -44,4 +47,3 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
 
 # Run the application
 CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-

@@ -76,7 +76,7 @@ class AnalyticsDb:
                   metric TEXT NOT NULL,
                   value DOUBLE PRECISION NULL,
                   unit TEXT NULL,
-                  window TEXT NULL,
+                  "window" TEXT NULL,
                   occurred_at TIMESTAMPTZ NOT NULL,
                   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
                   source_event_id TEXT NOT NULL,
@@ -171,7 +171,7 @@ class AnalyticsDb:
                 """
                 INSERT INTO analytics_results
                   (id, type, tenant_id, farm_id, barn_id, device_id, session_id,
-                   metric, value, unit, window, occurred_at, source_event_id, trace_id, payload)
+                   metric, value, unit, "window", occurred_at, source_event_id, trace_id, payload)
                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb)
                 ON CONFLICT (tenant_id, type, source_event_id, metric) DO NOTHING
                 """,
@@ -223,7 +223,7 @@ class AnalyticsDb:
 
         sql = f"""
           SELECT id, type, tenant_id, farm_id, barn_id, device_id, session_id,
-                 metric, value, unit, window, occurred_at, created_at, source_event_id, trace_id, payload
+                 metric, value, unit, "window", occurred_at, created_at, source_event_id, trace_id, payload
           FROM analytics_results
           WHERE {" AND ".join(where)}
           ORDER BY occurred_at DESC

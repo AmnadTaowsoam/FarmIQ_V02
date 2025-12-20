@@ -52,9 +52,14 @@ class RabbitConsumer:
         await self._channel.set_qos(prefetch_count=self._settings.rabbitmq_prefetch)
 
         # Declare queue and bind to canonical exchanges/routing keys.
+        # Arguments must match definitions.json to avoid PRECONDITION_FAILED errors
         queue = await self._channel.declare_queue(
             self._settings.rabbitmq_queue_name,
             durable=True,
+            arguments={
+                "x-message-ttl": 86400000,  # 24 hours in milliseconds
+                "x-dead-letter-exchange": "farmiq.dlq.exchange",
+            },
         )
 
         exchanges_and_keys = [

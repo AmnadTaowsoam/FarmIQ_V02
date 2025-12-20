@@ -1,0 +1,731 @@
+openapi: 3.1.0
+info:
+  title: FarmIQ Cloud BFF API
+  version: 1.2.0
+  description: >
+    Contract for cloud-api-gateway-bff based on current implementation.
+servers:
+  - url: /
+security:
+  - bearerAuth: []
+tags:
+  - name: System
+  - name: Dashboard
+  - name: Config
+  - name: Audit
+  - name: PublicVariables
+
+paths:
+  /api/health:
+    get:
+      tags: [System]
+      summary: Health check
+      security: []
+      responses:
+        '200':
+          description: OK
+
+  /api/ready:
+    get:
+      tags: [System]
+      summary: Readiness check
+      security: []
+      responses:
+        '200':
+          description: Ready
+
+  /api/public-variable-frontend:
+    get:
+      tags: [PublicVariables]
+      summary: Get public variables for frontend
+      parameters:
+        - $ref: '#/components/parameters/xRequestId'
+      responses:
+        '200':
+          description: Public variables
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicVariableResponse'
+
+  /api/v1/dashboard/overview:
+    get:
+      tags: [Dashboard]
+      summary: Get dashboard overview
+      parameters:
+        - $ref: '#/components/parameters/xRequestId'
+        - $ref: '#/components/parameters/tenantId'
+      responses:
+        '200':
+          description: Overview data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OverviewResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Downstream error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/dashboard/farms/{farmId}:
+    get:
+      tags: [Dashboard]
+      summary: Get farm dashboard
+      parameters:
+        - $ref: '#/components/parameters/xRequestId'
+        - $ref: '#/components/parameters/tenantId'
+        - name: farmId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Farm dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FarmDashboardResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Downstream error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/dashboard/barns/{barnId}:
+    get:
+      tags: [Dashboard]
+      summary: Get barn dashboard
+      parameters:
+        - $ref: '#/components/parameters/xRequestId'
+        - $ref: '#/components/parameters/tenantId'
+        - name: barnId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Barn dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BarnDashboardResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Downstream error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/dashboard/alerts:
+    get:
+      tags: [Dashboard]
+      summary: Get alerts for current tenant
+      parameters:
+        - $ref: '#/components/parameters/xRequestId'
+        - $ref: '#/components/parameters/tenantId'
+      responses:
+        '200':
+          description: Alerts data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertsResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Downstream error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/config/context:
+    get:
+      tags: [Config]
+      summary: Get effective config context
+      parameters:
+        - $ref: '#/components/parameters/xRequestId'
+        - $ref: '#/components/parameters/tenantIdSnake'
+        - $ref: '#/components/parameters/farmIdSnake'
+        - $ref: '#/components/parameters/barnIdSnake'
+      responses:
+        '200':
+          description: Config context
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigContextResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/config/thresholds:
+    get:
+      tags: [Config]
+      summary: List threshold rules
+      parameters:
+        - $ref: '#/components/parameters/xRequestId'
+        - $ref: '#/components/parameters/tenantIdSnake'
+        - $ref: '#/components/parameters/farmIdSnake'
+        - $ref: '#/components/parameters/barnIdSnake'
+      responses:
+        '200':
+          description: Threshold rules
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThresholdsResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags: [Config]
+      summary: Upsert threshold rule
+      parameters:
+        - $ref: '#/components/parameters/xRequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ThresholdUpsertRequest'
+      responses:
+        '200':
+          description: Upsert result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThresholdUpsertResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/config/targets:
+    get:
+      tags: [Config]
+      summary: List target curves
+      parameters:
+        - $ref: '#/components/parameters/xRequestId'
+        - $ref: '#/components/parameters/tenantIdSnake'
+        - $ref: '#/components/parameters/farmIdSnake'
+        - $ref: '#/components/parameters/barnIdSnake'
+        - name: species
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Target curves
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TargetsResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags: [Config]
+      summary: Upsert target curve
+      parameters:
+        - $ref: '#/components/parameters/xRequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TargetUpsertRequest'
+      responses:
+        '200':
+          description: Upsert result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TargetUpsertResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/audit/events:
+    get:
+      tags: [Audit]
+      summary: Query audit events
+      parameters:
+        - $ref: '#/components/parameters/xRequestId'
+        - $ref: '#/components/parameters/tenantIdSnake'
+        - name: actor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: action
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: resource_type
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 25
+      responses:
+        '200':
+          description: Audit events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditEventsResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    xRequestId:
+      name: x-request-id
+      in: header
+      required: true
+      schema:
+        type: string
+      description: Request correlation ID.
+    tenantId:
+      name: tenantId
+      in: query
+      required: false
+      schema:
+        type: string
+      description: >
+        Tenant context. Resolved from JWT tenant_id claim when present; optional
+        for platform_admin or dev mode.
+    tenantIdSnake:
+      name: tenant_id
+      in: query
+      required: true
+      schema:
+        type: string
+      description: Tenant context; required if not present in JWT claims.
+    farmIdSnake:
+      name: farm_id
+      in: query
+      required: false
+      schema:
+        type: string
+    barnIdSnake:
+      name: barn_id
+      in: query
+      required: false
+      schema:
+        type: string
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+            requestId:
+              type: string
+            timestamp:
+              type: string
+              format: date-time
+            traceId:
+              type: string
+          required: [code, message]
+      required: [error]
+
+    PublicVariableResponse:
+      type: object
+      properties:
+        datadog_rum_env:
+          type: string
+          nullable: true
+
+    OverviewResponse:
+      type: object
+      properties:
+        topology:
+          type: object
+          nullable: true
+        telemetry:
+          type: object
+          properties:
+            metrics:
+              type: object
+            aggregates:
+              type: array
+              items:
+                type: object
+        alerts:
+          type: array
+          items:
+            type: object
+        analyticsAvailable:
+          type: boolean
+
+    FarmDashboardResponse:
+      type: object
+      properties:
+        farm:
+          type: object
+          nullable: true
+        barns:
+          type: array
+          items:
+            type: object
+        telemetryAggregates:
+          type: array
+          items:
+            type: object
+
+    BarnDashboardResponse:
+      type: object
+      properties:
+        barn:
+          type: object
+          nullable: true
+        telemetryAggregates:
+          type: array
+          items:
+            type: object
+        telemetryReadings:
+          type: array
+          items:
+            type: object
+
+    AlertsResponse:
+      type: object
+      properties:
+        alerts:
+          type: array
+          items:
+            type: object
+        analyticsAvailable:
+          type: boolean
+
+    ConfigContextResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          additionalProperties: true
+
+    ThresholdRule:
+      type: object
+      properties:
+        id:
+          type: string
+        tenant_id:
+          type: string
+        farm_id:
+          type: string
+          nullable: true
+        barn_id:
+          type: string
+          nullable: true
+        metric:
+          type: string
+        op:
+          type: string
+        value:
+          type: number
+        duration_sec:
+          type: integer
+          nullable: true
+        severity:
+          type: string
+        enabled:
+          type: boolean
+
+    ThresholdsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ThresholdRule'
+
+    ThresholdUpsertRequest:
+      type: object
+      properties:
+        tenant_id:
+          type: string
+        farm_id:
+          type: string
+          nullable: true
+        barn_id:
+          type: string
+          nullable: true
+        metric:
+          type: string
+        op:
+          type: string
+        value:
+          type: number
+        severity:
+          type: string
+        enabled:
+          type: boolean
+        duration_sec:
+          type: integer
+          nullable: true
+      required:
+        - tenant_id
+        - metric
+        - op
+        - value
+
+    ThresholdUpsertResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          additionalProperties: true
+
+    TargetCurve:
+      type: object
+      properties:
+        id:
+          type: string
+        tenant_id:
+          type: string
+        farm_id:
+          type: string
+          nullable: true
+        barn_id:
+          type: string
+          nullable: true
+        species:
+          type: string
+        day:
+          type: integer
+        target_weight:
+          type: number
+        target_fcr:
+          type: number
+
+    TargetsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/TargetCurve'
+
+    TargetUpsertRequest:
+      type: object
+      properties:
+        tenant_id:
+          type: string
+        farm_id:
+          type: string
+          nullable: true
+        barn_id:
+          type: string
+          nullable: true
+        species:
+          type: string
+        day:
+          type: integer
+        target_weight:
+          type: number
+        target_fcr:
+          type: number
+      required:
+        - tenant_id
+        - species
+        - day
+
+    TargetUpsertResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          additionalProperties: true
+
+    AuditEventsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        meta:
+          type: object
+          properties:
+            page:
+              type: integer
+            limit:
+              type: integer
+            total:
+              type: integer
+            hasNext:
+              type: boolean

@@ -1,0 +1,10 @@
+{
+  "name": "farmiq",
+  "private": true,
+  "scripts": {
+    "api:generate": "pnpm -C packages/farmiq-api-client generate",
+    "api:lint": "pnpm -C packages/farmiq-api-client build",
+    "contracts:generate": "pnpm -C packages/contracts generate",
+    "contracts:build": "pnpm -C packages/contracts build"
+  }
+}

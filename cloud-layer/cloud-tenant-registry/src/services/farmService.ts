@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import { logger } from '../utils/logger'
+import { newUuidV7 } from '../utils/uuid'
 
 const prisma = new PrismaClient()
 
@@ -65,6 +66,7 @@ export async function createFarm(tenantId: string, data: {
     logger.info(`Creating farm for tenant ${tenantId}:`, data)
     return await prisma.farm.create({
       data: {
+        id: newUuidV7(),
         tenantId,
         name: data.name,
         location: data.location,

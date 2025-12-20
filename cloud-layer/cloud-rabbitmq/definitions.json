@@ -3,7 +3,14 @@
   "rabbitmq_version": "3.13.0",
   "product_name": "RabbitMQ",
   "product_version": "3.13.0",
-  "users": [],
+  "users": [
+    {
+      "name": "farmiq",
+      "password_hash": "k/3EfmOhxa9hNoRj3mKRzQkRxjCR9cr8etkr66ZPsIkCI1Ye",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": []
+    }
+  ],
   "vhosts": [
     {
       "name": "/"

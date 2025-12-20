@@ -50,8 +50,10 @@ app.use((req: Request, res: Response, next: NextFunction): void => {
 app.use(express.json())
 app.use(helmet())
 
+const downstream = buildDownstreamConfig()
+
 // Setup routes and swagger
-setupRoutes(app, { stats })
+setupRoutes(app, { stats, downstream })
 setupSwagger(app)
 
 // Define the health-check route
@@ -93,7 +95,6 @@ async function startServer() {
     await ensureIngressSchema(prisma)
     logger.info('Database connection has been established successfully.')
 
-    const downstream = buildDownstreamConfig()
     const dedupe = new PrismaDedupeStore(prisma)
     const allowlists = new PrismaAllowlistStore(prisma)
     const lastSeen = new PrismaLastSeenStore(prisma)

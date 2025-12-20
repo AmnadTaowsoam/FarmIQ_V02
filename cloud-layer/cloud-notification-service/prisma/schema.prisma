@@ -1,0 +1,29 @@
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Notification {
+  id         String   @id @default(uuid())
+  tenantId   String
+  channel    String   // "webhook", "email", "sms" (MVP: webhook only)
+  to         String   // Recipient (URL for webhook, email for email, etc.)
+  title      String
+  message    String
+  severity   String   @default("info") // "info", "warning", "critical"
+  status     String   @default("pending") // "pending", "sent", "failed"
+  attempts   Int      @default(0)
+  lastError  String?
+  createdAt  DateTime @default(now())
+  sentAt     DateTime?
+
+  @@index([tenantId, status, createdAt(sort: Desc)])
+  @@index([tenantId, channel, createdAt(sort: Desc)])
+  @@map("notifications")
+}
+

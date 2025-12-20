@@ -1,0 +1,36 @@
+{
+  "data": {
+    "kpis": {
+      "total_farms": 10,
+      "total_barns": 50,
+      "active_devices": 45,
+      "critical_alerts": 2,
+      "avg_weight_today_kg": 2.5,
+      "fcr_7day_avg": 1.8
+    },
+    "recent_alerts": [
+      {
+        "alert_id": "alert-1",
+        "severity": "critical",
+        "type": "temperature",
+        "message": "Temperature above threshold",
+        "occurred_at": "2025-12-20T10:00:00Z"
+      }
+    ],
+    "recent_activity": [
+      {
+        "type": "session_finalized",
+        "barn_id": "barn-1",
+        "barn_name": "Barn 1",
+        "occurred_at": "2025-12-20T10:00:00Z"
+      }
+    ],
+    "weight_trend": [
+      { "date": "2025-12-20", "avg_weight_kg": 2.5 }
+    ],
+    "sensor_status": {
+      "temperature": { "current": 25.5, "status": "normal" },
+      "humidity": { "current": 60.0, "status": "normal" }
+    }
+  }
+}

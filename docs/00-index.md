@@ -22,6 +22,7 @@ FarmIQ is organized into **three layers**:
 - [Architecture](01-architecture.md)
 - [Domain and multi-tenant model](02-domain-multi-tenant-data-model.md)
 - [Messaging (RabbitMQ)](03-messaging-rabbitmq.md)
+- [Database design](04-database-design.md)
 - [Topic normalization and routing](topic-bridge.md)
 - Shared
   - [API catalog](shared/00-api-catalog.md)
@@ -45,6 +46,20 @@ FarmIQ is organized into **three layers**:
   - [Overview](cloud-layer/00-overview.md)
   - [Cloud services](cloud-layer/01-cloud-services.md)
   - [Dashboard](cloud-layer/02-dashboard.md)
+  - [Dashboard Pages Design](cloud-layer/03-dashboard-pages-design.md)
+  - Dashboard Documentation Pack
+    - [📋 Docs Freeze Summary](cloud-layer/dashboard/00-DOCS-FREEZE-SUMMARY.md) ⭐ START HERE
+    - [📚 README](cloud-layer/dashboard/README.md)
+    - [Expanded Scope](cloud-layer/dashboard/00-dashboard-expanded-scope.md)
+    - [Information Architecture](cloud-layer/dashboard/01-information-architecture.md)
+    - [Page Specifications](cloud-layer/dashboard/02-page-specs.md)
+    - [Data Requirements](cloud-layer/dashboard/03-data-requirements-and-computation.md)
+    - [BFF API Contracts](cloud-layer/dashboard/04-bff-api-contracts.md) ⭐ API REFERENCE
+    - [KPI & Metrics Definitions](cloud-layer/dashboard/05-kpi-metrics-definitions.md)
+    - [Multi-Tenant & RBAC](cloud-layer/dashboard/06-multi-tenant-and-rbac.md)
+    - [Ops Observability UX](cloud-layer/dashboard/07-ops-observability-ux.md)
+    - [ML Analytics Roadmap](cloud-layer/dashboard/08-ml-analytics-roadmap.md)
+    - [Acceptance Checklist](cloud-layer/dashboard/09-acceptance-checklist.md)
 
 ---
 
@@ -130,6 +145,7 @@ Each service-level document below explicitly maps to one of these boilerplates.
   - [01-architecture](01-architecture.md): Overall architecture, responsibilities, and NFRs.
   - [02-domain-multi-tenant-data-model](02-domain-multi-tenant-data-model.md): Tenant model and data strategy.
   - [03-messaging-rabbitmq](03-messaging-rabbitmq.md): RabbitMQ design and message envelope.
+  - [04-database-design](04-database-design.md): Database design checklist and ownership map.
 
 - **Shared (cross-layer)**
   - [shared/00-api-catalog](shared/00-api-catalog.md): Single source of truth for endpoints.
@@ -155,6 +171,19 @@ Each service-level document below explicitly maps to one of these boilerplates.
   - [cloud-layer/00-overview](cloud-layer/00-overview.md)
   - [cloud-layer/01-cloud-services](cloud-layer/01-cloud-services.md)
   - [cloud-layer/02-dashboard](cloud-layer/02-dashboard.md)
+  - [cloud-layer/03-dashboard-pages-design](cloud-layer/03-dashboard-pages-design.md)
+  - [cloud-layer/04-dashboard-design-system](cloud-layer/04-dashboard-design-system.md)
+  - **cloud-layer/dashboard/** (Dashboard Documentation Pack)
+    - [dashboard/00-dashboard-expanded-scope](cloud-layer/dashboard/00-dashboard-expanded-scope.md)
+    - [dashboard/01-information-architecture](cloud-layer/dashboard/01-information-architecture.md)
+    - [dashboard/02-page-specs](cloud-layer/dashboard/02-page-specs.md)
+    - [dashboard/03-data-requirements-and-computation](cloud-layer/dashboard/03-data-requirements-and-computation.md)
+    - [dashboard/04-bff-api-contracts](cloud-layer/dashboard/04-bff-api-contracts.md)
+    - [dashboard/05-kpi-metrics-definitions](cloud-layer/dashboard/05-kpi-metrics-definitions.md)
+    - [dashboard/06-multi-tenant-and-rbac](cloud-layer/dashboard/06-multi-tenant-and-rbac.md)
+    - [dashboard/07-ops-observability-ux](cloud-layer/dashboard/07-ops-observability-ux.md)
+    - [dashboard/08-ml-analytics-roadmap](cloud-layer/dashboard/08-ml-analytics-roadmap.md)
+    - [dashboard/09-acceptance-checklist](cloud-layer/dashboard/09-acceptance-checklist.md)
 
 Refer to `shared/04-security-compliance-mapping.md` for explicit mapping back to GT&D standards.
 

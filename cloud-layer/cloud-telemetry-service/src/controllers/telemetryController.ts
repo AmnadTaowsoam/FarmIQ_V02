@@ -1,4 +1,5 @@
 import { Request, Response } from 'express'
+import { Prisma } from '@prisma/client'
 import {
   getTelemetryReadings,
   getAvailableMetrics,
@@ -148,9 +149,9 @@ export async function getAggregatesHandler(req: Request, res: Response) {
         metric: agg.metric,
         bucketStart: agg.bucket_start,
         bucketSize: agg.bucket_size,
-        avgValue: agg.avg_value,
-        minValue: agg.min_value,
-        maxValue: agg.max_value,
+        avgValue: new Prisma.Decimal(agg.avg_value),
+        minValue: new Prisma.Decimal(agg.min_value),
+        maxValue: new Prisma.Decimal(agg.max_value),
         count: agg.count,
         createdAt: new Date(),
         updatedAt: new Date(),

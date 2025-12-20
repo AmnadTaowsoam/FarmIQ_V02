@@ -1,0 +1,86 @@
+openapi: 3.1.0
+info:
+  title: FarmIQ Edge Retention Janitor
+  version: 1.0.0
+  description: Cleanup service for edge storage retention.
+servers:
+  - url: /
+paths:
+  /api/health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+  /api/ready:
+    get:
+      summary: Readiness check
+      responses:
+        '200':
+          description: Ready
+  /api/v1/janitor/run:
+    post:
+      summary: Trigger janitor run
+      responses:
+        '200':
+          description: Run result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JanitorRunResponse'
+  /api/v1/janitor/state:
+    get:
+      summary: Get janitor state
+      responses:
+        '200':
+          description: State
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JanitorStateResponse'
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      responses:
+        '200':
+          description: Metrics
+components:
+  schemas:
+    JanitorRunResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            started_at:
+              type: string
+              format: date-time
+            finished_at:
+              type: string
+              format: date-time
+            deleted_files:
+              type: integer
+            freed_bytes:
+              type: integer
+            dry_run:
+              type: boolean
+            error:
+              type: string
+              nullable: true
+    JanitorStateResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            last_run_at:
+              type: string
+              format: date-time
+              nullable: true
+            last_deleted_files:
+              type: integer
+            last_freed_bytes:
+              type: integer
+            last_error:
+              type: string
+              nullable: true

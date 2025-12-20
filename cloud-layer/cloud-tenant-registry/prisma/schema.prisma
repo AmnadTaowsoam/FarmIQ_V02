@@ -22,7 +22,10 @@ model Tenant {
   updatedAt DateTime @updatedAt
 
   // Relations
-  farms Farm[]
+  farms   Farm[]
+  barns   Barn[]   @relation("BarnToTenant")
+  batches Batch[]  @relation("BatchToTenant")
+  devices Device[] @relation("DeviceToTenant")
 
   @@index([status])
   @@map("tenants")
@@ -38,10 +41,11 @@ model Farm {
   updatedAt DateTime @updatedAt
 
   // Relations
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  barns  Barn[]
-  batches Batch[]
-  devices Device[]
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  barns    Barn[]
+  batches  Batch[]
+  devices  Device[]
+  stations Station[] @relation("StationToFarm")
 
   @@unique([tenantId, name])
   @@index([tenantId])
@@ -60,7 +64,7 @@ model Barn {
   updatedAt  DateTime @updatedAt
 
   // Relations
-  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant  Tenant  @relation("BarnToTenant", fields: [tenantId], references: [id], onDelete: Cascade)
   farm    Farm    @relation(fields: [farmId], references: [id], onDelete: Cascade)
   batches Batch[]
   devices Device[]
@@ -86,7 +90,7 @@ model Batch {
   updatedAt DateTime  @updatedAt
 
   // Relations
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation("BatchToTenant", fields: [tenantId], references: [id], onDelete: Cascade)
   farm   Farm   @relation(fields: [farmId], references: [id], onDelete: Cascade)
   barn   Barn   @relation(fields: [barnId], references: [id], onDelete: Cascade)
   devices Device[]
@@ -112,7 +116,7 @@ model Device {
   updatedAt   DateTime @updatedAt
 
   // Relations
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation("DeviceToTenant", fields: [tenantId], references: [id], onDelete: Cascade)
   farm   Farm?  @relation(fields: [farmId], references: [id], onDelete: SetNull)
   barn   Barn?  @relation(fields: [barnId], references: [id], onDelete: SetNull)
   batch  Batch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
@@ -140,7 +144,7 @@ model Station {
   updatedAt   DateTime @updatedAt
 
   // Relations (tenantId is for indexing/isolation, not FK)
-  farm Farm @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  farm Farm @relation("StationToFarm", fields: [farmId], references: [id], onDelete: Cascade)
   barn Barn @relation(fields: [barnId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, farmId, barnId, name])

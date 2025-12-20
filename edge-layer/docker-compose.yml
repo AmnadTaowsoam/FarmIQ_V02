@@ -5,7 +5,9 @@ services:
   # EDGE SERVICES
   # ============================================
   edge-mqtt-broker:
-    image: eclipse-mosquitto:2.0
+    build:
+      context: ./edge-mqtt-broker
+      dockerfile: Dockerfile
     container_name: farmiq-edge-mqtt
     ports:
       - "5100:1883"
@@ -158,6 +160,88 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
       - CLOUD_INGESTION_URL=http://cloud-ingestion:3000/api/v1/edge/batch
       - DD_SERVICE=edge-sync-forwarder
+      - DD_ENV=development
+    networks:
+      - farmiq-net
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  edge-policy-sync:
+    build:
+      context: ./edge-policy-sync
+      dockerfile: Dockerfile
+    container_name: farmiq-edge-policy-sync
+    ports:
+      - "5109:3000"
+    environment:
+      - NODE_ENV=development
+      - APP_PORT=3000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - BFF_BASE_URL=http://cloud-api-gateway-bff:3000
+      - EDGE_CLOUD_TOKEN=${EDGE_CLOUD_TOKEN:-}
+      - POLICY_SYNC_INTERVAL_SECONDS=60
+      - POLICY_SYNC_BACKOFF_CAP_SECONDS=600
+      - POLICY_SYNC_TIMEOUT_SECONDS=10
+      - EDGE_CONTEXTS=${EDGE_CONTEXTS:-[]}
+      - DD_SERVICE=edge-policy-sync
+      - DD_ENV=development
+    networks:
+      - farmiq-net
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  edge-retention-janitor:
+    build:
+      context: ./edge-retention-janitor
+      dockerfile: Dockerfile
+    container_name: farmiq-edge-retention-janitor
+    ports:
+      - "5110:3000"
+    environment:
+      - NODE_ENV=development
+      - APP_PORT=3000
+      - MEDIA_BASE_PATH=/data/media
+      - MEDIA_RETENTION_DAYS=7
+      - MIN_FREE_DISK_GB=5
+      - JANITOR_INTERVAL_SECONDS=21600
+      - JANITOR_DRY_RUN=true
+      - DD_SERVICE=edge-retention-janitor
+      - DD_ENV=development
+    volumes:
+      - ../../data/edge-media:/data/media
+    networks:
+      - farmiq-net
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  edge-observability-agent:
+    build:
+      context: ./edge-observability-agent
+      dockerfile: Dockerfile
+    container_name: farmiq-edge-observability-agent
+    ports:
+      - "5111:3000"
+    environment:
+      - NODE_ENV=development
+      - APP_PORT=3000
+      - OBS_POLL_INTERVAL_SECONDS=30
+      - DISK_PATH=/data
+      - EDGE_INGRESS_URL=http://edge-ingress-gateway:3000
+      - EDGE_TELEMETRY_URL=http://edge-telemetry-timeseries:3000
+      - EDGE_WEIGHVISION_URL=http://edge-weighvision-session:3000
+      - EDGE_VISION_URL=http://edge-vision-inference:8000
+      - EDGE_MEDIA_URL=http://edge-media-store:3000
+      - EDGE_SYNC_URL=http://edge-sync-forwarder:3000
+      - DD_SERVICE=edge-observability-agent
       - DD_ENV=development
     networks:
       - farmiq-net

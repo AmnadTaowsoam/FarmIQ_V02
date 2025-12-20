@@ -1,63 +1,191 @@
-version: '3.8'
-
 # Development overrides for cloud services
 # Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# Or: docker compose -f docker-compose.yml -f docker-compose.dev.yml build
+# Or standalone: docker compose -f docker-compose.dev.yml up
 
 services:
+  # ============================================
+  # CLOUD INFRASTRUCTURE
+  # ============================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: farmiq-cloud-postgres
+    ports:
+      - "5140:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-farmiq}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-farmiq_dev}
+      - POSTGRES_DB=${POSTGRES_DB:-farmiq}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - farmiq-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-farmiq}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: farmiq-cloud-rabbitmq
+    ports:
+      - "5150:5672"
+      - "5151:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER:-farmiq}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS:-farmiq_dev}
+      - RABBITMQ_DEFAULT_VHOST=/
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./cloud-rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./cloud-rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+      - ./cloud-rabbitmq/init.sh:/docker-entrypoint-init.d/init.sh:ro
+    networks:
+      - farmiq-net
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # CLOUD SERVICES
+  # ============================================
   cloud-identity-access:
     build:
+      context: ./cloud-identity-access
+      dockerfile: Dockerfile
       target: development
+    ports:
+      - "5120:3000"
     volumes:
-      - ./cloud-identity-access/src:/app/src:ro
-      - ./cloud-identity-access/package.json:/app/package.json:ro
+      - ./cloud-identity-access/src:/usr/src/app/src:ro
+      - ./cloud-identity-access/package.json:/usr/src/app/package.json:ro
     environment:
       - NODE_ENV=development
+      - APP_PORT=3000
       - LOG_LEVEL=debug
 
   cloud-tenant-registry:
     build:
+      context: ./cloud-tenant-registry
+      dockerfile: Dockerfile
       target: development
+    ports:
+      - "5121:3000"
     volumes:
-      - ./cloud-tenant-registry/src:/app/src:ro
-      - ./cloud-tenant-registry/package.json:/app/package.json:ro
+      - ./cloud-tenant-registry/src:/usr/src/app/src:ro
+      - ./cloud-tenant-registry/package.json:/usr/src/app/package.json:ro
     environment:
       - NODE_ENV=development
+      - APP_PORT=3000
       - LOG_LEVEL=debug
 
   cloud-ingestion:
     build:
+      context: ./cloud-ingestion
+      dockerfile: Dockerfile
       target: development
+    ports:
+      - "5122:3000"
     volumes:
-      - ./cloud-ingestion/src:/app/src:ro
-      - ./cloud-ingestion/package.json:/app/package.json:ro
+      - ./cloud-ingestion/src:/usr/src/app/src:ro
+      - ./cloud-ingestion/package.json:/usr/src/app/package.json:ro
     environment:
       - NODE_ENV=development
+      - APP_PORT=3000
       - LOG_LEVEL=debug
+    networks:
+      - farmiq-net
 
   cloud-telemetry-service:
     build:
+      context: ./cloud-telemetry-service
+      dockerfile: Dockerfile
       target: development
+    ports:
+      - "5123:3000"
     volumes:
-      - ./cloud-telemetry-service/src:/app/src:ro
-      - ./cloud-telemetry-service/package.json:/app/package.json:ro
+      - ./cloud-telemetry-service/src:/usr/src/app/src:ro
+      - ./cloud-telemetry-service/package.json:/usr/src/app/package.json:ro
     environment:
       - NODE_ENV=development
+      - APP_PORT=3000
       - LOG_LEVEL=debug
 
   cloud-analytics-service:
+    build:
+      context: ./cloud-analytics-service
+      dockerfile: Dockerfile
+    ports:
+      - "5124:8000"
     volumes:
       - ./cloud-analytics-service/app:/app/app:ro
+    command: ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
     environment:
       - LOG_LEVEL=DEBUG
+      - PORT=8000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
+    networks:
+      - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
 
   cloud-api-gateway-bff:
     build:
+      context: ./cloud-api-gateway-bff
+      dockerfile: Dockerfile
       target: development
+    ports:
+      - "5125:3000"
     volumes:
-      - ./cloud-api-gateway-bff/src:/app/src:ro
-      - ./cloud-api-gateway-bff/package.json:/app/package.json:ro
+      - ./cloud-api-gateway-bff/src:/usr/src/app/src:ro
+      - ./cloud-api-gateway-bff/package.json:/usr/src/app/package.json:ro
     environment:
       - NODE_ENV=development
+      - APP_PORT=3000
       - LOG_LEVEL=debug
 
+  cloud-config-rules-service:
+    build:
+      context: ./cloud-config-rules-service
+      dockerfile: Dockerfile
+      target: development
+    ports:
+      - "5126:3000"
+    volumes:
+      - ./cloud-config-rules-service/src:/usr/src/app/src:ro
+      - ./cloud-config-rules-service/package.json:/usr/src/app/package.json:ro
+    environment:
+      - NODE_ENV=development
+      - APP_PORT=3000
+      - LOG_LEVEL=debug
+
+  cloud-audit-log-service:
+    build:
+      context: ./cloud-audit-log-service
+      dockerfile: Dockerfile
+      target: development
+    ports:
+      - "5127:3000"
+    volumes:
+      - ./cloud-audit-log-service/src:/usr/src/app/src:ro
+      - ./cloud-audit-log-service/package.json:/usr/src/app/package.json:ro
+    environment:
+      - NODE_ENV=development
+      - APP_PORT=3000
+      - LOG_LEVEL=debug
+
+networks:
+  farmiq-net:
+    external: true
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
 

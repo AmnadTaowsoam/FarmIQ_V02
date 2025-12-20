@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import { logger } from '../utils/logger'
+import { newUuidV7 } from '../utils/uuid'
 
 const prisma = new PrismaClient()
 
@@ -36,6 +37,7 @@ export async function persistTelemetryReading(event: TelemetryIngestedEvent) {
     // Try to create - if duplicate, Prisma will throw P2002
     await prisma.telemetryRaw.create({
       data: {
+        id: newUuidV7(),
         tenantId: event.tenant_id,
         farmId: event.farm_id || null,
         barnId: event.barn_id || null,

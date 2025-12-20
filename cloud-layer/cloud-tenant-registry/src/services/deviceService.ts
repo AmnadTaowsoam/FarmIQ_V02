@@ -1,5 +1,6 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, Prisma } from '@prisma/client'
 import { logger } from '../utils/logger'
+import { newUuidV7 } from '../utils/uuid'
 
 const prisma = new PrismaClient()
 
@@ -69,6 +70,7 @@ export async function createDevice(
     logger.info(`Creating device for tenant ${tenantId}:`, data)
     return await prisma.device.create({
       data: {
+        id: newUuidV7(),
         tenantId,
         farmId: data.farmId,
         barnId: data.barnId,
@@ -76,7 +78,7 @@ export async function createDevice(
         deviceType: data.deviceType,
         serialNo: data.serialNo,
         status: data.status || 'active',
-        metadata: data.metadata,
+        metadata: data.metadata as any,
       },
     })
   } catch (error) {
@@ -103,12 +105,31 @@ export async function updateDevice(
 ) {
   try {
     logger.info(`Updating device ${deviceId} for tenant ${tenantId}:`, data)
+    // Convert null to undefined and prepare update data
+    const updateData: {
+      farmId?: string
+      barnId?: string
+      batchId?: string
+      deviceType?: string
+      serialNo?: string
+      status?: string
+      metadata?: Record<string, unknown>
+    } = {}
+    
+    if (data.farmId !== undefined) updateData.farmId = data.farmId || undefined
+    if (data.barnId !== undefined) updateData.barnId = data.barnId || undefined
+    if (data.batchId !== undefined) updateData.batchId = data.batchId || undefined
+    if (data.deviceType !== undefined) updateData.deviceType = data.deviceType
+    if (data.serialNo !== undefined) updateData.serialNo = data.serialNo
+    if (data.status !== undefined) updateData.status = data.status
+    if (data.metadata !== undefined) updateData.metadata = data.metadata
+    
     return await prisma.device.updateMany({
       where: {
         id: deviceId,
         tenantId,
       },
-      data,
+      data: updateData as any,
     })
   } catch (error) {
     logger.error(`Error updating device ${deviceId}:`, error)

@@ -1,100 +1,173 @@
-Purpose: Define the scope of the FarmIQ React dashboard and how it integrates with cloud APIs.  
-Scope: Key pages, BFF API calls, and high-level Datadog RUM guidance.  
-Owner: FarmIQ Frontend Team  
-Last updated: 2025-12-17  
+# FarmIQ Dashboard & Integration Strategy
+
+**Purpose**: Define the implementation strategy, security model, and API contracts for the FarmIQ React Dashboard.  
+**Scope**: Integration rules between `dashboard-web` and `cloud-layer` services.  
+**Owner**: FarmIQ Frontend Team  
+**Last updated**: 2025-01-20  
 
 ---
 
-## Dashboard overview
+## 1. Dashboard Overview
 
 The FarmIQ dashboard is a React application intended for:
 - Farm operations monitoring (telemetry trends, device health).
-- WeighVision session insights (weights, inference results, images where permitted).
-- Analytics KPIs and anomaly views (optional for MVP, but supported).
+- WeighVision session insights (weights, inference results, images).
+- Analytics KPIs and anomaly views.
 
-Implementation starting point:
-- **`dashboard-web`** uses `boilerplates/Frontend` (React 18 + TypeScript + Vite + Redux + optional Datadog RUM).
-
----
-
-## Key pages (MVP scope)
-
-- **Login / Access**
-  - OIDC login flow (handled by `cloud-identity-access` and/or external IdP).
-  - Tenant-scoped session.
-
-- **Tenant / Farm selection**
-  - Select tenant (if user has multiple).
-  - Select farm and barn context.
-
-- **Barn overview**
-  - Summary tiles:
-    - Active devices count
-    - Latest telemetry snapshot
-    - Alerts/anomalies (if enabled)
-    - Recent WeighVision sessions
-
-- **Device list and device detail**
-  - Devices by barn with status indicators.
-  - Device detail: time-series charts, last seen timestamps, recent events.
-
-- **Telemetry explorer**
-  - Charts over time for key metrics with filtering by device/barn/batch.
-  - Aggregation windows (1m/1h/1d).
-
-- **WeighVision sessions**
-  - Session list with search/filter by device, time, status.
-  - Session detail:
-    - Captured weights
-    - Inference results and confidence
-    - Images/thumbnails (if retention + permissions allow)
-
-- **Admin (optional in MVP)**
-  - Tenant registry and device onboarding.
-  - RBAC roles and user assignments.
+**Implementation**: `dashboard-web` serves as the primary UI, built via `boilerplates/Frontend`.
 
 ---
 
-## API calls to `cloud-api-gateway-bff`
+## 2. Architecture & BFF Pattern
 
-The dashboard should call only the BFF (`cloud-api-gateway-bff`) for backend data. Example endpoints:
-
-- **Health**
-  - `GET /api/health`
-
-- **Dashboard BFF (business)**
-  - `GET /api/v1/dashboard/overview`
-  - `GET /api/v1/dashboard/farms/{farmId}`
-  - `GET /api/v1/dashboard/barns/{barnId}`
-  - `GET /api/v1/dashboard/alerts`
-
-Headers:
-- `Authorization: Bearer <jwt>`
-- `x-request-id` generated per request (frontend-side).
-
-Error handling:
-- Always assume the standard backend error shape:
-  - `{"error":{"code":"...","message":"...","traceId":"..."}}`
+**Rule**: `dashboard-web` MUST call **only** the `cloud-api-gateway-bff` for all data requirements.
+*   **Exception**: Auth endpoints (`/auth/login`) may be called directly if the Gateway proxies them transparently.
+*   **Reason**: The BFF pattern abstracts microservice complexity, aggregates data (e.g., Farm + Alerts + Summary), and enforces tenant context.
 
 ---
 
-## Optional: Datadog RUM notes
+## 3. Authentication & Authorization (RBAC)
 
-If enabled (recommended for production):
-- Use `boilerplates/Frontend` `src/monitoring.ts` as starting point.
-- Configure:
-  - `service`: `dashboard-web`
-  - `env`: `dev|qa|uat|prod`
-  - `version`: commit id
-- Avoid sending PII in RUM attributes.
-- Correlate RUM with backend traces by forwarding `x-request-id` and ensuring backend logs/traces include it.
+### 3.1 Roles & Permissions
+The frontend MUST recognise the following canonical roles.
+
+| Role | Description | Key Permissions |
+| :--- | :--- | :--- |
+| **platform_admin** | System Owner | Manage Tenants, provisioning, global system health. |
+| **tenant_admin** | Farm Owner | Manage Farms, Users, Devices, Billing. Full access to own tenant. |
+| **farm_manager** | Vet / Manager | View all farm data, acknowledge alerts, edit thresholds. No user management. |
+| **operator** | Farm Hand | View telemetry, alerts, and sessions. Read-only mostly. |
+| **viewer** | Auditor / Guest | Read-only access to specific dashboard pages. |
+
+### 3.2 Permission Matrix (Quick Reference)
+
+| Action | Platform Admin | Tenant Admin | Farm Manager | Operator |
+| :--- | :---: | :---: | :---: | :---: |
+| **Create Tenant** | ✅ | ❌ | ❌ | ❌ |
+| **Create Farm** | ✅ | ✅ | ❌ | ❌ |
+| **Provision Device**| ✅ | ✅ | ❌ | ❌ |
+| **Acknowledge Alert**| ✅ | ✅ | ✅ | ❌ |
+| **View Telemetry** | ✅ | ✅ | ✅ | ✅ |
+| **Manage Users** | ✅ | ✅ | ❌ | ❌ |
+
+### 3.3 Auth Implementation Rules
+1.  **Source of Truth**: The permissions source is the `/api/v1/users/me` endpoint, which returns a `roles: string[]` array.
+    *   *Note*: Do not rely solely on decoded JWT claims for UI logic if they can become stale; prefer fetching `/me` on app load.
+2.  **Route Guards**:
+    *   **Level 1**: Check `isAuthenticated`. Redirect to `/login` if false.
+    *   **Level 2**: Check `hasRole`. Redirect to `/403` if false.
+3.  **Feature Flags**:
+    *   Hide/Disable buttons (e.g., "Delete Farm") if the user lacks the role. Do not clutter the UI with disabled interactions unless discovery is important.
 
 ---
 
-## Implementation Notes
+## 4. API Integration Standards
 
-- Use i18n patterns from the boilerplate for Thai/English readiness.
-- Follow accessibility guidelines (WCAG 2.2 Level A) as required by GT&D standards.
-- Implement a maintenance mode page controlled by an environment variable as required by infrastructure standards.
+### 4.1 Request Contract
+All list endpoints MUST support the following query parameters:
+*   `page`: Integer, 1-based index (Default: 1).
+*   `limit`: Integer (Default: 20 or 25).
+*   `sort_by`: String (Field name).
+*   `sort_dir`: String (`asc` | `desc`).
+*   `q`: String (Search query).
+*   `start_time` / `end_time`: ISO 8601 Strings (for time-series).
 
+**Multi-tenant Headers**:
+All requests MUST include:
+1.  `Authorization`: `Bearer <token>`
+2.  `x-request-id`: UUID v4 (Generated by FE for tracing).
+3.  `tenant_id`: Query param (BFF validation).
 
+### 4.2 Response Contract (Standard List)
+The frontend expects this exact shape for all paginated lists:
+```json
+{
+  "data": [ ... ],
+  "meta": {
+    "page": 1,
+    "limit": 25,
+    "total": 120,
+    "hasNext": true
+  }
+}
+```
+
+### 4.3 Error Contract
+```json
+{
+  "error": {
+    "code": "ERR_RESOURCE_NOT_FOUND",
+    "message": "The requested barn does not exist.",
+    "traceId": "abc-123-xyz"
+  }
+}
+```
+**Handling Rules**:
+*   **400 (Bad Request)**: Show form validation error or inline toast.
+*   **401 (Unauthorized)**: Silent refresh -> Retry -> Logout.
+*   **403 (Forbidden)**: Redirect to 403 page or show inline access denied.
+*   **404 (Not Found)**: Show 404 page.
+*   **5xx (Server Error)**: Show "Service Unavailable" and **Retry** button.
+
+### 4.4 Retry Policy
+*   **Permitted**: Network Failure, 502, 503, 504. (Max 3 retries, exponential backoff).
+*   **Forbidden**: 400, 401, 403, 404. (Do not retry logic errors).
+
+---
+
+## 5. Realtime & Refresh Strategy
+
+### 5.1 Polling Policy (MVP)
+WebSockets are deferred. We rely on smart polling.
+
+*   **Global Interval**: No global polling.
+*   **Dashboard Overview**: Poll every **60s**.
+*   **Barn/Device Detail**: Poll every **30s**.
+*   **Alerts**: Poll every **60s**.
+
+### 5.2 Implementation Rules
+1.  **Tab Visibility**: Polling MUST pause when `document.visibilityState === 'hidden'`.
+2.  **Manual Refresh**: All pages MUST have a "Refresh" button in the `PageHeader`.
+3.  **Stale-While-Revalidate**: UI should show cached data while fetching new data (avoid layout thrashing).
+
+---
+
+## 6. Security Hardening
+
+### 6.1 Token Storage
+*   **Decision**: Store Access Tokens in **Memory** (React Context / Redux state).
+*   **Refresh Token**: Store in `httpOnly` cookie (preferred) or `localStorage`.
+    *   *Risk*: If `localStorage` is used, XSS leads to account takeover.
+    *   *Mitigation*: Strict CSP, sanitize all inputs.
+
+### 6.2 XSS Prevention
+*   **Rule**: Never use `dangerouslySetInnerHTML`.
+*   **Sanitization**: If rich text is absolutely required, use `DOMPurify` before rendering.
+
+### 6.3 Route Protection
+*   **Rule**: Client-side checks are UX only. The Backend MUST validate permissions on every request.
+*   **Privacy**: Do not send PII (Email, Phone, Names) in Telemetry/RUM events.
+
+---
+
+## 7. Maintenance Mode
+Environment Variable: `VITE_MAINTENANCE_MODE=true`.
+*   Blocks all routes except `/login`.
+*   Shows a full-screen "System Under Maintenance" banner.
+
+---
+
+## 8. Expanded Documentation
+
+For comprehensive Dashboard documentation, see the [Dashboard Documentation Pack](dashboard/):
+
+- **[Expanded Scope](dashboard/00-dashboard-expanded-scope.md)**: Commercial-scale requirements, goals, and FE-to-BFF integration pattern
+- **[Information Architecture](dashboard/01-information-architecture.md)**: Navigation, route map, context selector, and page grouping
+- **[Page Specifications](dashboard/02-page-specs.md)**: Detailed specifications for all 26+ dashboard pages
+- **[Data Requirements](dashboard/03-data-requirements-and-computation.md)**: Data sources, canonical IDs, computation responsibilities, and freshness model
+- **[BFF API Contracts](dashboard/04-bff-api-contracts.md)**: Complete API endpoint definitions for all dashboard pages
+- **[KPI & Metrics Definitions](dashboard/05-kpi-metrics-definitions.md)**: Formulas, units, and aggregation rules for all KPIs
+- **[Multi-Tenant & RBAC](dashboard/06-multi-tenant-and-rbac.md)**: Role definitions, permission matrix, and audit requirements
+- **[Ops Observability UX](dashboard/07-ops-observability-ux.md)**: Data freshness indicators, sync monitoring, and troubleshooting
+- **[ML Analytics Roadmap](dashboard/08-ml-analytics-roadmap.md)**: Data collection, export formats, drift monitoring, and implementation phases
+- **[Acceptance Checklist](dashboard/09-acceptance-checklist.md)**: Comprehensive testing checklist for release readiness

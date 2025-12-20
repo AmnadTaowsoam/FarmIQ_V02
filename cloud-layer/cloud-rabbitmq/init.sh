@@ -16,5 +16,20 @@ if [ -f /etc/rabbitmq/definitions.json ]; then
   rabbitmqctl import_definitions /etc/rabbitmq/definitions.json || true
 fi
 
+# Create default user if it doesn't exist (needed when definitions.json is present)
+# Wait a bit more for RabbitMQ to be fully initialized
+sleep 2
+USER="${RABBITMQ_DEFAULT_USER:-farmiq}"
+PASS="${RABBITMQ_DEFAULT_PASS:-farmiq_dev}"
+
+if ! rabbitmqctl list_users | grep -q "^${USER}"; then
+  echo "Creating user ${USER}..."
+  rabbitmqctl add_user "${USER}" "${PASS}" || true
+fi
+
+# Set permissions for default user
+echo "Setting permissions for user ${USER}..."
+rabbitmqctl set_permissions -p / "${USER}" ".*" ".*" ".*" || true
+
 echo "RabbitMQ initialization complete"
 

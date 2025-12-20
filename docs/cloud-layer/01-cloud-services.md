@@ -53,15 +53,15 @@ Ownership guards (non-negotiable):
 
 ### `cloud-identity-access` (Node)
 
-- **Purpose**: Authentication and authorization service integrating with OIDC; issues/validates JWTs and enforces RBAC.
+- **Purpose**: Authentication and authorization service. MVP: Password-based authentication; Production: OIDC integration support. Issues/validates JWTs and enforces RBAC.
 - **APIs**:
   - `GET /api/health`
   - `GET /api/ready` (recommended)
   - `GET /api-docs`
   - `GET /api-docs/openapi.json` (or `openapi.yaml`)
-  - `POST /api/v1/auth/login`
-  - `POST /api/v1/auth/refresh`
-  - `GET /api/v1/users/me`
+  - `POST /api/v1/auth/login` (MVP: email/password; Future: OIDC redirect support)
+  - `POST /api/v1/auth/refresh` (refresh token exchange for new access token)
+  - `GET /api/v1/users/me` (current user profile with roles)
 - **DB tables owned** (typical):
   - `user`
   - `role`

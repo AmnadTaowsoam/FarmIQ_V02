@@ -1,0 +1,33 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Immutable audit log events
+model AuditEvent {
+  id           String   @id @default(uuid())
+  tenantId     String
+  actorId      String   // User ID who performed the action
+  actorRole    String   // Role of the actor (platform_admin, tenant_admin, etc.)
+  action       String   // e.g., "create", "update", "delete", "view", "acknowledge"
+  resourceType String   // e.g., "farm", "barn", "threshold", "alert"
+  resourceId   String?  // ID of the resource (nullable for list operations)
+  summary      String   // Human-readable summary
+  metadataJson Json?    // Additional metadata (JSON)
+  requestId    String?  // Request ID for correlation
+  createdAt    DateTime @default(now())
+
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@index([tenantId, actorId, createdAt(sort: Desc)])
+  @@index([tenantId, action, resourceType, createdAt(sort: Desc)])
+  @@map("audit_events")
+}
+

@@ -15,9 +15,10 @@ datasource db {
 }
 
 model CloudDedupe {
-  tenantId    String
-  eventId     String
-  firstSeenAt DateTime @default(now())
+  tenantId    String   @map("tenant_id")
+  eventId     String   @map("event_id")
+  firstSeenAt DateTime @default(now()) @map("first_seen_at")
 
   @@id([tenantId, eventId])
+  @@map("cloud_dedupe")
 }

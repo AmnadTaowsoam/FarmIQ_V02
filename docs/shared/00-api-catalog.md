@@ -112,7 +112,7 @@ All FarmIQ services must follow `shared/01-api-standards.md`:
 
 - **Purpose**: Media owner (PVC filesystem + metadata).
 - **Base path**: `/api`
-- **Auth**: Internal cluster auth for reads; device uploads routed via `edge-ingress-gateway`.
+- **Auth**: Internal cluster auth for reads; presign requires device auth (x-tenant-id or token claims). Gateway does not proxy image bytes.
 - **/api-docs**: `GET /api-docs`
 - **Core endpoints**
   - `GET /api/health`
@@ -155,10 +155,60 @@ All FarmIQ services must follow `shared/01-api-standards.md`:
   - `GET /api/ready` (recommended)
   - `GET /api-docs`
   - `GET /api-docs/openapi.json` (or `openapi.yaml`)
-  - `GET /api/v1/sync/state`
+  - `GET /api/v1/sync/state` (returns pending/claimed/dead/dlq counts + oldest pending age)
   - `POST /api/v1/sync/trigger` (admin/debug)
-  - `GET /api/v1/sync/outbox` (admin/debug)
-- **Data ownership**: `sync_outbox`, `sync_state`
+  - `POST /api/v1/sync/dlq/redrive` (admin/debug; re-drive DLQ with reason)
+- **Data ownership**: `sync_outbox`, `sync_outbox_dlq`
+- **Implementation notes**: `boilerplates/Backend-node`
+
+### `edge-policy-sync`
+
+- **Purpose**: Cache effective config from cloud BFF for offline-first edge operation.
+- **Base path**: `/api`
+- **Auth**: Internal cluster auth (service token) when calling BFF; local reads are internal only.
+- **/api-docs**: `GET /api-docs`
+- **Core endpoints**
+  - `GET /api/health`
+  - `GET /api/ready`
+  - `GET /api-docs`
+  - `GET /api-docs/openapi.json` (or `openapi.yaml`)
+  - `GET /api/v1/edge-config/effective?tenantId&farmId&barnId`
+  - `GET /api/v1/edge-config/state`
+  - `GET /metrics`
+- **Data ownership**: `edge_config_cache`, `edge_config_sync_state`
+- **Implementation notes**: `boilerplates/Backend-node`
+
+### `edge-retention-janitor`
+
+- **Purpose**: Enforce media retention and free-disk safeguards.
+- **Base path**: `/api`
+- **Auth**: Internal cluster auth (admin-only in production).
+- **/api-docs**: `GET /api-docs`
+- **Core endpoints**
+  - `GET /api/health`
+  - `GET /api/ready`
+  - `GET /api-docs`
+  - `GET /api-docs/openapi.json` (or `openapi.yaml`)
+  - `POST /api/v1/janitor/run`
+  - `GET /api/v1/janitor/state`
+  - `GET /metrics`
+- **Data ownership**: None (acts on PVC paths only).
+- **Implementation notes**: `boilerplates/Backend-node`
+
+### `edge-observability-agent`
+
+- **Purpose**: Aggregate edge health, resources, and sync backlog into a single ops view.
+- **Base path**: `/api`
+- **Auth**: Internal cluster auth (ops only).
+- **/api-docs**: `GET /api-docs`
+- **Core endpoints**
+  - `GET /api/health`
+  - `GET /api/ready`
+  - `GET /api-docs`
+  - `GET /api-docs/openapi.json` (or `openapi.yaml`)
+  - `GET /api/v1/ops/edge/status`
+  - `GET /metrics`
+- **Data ownership**: None (aggregator only).
 - **Implementation notes**: `boilerplates/Backend-node`
 
 ---
@@ -273,6 +323,75 @@ All FarmIQ services must follow `shared/01-api-standards.md`:
   - `/api/v1/analytics/forecasts`
 - **Data ownership**: analytics tables
 - **Implementation notes**: `boilerplates/Backend-python`
+
+### `cloud-config-rules-service`
+
+- **Purpose**: Store per-tenant and per-barn configuration (thresholds, rules, target curves).
+- **Base path**: `/api`
+- **Auth**: JWT + RBAC.
+- **/api-docs**: `GET /api-docs`
+- **Core endpoints**
+  - `GET /api/health`
+  - `GET /api/ready` (recommended)
+  - `GET /api-docs`
+  - `GET /api-docs/openapi.json` (or `openapi.yaml`)
+  - `GET /api/v1/config/context` - Get effective config for context
+  - `GET /api/v1/config/thresholds` - Get thresholds
+  - `PUT /api/v1/config/thresholds` - Upsert thresholds
+  - `GET /api/v1/config/targets` - Get target curves
+  - `PUT /api/v1/config/targets` - Upsert target curves
+- **Data ownership**: `config_threshold_rules`, `config_target_curves`
+- **Implementation notes**: `boilerplates/Backend-node`
+
+### `cloud-audit-log-service`
+
+- **Purpose**: Immutable audit trail for all user actions and system events.
+- **Base path**: `/api`
+- **Auth**: JWT + RBAC (for read); internal service auth (for write).
+- **/api-docs**: `GET /api-docs`
+- **Core endpoints**
+  - `GET /api/health`
+  - `GET /api/ready` (recommended)
+  - `GET /api-docs`
+  - `GET /api-docs/openapi.json` (or `openapi.yaml`)
+  - `POST /api/v1/audit/events` - Create audit event (internal/BFF)
+  - `GET /api/v1/audit/events` - Query audit events
+- **Data ownership**: `audit_events` (append-only)
+- **Implementation notes**: `boilerplates/Backend-node`
+
+### `cloud-notification-service`
+
+- **Purpose**: Deliver notifications from anomalies/rules (MVP: webhook).
+- **Base path**: `/api`
+- **Auth**: JWT + RBAC (for history); internal service auth (for send).
+- **/api-docs**: `GET /api-docs`
+- **Core endpoints**
+  - `GET /api/health`
+  - `GET /api/ready` (recommended)
+  - `GET /api-docs`
+  - `POST /api/v1/notifications/send` - Direct send (MVP: webhook)
+  - `GET /api/v1/notifications/history` - Notification history
+- **Data ownership**: `notifications`
+- **Async**: Consumes `notification.jobs` queue from RabbitMQ
+- **Implementation notes**: `boilerplates/Backend-node`
+
+### `cloud-reporting-export-service`
+
+- **Purpose**: Async export jobs (dataset/report generation).
+- **Base path**: `/api`
+- **Auth**: JWT + RBAC.
+- **/api-docs**: `GET /api-docs`
+- **Core endpoints**
+  - `GET /api/health`
+  - `GET /api/ready` (recommended)
+  - `GET /api-docs`
+  - `POST /api/v1/reports/jobs` - Create export job
+  - `GET /api/v1/reports/jobs/:jobId` - Get job status
+  - `GET /api/v1/reports/jobs` - List jobs
+  - `GET /api/v1/reports/jobs/:jobId/download` - Get download URL
+- **Data ownership**: `report_jobs` + file storage (local volume for MVP)
+- **Async**: Consumes `report.jobs` queue from RabbitMQ
+- **Implementation notes**: `boilerplates/Backend-node`
 
 ### `cloud-media-store` (optional)
 

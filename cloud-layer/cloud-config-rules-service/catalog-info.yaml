@@ -1,0 +1,12 @@
+apiVersion: backstage.io/v1beta2
+kind: Component
+metadata:
+  name: cloud-config-rules-service
+  description: FarmIQ Cloud Config Rules Service - Configuration rules, thresholds, and target curves management service
+  annotations:
+    dev.azure.com/project-slug: betagro-dev/farmiq
+spec:
+  type: service
+  lifecycle: production
+  owner: cloud-layer-team
+
