@@ -1,0 +1,76 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Feed intake records (local edge storage)
+model FeedIntakeLocal {
+  id            String   @id @default(uuid())
+  tenantId      String   @map("tenant_id")
+  farmId        String?  @map("farm_id")
+  barnId        String   @map("barn_id")
+  batchId       String?  @map("batch_id")
+  deviceId      String?  @map("device_id")
+  source        String   // MANUAL, API_IMPORT, SILO_AUTO, MQTT_DISPENSED
+  feedFormulaId String?  @map("feed_formula_id")
+  feedLotId     String?  @map("feed_lot_id")
+  quantityKg    Decimal  @db.Decimal(10, 3) @map("quantity_kg")
+  occurredAt    DateTime @map("occurred_at")
+  ingestedAt    DateTime @default(now()) @map("ingested_at")
+  eventId       String?  @unique @map("event_id")
+  externalRef   String?  @map("external_ref")
+  sequence      Int?     @map("sequence")
+  notes         String?  @map("notes")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, eventId], name: "unique_tenant_event")
+  @@unique([tenantId, externalRef], name: "unique_tenant_external_ref")
+  @@index([tenantId, barnId, occurredAt(sort: Desc)])
+  @@index([tenantId, deviceId, occurredAt(sort: Desc)])
+  @@map("feed_intake_local")
+}
+
+// Deduplication table for feed intake events
+model FeedIntakeDedupe {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  eventId     String   @map("event_id")
+  externalRef String?  @map("external_ref")
+  deviceId    String?  @map("device_id")
+  processedAt DateTime @default(now()) @map("processed_at")
+  expiresAt   DateTime @map("expires_at") // TTL for cleanup
+
+  @@unique([tenantId, eventId], name: "unique_tenant_event_dedupe")
+  @@index([tenantId, externalRef])
+  @@index([expiresAt])
+  @@map("feed_intake_dedupe")
+}
+
+// Silo weight tracking for delta computation (Mode B: SILO_AUTO)
+model SiloWeightSnapshot {
+  id            String   @id @default(uuid())
+  tenantId      String   @map("tenant_id")
+  deviceId      String   @map("device_id")
+  weightKg      Decimal  @db.Decimal(10, 3) @map("weight_kg")
+  recordedAt     DateTime @map("recorded_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, deviceId], name: "unique_tenant_device_silo")
+  @@index([tenantId, deviceId, recordedAt(sort: Desc)])
+  @@map("silo_weight_snapshot")
+}
+
+// Note: sync_outbox table is shared across services and managed by edge-sync-forwarder
+// We write to it using raw SQL or Prisma raw queries since it has additional fields
+// (claim/lease fields) that are managed by the forwarder service
+

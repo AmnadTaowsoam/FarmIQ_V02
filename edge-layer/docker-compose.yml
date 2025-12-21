@@ -251,6 +251,34 @@ services:
       timeout: 5s
       retries: 5
 
+  edge-feed-intake:
+    build:
+      context: ./edge-feed-intake
+      dockerfile: Dockerfile
+    container_name: farmiq-edge-feed-intake
+    ports:
+      - "5112:5109"
+    environment:
+      - NODE_ENV=development
+      - APP_PORT=5109
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - MQTT_BROKER_URL=mqtt://edge-mqtt-broker:1883
+      - EDGE_SYNC_FORWARDER_URL=http://edge-sync-forwarder:3000
+      - DD_SERVICE=edge-feed-intake
+      - DD_ENV=development
+    networks:
+      - farmiq-net
+    depends_on:
+      edge-mqtt-broker:
+        condition: service_started
+      edge-sync-forwarder:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5109/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 networks:
   farmiq-net:
     external: true

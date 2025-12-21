@@ -3,7 +3,7 @@
 
 generator client {
   provider = "prisma-client-js"
-  binaryTargets = ["native", "debian-openssl-3.0.x"]
+  binaryTargets = ["native", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -26,6 +26,9 @@ model Tenant {
   barns   Barn[]   @relation("BarnToTenant")
   batches Batch[]  @relation("BatchToTenant")
   devices Device[] @relation("DeviceToTenant")
+  sensors Sensor[] @relation("SensorToTenant")
+  sensorBindings SensorBinding[] @relation("BindingToTenant")
+  sensorCalibrations SensorCalibration[] @relation("CalibrationToTenant")
 
   @@index([status])
   @@map("tenants")
@@ -69,6 +72,7 @@ model Barn {
   batches Batch[]
   devices Device[]
   stations Station[]
+  sensors Sensor[] @relation("SensorToBarn")
 
   @@unique([tenantId, farmId, name])
   @@index([tenantId])
@@ -120,6 +124,7 @@ model Device {
   farm   Farm?  @relation(fields: [farmId], references: [id], onDelete: SetNull)
   barn   Barn?  @relation(fields: [barnId], references: [id], onDelete: SetNull)
   batch  Batch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  sensorBindings SensorBinding[] @relation("BindingToDevice")
 
   @@unique([tenantId, serialNo])
   @@index([tenantId])
@@ -152,4 +157,79 @@ model Station {
   @@index([tenantId, farmId, barnId])
   @@index([tenantId, status])
   @@map("stations")
+}
+
+// Sensor Module (Phase 1)
+model Sensor {
+  id        String   @id @default(uuid())
+  tenantId  String
+  sensorId  String   // Human-readable stable identifier, unique per tenant
+  type      String   // e.g., "temperature", "humidity", "silo_weight", "water_flow"
+  unit      String   // e.g., "C", "%", "kg", "L/min"
+  label     String?
+  barnId    String?  // Optional placement
+  zone      String?  // e.g., "A1", "SILO-01"
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  tenant      Tenant              @relation("SensorToTenant", fields: [tenantId], references: [id], onDelete: Cascade)
+  barn        Barn?               @relation("SensorToBarn", fields: [barnId], references: [id], onDelete: SetNull)
+  bindings    SensorBinding[]
+  calibrations SensorCalibration[]
+
+  @@unique([tenantId, sensorId])
+  @@index([tenantId])
+  @@index([tenantId, barnId])
+  @@index([tenantId, type])
+  @@index([tenantId, enabled])
+  @@map("sensors")
+}
+
+model SensorBinding {
+  id            String    @id @default(uuid())
+  tenantId      String
+  sensorId      String    // FK to Sensor.id
+  deviceId      String    // FK to Device.id
+  protocol      String    // e.g., "mqtt", "modbus", "opcua", "http"
+  channel       String?   // MQTT topic OR modbus register OR logical channel name
+  samplingRate  Int?      // Seconds
+  effectiveFrom DateTime
+  effectiveTo   DateTime? // null means active indefinitely
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  tenant Tenant @relation("BindingToTenant", fields: [tenantId], references: [id], onDelete: Cascade)
+  sensor Sensor @relation(fields: [sensorId], references: [id], onDelete: Cascade)
+  device Device @relation("BindingToDevice", fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, sensorId])
+  @@index([tenantId, deviceId])
+  @@index([tenantId, sensorId, effectiveFrom])
+  @@map("sensor_bindings")
+}
+
+model SensorCalibration {
+  id          String   @id @default(uuid())
+  tenantId    String
+  sensorId    String   // FK to Sensor.id
+  offset      Float    @default(0)
+  gain        Float    @default(1)
+  method      String   // e.g., "two-point", "factory"
+  performedAt DateTime
+  performedBy String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  tenant Tenant @relation("CalibrationToTenant", fields: [tenantId], references: [id], onDelete: Cascade)
+  sensor Sensor @relation(fields: [sensorId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, sensorId])
+  @@index([tenantId, sensorId, performedAt(sort: Desc)])
+  @@map("sensor_calibrations")
 }

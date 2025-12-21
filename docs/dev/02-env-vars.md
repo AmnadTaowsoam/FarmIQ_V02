@@ -20,10 +20,13 @@ RABBITMQ_USER=guest
 RABBITMQ_PASSWORD=guest
 
 # Datadog (optional for local dev)
+DD_API_KEY=your-datadog-api-key-here
+DD_SITE=datadoghq.com
 DD_SERVICE=farmiq-local
 DD_ENV=development
-DD_AGENT_HOST=localhost
+DD_AGENT_HOST=datadog
 DD_TRACE_AGENT_PORT=8126
+DD_LOGS_INJECTION=true
 
 # JWT (for cloud services)
 JWT_SECRET=change-me-in-production

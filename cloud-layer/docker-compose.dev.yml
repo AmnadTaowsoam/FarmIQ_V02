@@ -49,6 +49,32 @@ services:
       timeout: 5s
       retries: 5
 
+  # Datadog Agent - Commented out until DD_API_KEY is configured
+  # datadog:
+  #   image: gcr.io/datadoghq/agent:7
+  #   container_name: farmiq-cloud-datadog-agent
+  #   restart: unless-stopped
+  #   ports:
+  #     - "8126:8126"   # APM intake
+  #     - "8125:8125/udp" # dogstatsd
+  #   environment:
+  #     - DD_API_KEY=${DD_API_KEY}
+  #     - DD_SITE=${DD_SITE:-datadoghq.com}
+  #     - DD_ENV=${DD_ENV:-dev}
+  #     - DD_TAGS=project:farmiq layer:cloud stack:dev
+  #     - DD_LOGS_ENABLED=true
+  #     - DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL=true
+  #     - DD_APM_ENABLED=true
+  #     - DD_APM_NON_LOCAL_TRAFFIC=true
+  #     - DD_DOGSTATSD_NON_LOCAL_TRAFFIC=true
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock:ro
+  #     - /proc/:/host/proc/:ro
+  #     - /sys/fs/cgroup:/host/sys/fs/cgroup:ro
+  #     - /var/lib/docker/containers:/var/lib/docker/containers:ro
+  #   networks:
+  #     - farmiq-net
+
   # ============================================
   # CLOUD SERVICES
   # ============================================
@@ -66,6 +92,17 @@ services:
       - NODE_ENV=development
       - APP_PORT=3000
       - LOG_LEVEL=debug
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DD_ENV=${DD_ENV:-dev}
+      - DD_SERVICE=cloud-identity-access
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+    networks:
+      - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   cloud-tenant-registry:
     build:
@@ -77,10 +114,22 @@ services:
     volumes:
       - ./cloud-tenant-registry/src:/usr/src/app/src:ro
       - ./cloud-tenant-registry/package.json:/usr/src/app/package.json:ro
+      - ./cloud-tenant-registry/prisma:/usr/src/app/prisma:ro
     environment:
       - NODE_ENV=development
       - APP_PORT=3000
       - LOG_LEVEL=debug
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DD_ENV=${DD_ENV:-dev}
+      - DD_SERVICE=cloud-tenant-registry
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+    networks:
+      - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   cloud-ingestion:
     build:
@@ -96,8 +145,17 @@ services:
       - NODE_ENV=development
       - APP_PORT=3000
       - LOG_LEVEL=debug
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DD_ENV=${DD_ENV:-dev}
+      - DD_SERVICE=cloud-ingestion
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
     networks:
       - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   cloud-telemetry-service:
     build:
@@ -113,6 +171,17 @@ services:
       - NODE_ENV=development
       - APP_PORT=3000
       - LOG_LEVEL=debug
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DD_ENV=${DD_ENV:-dev}
+      - DD_SERVICE=cloud-telemetry-service
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+    networks:
+      - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   cloud-analytics-service:
     build:
@@ -128,6 +197,11 @@ services:
       - PORT=8000
       - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
+      - DD_ENV=${DD_ENV:-dev}
+      - DD_SERVICE=cloud-analytics-service
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
     networks:
       - farmiq-net
     depends_on:
@@ -146,10 +220,33 @@ services:
     volumes:
       - ./cloud-api-gateway-bff/src:/usr/src/app/src:ro
       - ./cloud-api-gateway-bff/package.json:/usr/src/app/package.json:ro
+      - ./cloud-api-gateway-bff/prisma:/usr/src/app/prisma:ro
     environment:
       - NODE_ENV=development
       - APP_PORT=3000
       - LOG_LEVEL=debug
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - IDENTITY_BASE_URL=http://cloud-identity-access:3000
+      - REGISTRY_BASE_URL=http://cloud-tenant-registry:3000
+      - TELEMETRY_BASE_URL=http://cloud-telemetry-service:3000
+      - ANALYTICS_BASE_URL=http://cloud-analytics-service:8000
+      - WEIGHVISION_READMODEL_BASE_URL=http://cloud-weighvision-readmodel:3000
+      - CONFIG_RULES_BASE_URL=http://cloud-config-rules-service:3000
+      - AUDIT_LOG_BASE_URL=http://cloud-audit-log-service:3000
+      - NOTIFICATION_BASE_URL=http://cloud-notification-service:3000
+      - REPORTING_EXPORT_BASE_URL=http://cloud-reporting-export-service:3000
+      - FEED_SERVICE_URL=http://cloud-feed-service:3000
+      - BARN_RECORDS_SERVICE_URL=http://cloud-barn-records-service:3000
+      - DD_ENV=${DD_ENV:-dev}
+      - DD_SERVICE=cloud-api-gateway-bff
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+    networks:
+      - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   cloud-config-rules-service:
     build:
@@ -161,10 +258,22 @@ services:
     volumes:
       - ./cloud-config-rules-service/src:/usr/src/app/src:ro
       - ./cloud-config-rules-service/package.json:/usr/src/app/package.json:ro
+      - ./cloud-config-rules-service/prisma:/usr/src/app/prisma:ro
     environment:
       - NODE_ENV=development
       - APP_PORT=3000
       - LOG_LEVEL=debug
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DD_ENV=${DD_ENV:-dev}
+      - DD_SERVICE=cloud-config-rules-service
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+    networks:
+      - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   cloud-audit-log-service:
     build:
@@ -176,10 +285,181 @@ services:
     volumes:
       - ./cloud-audit-log-service/src:/usr/src/app/src:ro
       - ./cloud-audit-log-service/package.json:/usr/src/app/package.json:ro
+      - ./cloud-audit-log-service/prisma:/usr/src/app/prisma:ro
     environment:
       - NODE_ENV=development
       - APP_PORT=3000
       - LOG_LEVEL=debug
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DD_ENV=${DD_ENV:-dev}
+      - DD_SERVICE=cloud-audit-log-service
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+    networks:
+      - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  cloud-notification-service:
+    build:
+      context: ./cloud-notification-service
+      dockerfile: Dockerfile
+      target: development
+    ports:
+      - "5128:3000"
+    volumes:
+      - ./cloud-notification-service/src:/usr/src/app/src:ro
+      - ./cloud-notification-service/package.json:/usr/src/app/package.json:ro
+      - ./cloud-notification-service/prisma:/usr/src/app/prisma:ro
+    environment:
+      - NODE_ENV=development
+      - APP_PORT=3000
+      - LOG_LEVEL=debug
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
+      - WORKER_CONCURRENCY=1
+      - DD_ENV=${DD_ENV:-dev}
+      - DD_SERVICE=cloud-notification-service
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+    networks:
+      - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  cloud-reporting-export-service:
+    build:
+      context: ./cloud-reporting-export-service
+      dockerfile: Dockerfile
+      target: development
+    ports:
+      - "5129:3000"
+    volumes:
+      - ./cloud-reporting-export-service/src:/usr/src/app/src:ro
+      - ./cloud-reporting-export-service/package.json:/usr/src/app/package.json:ro
+      - ./cloud-reporting-export-service/prisma:/usr/src/app/prisma:ro
+      - report_exports_data:/data/exports
+    environment:
+      - NODE_ENV=development
+      - APP_PORT=3000
+      - LOG_LEVEL=debug
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
+      - REPORT_DOWNLOAD_SECRET=${REPORT_DOWNLOAD_SECRET:-dev-report-secret}
+      - EXPORT_ROOT=/data/exports
+      - WORKER_CONCURRENCY=1
+      - CLOUD_FEED_SERVICE_URL=http://cloud-feed-service:5130
+      - DD_ENV=${DD_ENV:-dev}
+      - DD_SERVICE=cloud-reporting-export-service
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+    networks:
+      - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  cloud-feed-service:
+    build:
+      context: ./cloud-feed-service
+      dockerfile: Dockerfile
+      target: development
+    ports:
+      - "5130:3000"
+    volumes:
+      - ./cloud-feed-service/src:/usr/src/app/src:ro
+      - ./cloud-feed-service/package.json:/usr/src/app/package.json:ro
+      - ./cloud-feed-service/prisma:/usr/src/app/prisma:ro
+    environment:
+      - NODE_ENV=development
+      - APP_PORT=3000
+      - LOG_LEVEL=debug
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
+      - DD_ENV=${DD_ENV:-dev}
+      - DD_SERVICE=cloud-feed-service
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+      - DD_LOGS_INJECTION=true
+    networks:
+      - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  cloud-barn-records-service:
+    build:
+      context: ./cloud-barn-records-service
+      dockerfile: Dockerfile
+      target: development
+    ports:
+      - "5131:3000"
+    volumes:
+      - ./cloud-barn-records-service/src:/usr/src/app/src:ro
+      - ./cloud-barn-records-service/package.json:/usr/src/app/package.json:ro
+      - ./cloud-barn-records-service/prisma:/usr/src/app/prisma:ro
+    environment:
+      - NODE_ENV=development
+      - APP_PORT=3000
+      - LOG_LEVEL=debug
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
+      - DD_ENV=${DD_ENV:-dev}
+      - DD_SERVICE=cloud-barn-records-service
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+      - DD_LOGS_INJECTION=true
+    networks:
+      - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  cloud-weighvision-readmodel:
+    build:
+      context: ./cloud-weighvision-readmodel
+      dockerfile: Dockerfile
+      target: development
+    ports:
+      - "5132:3000"
+    volumes:
+      - ./cloud-weighvision-readmodel/src:/usr/src/app/src:ro
+      - ./cloud-weighvision-readmodel/package.json:/usr/src/app/package.json:ro
+      - ./cloud-weighvision-readmodel/prisma:/usr/src/app/prisma:ro
+    environment:
+      - NODE_ENV=development
+      - APP_PORT=3000
+      - LOG_LEVEL=debug
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
+      - DD_ENV=${DD_ENV:-dev}
+      - DD_SERVICE=cloud-weighvision-readmodel
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+      - DD_LOGS_INJECTION=true
+    networks:
+      - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
 
 networks:
   farmiq-net:
@@ -188,4 +468,4 @@ networks:
 volumes:
   postgres_data:
   rabbitmq_data:
-
+  report_exports_data:

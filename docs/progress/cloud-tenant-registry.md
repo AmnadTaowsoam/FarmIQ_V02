@@ -4,7 +4,7 @@
 **Layer**: cloud  
 **Status**: done  
 **Owner**: CursorAI  
-**Last Updated**: 2025-01-18
+**Last Updated**: 2025-01-27
 
 ---
 
@@ -67,6 +67,16 @@ Multi-tenant master data management service for FarmIQ. Owns all master data tab
 
 #### Topology
 - `GET /api/v1/topology?tenantId=...` → Get complete nested topology (tenant → farms → barns → devices → stations)
+
+#### Sensors (Phase 1 - Sensor Module)
+- `GET /api/v1/sensors?tenantId=...&barnId=...&deviceId=...&type=...&enabled=...&q=...&cursor=...&limit=...` → List sensors with filters and pagination
+- `GET /api/v1/sensors/{sensorId}?tenantId=...` → Get sensor by sensorId (human-readable ID)
+- `POST /api/v1/sensors` → Create sensor (requires Idempotency-Key header for idempotency)
+- `PATCH /api/v1/sensors/{sensorId}` → Update sensor (label, enabled, barnId, zone, unit, type)
+- `GET /api/v1/sensors/{sensorId}/bindings?tenantId=...&cursor=...&limit=...` → List bindings for sensor
+- `POST /api/v1/sensors/{sensorId}/bindings` → Create binding (requires Idempotency-Key, enforces overlap validation)
+- `GET /api/v1/sensors/{sensorId}/calibrations?tenantId=...&cursor=...&limit=...` → List calibrations for sensor
+- `POST /api/v1/sensors/{sensorId}/calibrations` → Create calibration (requires Idempotency-Key)
 
 ---
 
@@ -136,6 +146,46 @@ Multi-tenant master data management service for FarmIQ. Owns all master data tab
 - `createdAt`, `updatedAt`
 - Unique: `(tenantId, farmId, barnId, name)`
 - Indexes: `tenantId`, `(tenantId, farmId, barnId)`, `(tenantId, status)`
+
+### sensors (Sensor Module Phase 1)
+- `id` (uuid, pk)
+- `tenantId` (uuid, fk → tenants.id)
+- `sensorId` (string) - Human-readable stable identifier, unique per tenant
+- `type` (string) - e.g., "temperature", "humidity", "silo_weight", "water_flow"
+- `unit` (string) - e.g., "C", "%", "kg", "L/min"
+- `label` (string, nullable)
+- `barnId` (uuid, fk → barns.id, nullable) - Optional placement
+- `zone` (string, nullable) - e.g., "A1", "SILO-01"
+- `enabled` (boolean, default true)
+- `createdAt`, `updatedAt`
+- Unique: `(tenantId, sensorId)`
+- Indexes: `tenantId`, `(tenantId, barnId)`, `(tenantId, type)`, `(tenantId, enabled)`
+
+### sensor_bindings (Sensor Module Phase 1)
+- `id` (uuid, pk)
+- `tenantId` (uuid, fk → tenants.id)
+- `sensorId` (uuid, fk → sensors.id)
+- `deviceId` (uuid, fk → devices.id)
+- `protocol` (string) - e.g., "mqtt", "modbus", "opcua", "http"
+- `channel` (string, nullable) - MQTT topic OR modbus register OR logical channel name
+- `samplingRate` (integer, nullable) - Seconds
+- `effectiveFrom` (datetime)
+- `effectiveTo` (datetime, nullable) - null means active indefinitely
+- `createdAt`, `updatedAt`
+- Indexes: `tenantId`, `(tenantId, sensorId)`, `(tenantId, deviceId)`, `(tenantId, sensorId, effectiveFrom)`
+- **Overlap Rule**: Only ONE active binding per sensor at any time (enforced in application logic)
+
+### sensor_calibrations (Sensor Module Phase 1)
+- `id` (uuid, pk)
+- `tenantId` (uuid, fk → tenants.id)
+- `sensorId` (uuid, fk → sensors.id)
+- `offset` (float, default 0)
+- `gain` (float, default 1)
+- `method` (string) - e.g., "two-point", "factory"
+- `performedAt` (datetime)
+- `performedBy` (string)
+- `createdAt`, `updatedAt`
+- Indexes: `tenantId`, `(tenantId, sensorId)`, `(tenantId, sensorId, performedAt desc)`
 
 ---
 
@@ -233,6 +283,33 @@ $station = Invoke-RestMethod -Method POST -Uri "http://localhost:5121/api/v1/sta
 # 6. Get topology
 Invoke-RestMethod -Method GET -Uri "http://localhost:5121/api/v1/topology?tenantId=$tenantId" `
   -Headers @{"Authorization"="Bearer <JWT_TOKEN>"} | ConvertTo-Json -Depth 10
+
+# 7. Create sensor
+$sensor = Invoke-RestMethod -Method POST -Uri "http://localhost:5121/api/v1/sensors" `
+  -ContentType "application/json" `
+  -Headers @{"Authorization"="Bearer <JWT_TOKEN>"; "Idempotency-Key"="sensor-001-key"} `
+  -Body "{\"sensorId\":\"temp-001\",\"type\":\"temperature\",\"unit\":\"C\",\"label\":\"Barn 1 Temperature\",\"barnId\":\"$barnId\",\"zone\":\"A1\",\"tenantId\":\"$tenantId\"}" | ConvertTo-Json
+$sensorId = ($sensor | ConvertFrom-Json).sensorId
+
+# 8. Get sensors filtered by barnId
+Invoke-RestMethod -Method GET -Uri "http://localhost:5121/api/v1/sensors?tenantId=$tenantId&barnId=$barnId" `
+  -Headers @{"Authorization"="Bearer <JWT_TOKEN>"} | ConvertTo-Json
+
+# 9. Create sensor binding
+$binding = Invoke-RestMethod -Method POST -Uri "http://localhost:5121/api/v1/sensors/$sensorId/bindings" `
+  -ContentType "application/json" `
+  -Headers @{"Authorization"="Bearer <JWT_TOKEN>"; "Idempotency-Key"="binding-001-key"} `
+  -Body "{\"deviceId\":\"$($device.id)\",\"protocol\":\"mqtt\",\"channel\":\"sensors/temp-001\",\"samplingRate\":60,\"effectiveFrom\":\"2025-01-01T00:00:00Z\",\"tenantId\":\"$tenantId\"}" | ConvertTo-Json
+
+# 10. Get bindings
+Invoke-RestMethod -Method GET -Uri "http://localhost:5121/api/v1/sensors/$sensorId/bindings?tenantId=$tenantId" `
+  -Headers @{"Authorization"="Bearer <JWT_TOKEN>"} | ConvertTo-Json
+
+# 11. Create calibration
+Invoke-RestMethod -Method POST -Uri "http://localhost:5121/api/v1/sensors/$sensorId/calibrations" `
+  -ContentType "application/json" `
+  -Headers @{"Authorization"="Bearer <JWT_TOKEN>"; "Idempotency-Key"="cal-001-key"} `
+  -Body "{\"offset\":0.5,\"gain\":1.02,\"method\":\"two-point\",\"performedAt\":\"2025-01-15T10:00:00Z\",\"performedBy\":\"user-123\",\"tenantId\":\"$tenantId\"}" | ConvertTo-Json
 ```
 
 ### Logs
@@ -248,6 +325,15 @@ docker exec -it farmiq-postgres psql -U farmiq -d farmiq
 
 # Prisma Studio (if available)
 docker exec -it farmiq-cloud-tenant-registry npx prisma studio
+```
+
+### Prisma Migration Status
+```powershell
+# Check migration status
+docker exec -it farmiq-cloud-tenant-registry npx prisma migrate status
+
+# Apply migrations (if needed)
+docker exec -it farmiq-cloud-tenant-registry npx prisma migrate deploy
 ```
 
 ---
@@ -272,6 +358,16 @@ docker exec -it farmiq-cloud-tenant-registry npx prisma studio
 - [x] Multi-tenant isolation enforced
 - [x] Tests written (minimal unit tests)
 - [x] Progress documented in this file
+- [x] Sensor Module (Phase 1) implemented:
+  - [x] Prisma schema: sensors, sensor_bindings, sensor_calibrations tables with indexes and constraints
+  - [x] All 8 sensor endpoints implemented (POST/GET sensors, PATCH sensor, POST/GET bindings, POST/GET calibrations)
+  - [x] Zod validation schemas for all sensor entities
+  - [x] Idempotency support via Idempotency-Key header (POST endpoints)
+  - [x] RBAC enforcement (tenant_admin, farm_manager write; viewer+ read)
+  - [x] Multi-tenant scoping on all queries/writes
+  - [x] Binding overlap validation (only one active binding per sensor)
+  - [x] OpenAPI/Swagger updated with sensor endpoints
+  - [x] Unit tests for validation, idempotency, tenant isolation, binding overlap
 
 ---
 

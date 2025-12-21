@@ -141,6 +141,567 @@ paths:
         '502':
           description: Downstream error
 
+  # Feed Service Proxy Endpoints
+  /api/v1/kpi/feeding:
+    get:
+      summary: Get feeding KPIs (FCR, ADG, SGR)
+      tags: [Feed]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: tenantId
+          schema:
+            type: string
+          required: true
+        - in: query
+          name: barnId
+          schema:
+            type: string
+          required: true
+        - in: query
+          name: batchId
+          schema:
+            type: string
+          required: false
+        - in: query
+          name: startDate
+          schema:
+            type: string
+            format: date-time
+          required: true
+        - in: query
+          name: endDate
+          schema:
+            type: string
+            format: date-time
+          required: true
+      responses:
+        '200':
+          description: KPI series data
+        '400':
+          description: Validation error
+        '401':
+          description: Unauthorized
+        '502':
+          description: Downstream service error
+
+  /api/v1/feed/intake-records:
+    post:
+      summary: Create feed intake record
+      tags: [Feed]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Created
+        '400':
+          description: Validation error
+        '409':
+          description: Conflict (duplicate)
+        '502':
+          description: Downstream service error
+    get:
+      summary: List feed intake records
+      tags: [Feed]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: tenantId
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: List of intake records
+        '400':
+          description: Validation error
+        '502':
+          description: Downstream service error
+
+  /api/v1/feed/lots:
+    post:
+      summary: Create feed lot
+      tags: [Feed]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Created
+        '400':
+          description: Validation error
+        '502':
+          description: Downstream service error
+    get:
+      summary: List feed lots
+      tags: [Feed]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: tenantId
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: List of lots
+        '502':
+          description: Downstream service error
+
+  /api/v1/feed/deliveries:
+    post:
+      summary: Create feed delivery
+      tags: [Feed]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Created
+        '400':
+          description: Validation error
+        '502':
+          description: Downstream service error
+    get:
+      summary: List feed deliveries
+      tags: [Feed]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: tenantId
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: List of deliveries
+        '502':
+          description: Downstream service error
+
+  /api/v1/feed/quality-results:
+    post:
+      summary: Create feed quality result
+      tags: [Feed]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Created
+        '400':
+          description: Validation error
+        '502':
+          description: Downstream service error
+    get:
+      summary: List feed quality results
+      tags: [Feed]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: tenantId
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: List of quality results
+        '502':
+          description: Downstream service error
+
+  /api/v1/feed/formulas:
+    post:
+      summary: Create feed formula
+      tags: [Feed]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Created
+        '400':
+          description: Validation error
+        '502':
+          description: Downstream service error
+    get:
+      summary: List feed formulas
+      tags: [Feed]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: tenantId
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: List of formulas
+        '502':
+          description: Downstream service error
+
+  /api/v1/feed/programs:
+    post:
+      summary: Create feed program
+      tags: [Feed]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Created
+        '400':
+          description: Validation error
+        '502':
+          description: Downstream service error
+    get:
+      summary: List feed programs
+      tags: [Feed]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: tenantId
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: List of programs
+        '502':
+          description: Downstream service error
+
+  # Barn Records Service Proxy Endpoints
+  /api/v1/barn-records/mortality:
+    post:
+      summary: Create mortality event
+      tags: [Barn Records]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Created
+        '400':
+          description: Validation error
+        '409':
+          description: Conflict (duplicate)
+        '502':
+          description: Downstream service error
+
+  /api/v1/barn-records/morbidity:
+    post:
+      summary: Create morbidity event
+      tags: [Barn Records]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Created
+        '400':
+          description: Validation error
+        '409':
+          description: Conflict (duplicate)
+        '502':
+          description: Downstream service error
+
+  /api/v1/barn-records/vaccines:
+    post:
+      summary: Create vaccine event
+      tags: [Barn Records]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Created
+        '400':
+          description: Validation error
+        '502':
+          description: Downstream service error
+
+  /api/v1/barn-records/treatments:
+    post:
+      summary: Create treatment event
+      tags: [Barn Records]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Created
+        '400':
+          description: Validation error
+        '502':
+          description: Downstream service error
+
+  /api/v1/barn-records/welfare-checks:
+    post:
+      summary: Create welfare check
+      tags: [Barn Records]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Created
+        '400':
+          description: Validation error
+        '502':
+          description: Downstream service error
+
+  /api/v1/barn-records/housing-conditions:
+    post:
+      summary: Create housing condition
+      tags: [Barn Records]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Created
+        '400':
+          description: Validation error
+        '502':
+          description: Downstream service error
+
+  /api/v1/barn-records/genetics:
+    post:
+      summary: Create genetic profile
+      tags: [Barn Records]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Created
+        '400':
+          description: Validation error
+        '502':
+          description: Downstream service error
+
+  /api/v1/barn-records/daily-counts:
+    post:
+      summary: Create daily count
+      tags: [Barn Records]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Created
+        '400':
+          description: Validation error
+        '409':
+          description: Conflict (duplicate)
+        '502':
+          description: Downstream service error
+    get:
+      summary: List daily counts
+      tags: [Barn Records]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: tenantId
+          schema:
+            type: string
+          required: true
+        - in: query
+          name: farmId
+          schema:
+            type: string
+          required: false
+        - in: query
+          name: barnId
+          schema:
+            type: string
+          required: false
+        - in: query
+          name: batchId
+          schema:
+            type: string
+          required: false
+        - in: query
+          name: start
+          schema:
+            type: string
+            format: date
+          required: false
+        - in: query
+          name: end
+          schema:
+            type: string
+            format: date
+          required: false
+      responses:
+        '200':
+          description: List of daily counts
+        '400':
+          description: Validation error
+        '502':
+          description: Downstream service error
+
 components:
   securitySchemes:
     bearerAuth:

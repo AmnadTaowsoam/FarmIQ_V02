@@ -10,6 +10,8 @@ export interface ServiceBaseUrls {
   auditLogBaseUrl: string
   notificationBaseUrl: string
   reportingExportBaseUrl: string
+  feedServiceUrl: string
+  barnRecordsServiceUrl: string
 }
 
 export function getServiceBaseUrls(): ServiceBaseUrls {
@@ -53,6 +55,16 @@ export function getServiceBaseUrls(): ServiceBaseUrls {
     process.env.REPORTING_EXPORT_BASE_URL ||
     'http://cloud-reporting-export-service:3000'
 
+  const feedServiceUrl =
+    process.env.FEED_SERVICE_URL ||
+    process.env.FEED_BASE_URL ||
+    'http://cloud-feed-service:5130'
+
+  const barnRecordsServiceUrl =
+    process.env.BARN_RECORDS_SERVICE_URL ||
+    process.env.BARN_RECORDS_BASE_URL ||
+    'http://cloud-barn-records-service:5131'
+
   return {
     identityBaseUrl,
     registryBaseUrl,
@@ -63,11 +75,13 @@ export function getServiceBaseUrls(): ServiceBaseUrls {
     auditLogBaseUrl,
     notificationBaseUrl,
     reportingExportBaseUrl,
+    feedServiceUrl,
+    barnRecordsServiceUrl,
   }
 }
 
-interface DownstreamOptions {
-  method?: 'GET' | 'POST' | 'PUT'
+export interface DownstreamOptions {
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH'
   headers: Record<string, string>
   body?: unknown
 }

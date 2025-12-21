@@ -1,0 +1,10 @@
+{
+  "tenantId": "__TENANT_ID__",
+  "farmId": "__FARM_ID__",
+  "barnId": "__BARN_ID__",
+  "batchId": "__BATCH_ID__",
+  "source": "MANUAL",
+  "quantityKg": 125.5,
+  "occurredAt": "__OCCURRED_AT__",
+  "notes": "Contract test intake record"
+}

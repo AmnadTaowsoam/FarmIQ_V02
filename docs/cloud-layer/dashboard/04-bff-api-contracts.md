@@ -747,7 +747,7 @@ All endpoints require:
 ## Feeding & FCR Endpoints
 
 ### GET /api/v1/feeding/daily
-**Status**: NEW  
+**Status**: ⚠️ **DEPRECATED** (use `GET /api/v1/feed/intake-records` via `cloud-feed-service` or `GET /api/v1/kpi/feeding` for KPI queries - see `docs/contracts/feed-service.contract.md`)  
 **Purpose**: Get daily feed intake data.
 
 **Query Params**:
@@ -788,7 +788,7 @@ All endpoints require:
 ---
 
 ### GET /api/v1/feeding/fcr
-**Status**: NEW  
+**Status**: ⚠️ **DEPRECATED** (canonical endpoint: `GET /api/v1/kpi/feeding` - see `docs/contracts/feed-service.contract.md`)  
 **Purpose**: Get FCR (Feed Conversion Ratio) and forecast data.
 
 **Query Params**:

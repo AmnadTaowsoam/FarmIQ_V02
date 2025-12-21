@@ -5,6 +5,7 @@ export type ApiError = {
   code: string
   message: string
   requestId?: string
+  traceId?: string
   details?: Record<string, unknown>
 }
 
@@ -93,6 +94,7 @@ export class ApiClient {
       code: payload?.code || payload?.error?.code || 'UNKNOWN_ERROR',
       message: payload?.message || payload?.error?.message || 'Unexpected error',
       requestId: payload?.requestId || payload?.error?.requestId,
+      traceId: payload?.traceId || payload?.error?.traceId,
       details: payload?.details || payload?.error?.details,
     }
   }

@@ -125,6 +125,28 @@ All FarmIQ services must follow `shared/01-api-standards.md`:
 - **Data ownership**: `media_objects` + PVC `/data/media`
 - **Implementation notes**: `boilerplates/Backend-node`
 
+### `edge-feed-intake`
+
+- **Purpose**: Edge feed intake owner for SILO_AUTO and local manual/import entries; writes local intake + outbox events.
+- **Base path**: `/api`
+- **Auth**: Internal cluster auth (mTLS/service identity); no direct device access.
+- **/api-docs**: `GET /api-docs`
+- **Primary Interface**
+  - Consumes feed events from the edge pipeline (normalized ingestion from MQTT/ingress).
+  - Supports SILO_AUTO intake by processing telemetry/event deltas (if applicable).
+  - Emits/records outbox entries for sync-forwarder (edge->cloud).
+- **Core endpoints**
+  - `GET /api/health`
+  - `GET /api/ready` (recommended)
+  - `GET /api-docs`
+  - `GET /api-docs/openapi.json` (or `openapi.yaml`)
+- **Optional ops/debug endpoints**: No business HTTP endpoints; internal-only ops endpoints are optional if implemented.
+  - `GET /api/v1/edge-feed-intake/status` (optional, internal)
+  - `GET /api/v1/edge-feed-intake/backlog` (optional, internal)
+- **Metrics**: `GET /metrics` (internal, if enabled)
+- **Data ownership**: `feed_intake_local`, `feed_intake_dedupe`, `sync_outbox`
+- **Implementation notes**: `boilerplates/Backend-node`
+
 ### `edge-vision-inference`
 
 - **Purpose**: Inference owner (computes predictions and writes results).
@@ -230,6 +252,7 @@ All FarmIQ services must follow `shared/01-api-standards.md`:
   - `GET /api/v1/dashboard/farms/{farmId}`
   - `GET /api/v1/dashboard/barns/{barnId}`
   - `GET /api/v1/dashboard/alerts`
+- **Feeding surfaces**: Canonical proxy/aggregation is `GET /api/v1/kpi/feeding` for FE dashboards.
 - **Data ownership**: None (aggregation layer)
 - **Implementation notes**: `boilerplates/Backend-node`
 
@@ -271,7 +294,75 @@ All FarmIQ services must follow `shared/01-api-standards.md`:
   - `/api/v1/batches`
   - `/api/v1/devices`
   - `GET /api/v1/topology`
-- **Data ownership**: `tenant`, `farm`, `barn`, `batch`, `device`
+  - `/api/v1/sensors` (Phase 1: Sensor module)
+  - `/api/v1/sensors/{sensorId}/bindings` (Phase 1: Sensor-device bindings)
+  - `/api/v1/sensors/{sensorId}/calibrations` (Phase 1: Calibration history)
+- **Data ownership**: `tenant`, `farm`, `barn`, `batch`, `device`, `sensor`, `sensor_binding`, `sensor_calibration`
+- **Implementation notes**: `boilerplates/Backend-node`
+
+### `cloud-feed-service`
+
+- **Purpose**: Feed master data and authoritative feed intake records.
+- **Base path**: `/api`
+- **Auth**: JWT + RBAC (tenant/farm/barn scope enforced).
+- **/api-docs**: `GET /api-docs`
+- **Core endpoints**
+  - `GET /api/health` - Health probe.
+  - `GET /api/ready` (recommended) - Readiness probe.
+  - `GET /api-docs` - Swagger UI.
+  - `GET /api-docs/openapi.json` (or `openapi.yaml`) - OpenAPI spec.
+  - `POST /api/v1/feed/formulas` - Create feed formula.
+  - `GET /api/v1/feed/formulas` - List/query formulas.
+  - `POST /api/v1/feed/lots` - Create feed lot.
+  - `GET /api/v1/feed/lots` - List/query lots.
+  - `POST /api/v1/feed/deliveries` - Create delivery.
+  - `GET /api/v1/feed/deliveries` - List/query deliveries.
+  - `POST /api/v1/feed/quality-results` - Create quality result.
+  - `GET /api/v1/feed/quality-results` - List/query quality results.
+  - `POST /api/v1/feed/intake-records` - Create intake record.
+  - `GET /api/v1/feed/intake-records` - List/query intake records.
+  - `POST /api/v1/feed/programs` - Create feed program.
+  - `GET /api/v1/feed/programs` - List/query feed programs.
+  - `POST /api/v1/feed/inventory-snapshots` - Create inventory snapshot.
+  - `GET /api/v1/feed/inventory-snapshots` - List/query inventory snapshots (optional).
+  - `GET /api/v1/kpi/feeding` - Query feeding KPIs (proxy to KPI engine).
+    - **Note**: This is the canonical KPI endpoint. Legacy `/api/v1/feeding/fcr` is deprecated.
+- **Idempotency & Dedupe**: Write endpoints accept `Idempotency-Key` or `external_ref`/`event_id`; duplicates return the original record per unique constraints.
+- **Metrics**: `GET /metrics` (internal, if enabled)
+- **Data ownership**: `feed_formula`, `feed_lot`, `feed_delivery`, `feed_quality_result`, `feed_intake_record`, `feed_program`, `feed_inventory_snapshot`
+- **Implementation notes**: `boilerplates/Backend-node`
+
+### `cloud-barn-records-service`
+
+- **Purpose**: Barn health, welfare, housing, and genetic records.
+- **Base path**: `/api`
+- **Auth**: JWT + RBAC (tenant/farm/barn scope enforced).
+- **/api-docs**: `GET /api-docs`
+- **Core endpoints**
+  - `GET /api/health` - Health probe.
+  - `GET /api/ready` (recommended) - Readiness probe.
+  - `GET /api-docs` - Swagger UI.
+  - `GET /api-docs/openapi.json` (or `openapi.yaml`) - OpenAPI spec.
+  - `POST /api/v1/barn-records/morbidity` - Create morbidity event.
+  - `GET /api/v1/barn-records/morbidity` - List/query morbidity events.
+  - `POST /api/v1/barn-records/mortality` - Create mortality event.
+  - `GET /api/v1/barn-records/mortality` - List/query mortality events.
+  - `POST /api/v1/barn-records/vaccines` - Create vaccine event.
+  - `GET /api/v1/barn-records/vaccines` - List/query vaccine events.
+  - `POST /api/v1/barn-records/treatments` - Create treatment event.
+  - `GET /api/v1/barn-records/treatments` - List/query treatment events.
+  - `POST /api/v1/barn-records/daily-counts` - Create daily count.
+  - `GET /api/v1/barn-records/daily-counts` - List/query daily counts.
+  - `POST /api/v1/barn-records/welfare-checks` - Create welfare check.
+  - `GET /api/v1/barn-records/welfare-checks` - List/query welfare checks.
+  - `POST /api/v1/barn-records/housing-conditions` - Create housing condition.
+  - `GET /api/v1/barn-records/housing-conditions` - List/query housing conditions.
+  - `POST /api/v1/barn-records/genetics` - Create genetic profile.
+  - `GET /api/v1/barn-records/genetics` - List/query genetic profiles.
+- **Query filters**: tenant/farm/barn/batch/date-range filters supported on list endpoints.
+- **Idempotency & Dedupe**: Write endpoints accept `Idempotency-Key` or `external_ref`/`event_id`; duplicates return the original record per unique constraints.
+- **Metrics**: `GET /metrics` (internal, if enabled)
+- **Data ownership**: `barn_morbidity_event`, `barn_mortality_event`, `barn_cull_event`, `barn_vaccine_event`, `barn_treatment_event`, `barn_daily_count`, `barn_welfare_check`, `barn_housing_condition`, `barn_genetic_profile`
 - **Implementation notes**: `boilerplates/Backend-node`
 
 ### `cloud-ingestion`

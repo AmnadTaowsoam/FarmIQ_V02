@@ -1,0 +1,171 @@
+openapi: 3.0.0
+info:
+  title: FarmIQ Cloud Feed Service API
+  version: 1.0.0
+  description: Feed master data and authoritative feed intake records
+paths:
+  /api/health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+  /api/ready:
+    get:
+      summary: Readiness check
+      responses:
+        '200':
+          description: Ready
+        '503':
+          description: Not ready
+  /api/v1/feed/formulas:
+    post:
+      summary: Create feed formula
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - tenantId
+                - name
+              properties:
+                tenantId:
+                  type: string
+                name:
+                  type: string
+                species:
+                  type: string
+                phase:
+                  type: string
+                energyKcalPerKg:
+                  type: number
+                proteinPct:
+                  type: number
+                status:
+                  type: string
+      responses:
+        '201':
+          description: Created
+        '409':
+          description: Conflict
+    get:
+      summary: List feed formulas
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tenantId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+  /api/v1/feed/intake-records:
+    post:
+      summary: Create feed intake record
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - tenantId
+                - farmId
+                - barnId
+                - source
+                - quantityKg
+                - occurredAt
+              properties:
+                tenantId:
+                  type: string
+                farmId:
+                  type: string
+                barnId:
+                  type: string
+                batchId:
+                  type: string
+                source:
+                  type: string
+                  enum: [MANUAL, API_IMPORT, SILO_AUTO]
+                quantityKg:
+                  type: number
+                occurredAt:
+                  type: string
+                  format: date-time
+                eventId:
+                  type: string
+      responses:
+        '201':
+          description: Created
+        '409':
+          description: Conflict
+    get:
+      summary: List feed intake records
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tenantId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: barnId
+          in: query
+          schema:
+            type: string
+        - name: start
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: end
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+

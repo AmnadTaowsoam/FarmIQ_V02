@@ -1,0 +1,10 @@
+{
+  "tenantId": "__TENANT_ID__",
+  "farmId": "__FARM_ID__",
+  "barnId": "__BARN_ID__",
+  "feedLotId": "__FEED_LOT_ID__",
+  "deliveredAt": "__DELIVERED_AT__",
+  "quantityKg": 1200,
+  "unitCost": 0.42,
+  "deliveryRef": "DEL-CT-001"
+}

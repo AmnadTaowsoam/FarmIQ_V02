@@ -1,0 +1,297 @@
+openapi: 3.0.0
+info:
+  title: FarmIQ Cloud Notification Service API
+  version: 1.0.0
+  description: In-app notifications and delivery jobs
+paths:
+  /api/health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+  /api/ready:
+    get:
+      summary: Readiness check
+      responses:
+        '200':
+          description: Ready
+        '503':
+          description: Not ready
+  /api/v1/notifications/send:
+    post:
+      summary: Send a notification
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationSendRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationSendResponse'
+        '200':
+          description: Idempotent replay
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationSendResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/notifications/history:
+    get:
+      summary: List notification history
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: farmId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: barnId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: batchId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: severity
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [info, warning, critical]
+        - name: channel
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [in_app, webhook, email, sms]
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [created, queued, sent, failed, canceled]
+        - name: startDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationHistoryResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/notifications/inbox:
+    get:
+      summary: List in-app notifications for current user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: topic
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationHistoryResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    NotificationTarget:
+      type: object
+      required:
+        - type
+        - value
+      properties:
+        type:
+          type: string
+          enum: [user, role, topic]
+        value:
+          type: string
+    NotificationSendRequest:
+      type: object
+      required:
+        - severity
+        - channel
+        - title
+        - message
+      properties:
+        farmId:
+          type: string
+        barnId:
+          type: string
+        batchId:
+          type: string
+        severity:
+          type: string
+          enum: [info, warning, critical]
+        channel:
+          type: string
+          enum: [in_app, webhook, email, sms]
+        title:
+          type: string
+        message:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+        targets:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationTarget'
+        externalRef:
+          type: string
+        dedupeKey:
+          type: string
+    NotificationSendResponse:
+      type: object
+      properties:
+        notificationId:
+          type: string
+        status:
+          type: string
+          enum: [created, queued, sent, failed, canceled]
+        createdAt:
+          type: string
+          format: date-time
+    NotificationItem:
+      type: object
+      properties:
+        id:
+          type: string
+        tenantId:
+          type: string
+        farmId:
+          type: string
+          nullable: true
+        barnId:
+          type: string
+          nullable: true
+        batchId:
+          type: string
+          nullable: true
+        severity:
+          type: string
+        channel:
+          type: string
+        title:
+          type: string
+        message:
+          type: string
+        payloadJson:
+          type: object
+          additionalProperties: true
+          nullable: true
+        status:
+          type: string
+        dedupeKey:
+          type: string
+          nullable: true
+        idempotencyKey:
+          type: string
+          nullable: true
+        externalRef:
+          type: string
+          nullable: true
+        createdBy:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    NotificationHistoryResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationItem'
+        nextCursor:
+          type: string
+          nullable: true
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            traceId:
+              type: string

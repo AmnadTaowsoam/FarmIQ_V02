@@ -1,0 +1,297 @@
+openapi: 3.0.0
+info:
+  title: FarmIQ Cloud Reporting Export Service API
+  version: 1.0.0
+  description: Async export/report jobs service
+paths:
+  /api/health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+  /api/ready:
+    get:
+      summary: Readiness check
+      responses:
+        '200':
+          description: Ready
+        '503':
+          description: Not ready
+  /api/v1/reports/jobs:
+    post:
+      summary: Create report export job
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReportJobRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportJob'
+        '200':
+          description: Idempotent replay
+          headers:
+            x-idempotent-replay:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportJob'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      summary: List report jobs
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [queued, running, succeeded, failed, cancelled]
+        - name: job_type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [FEED_INTAKE_EXPORT, KPI_FEEDING_EXPORT, TELEMETRY_EXPORT, WEIGHVISION_EXPORT]
+        - name: created_from
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: created_to
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ReportJob'
+                  next_cursor:
+                    type: string
+                    nullable: true
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/reports/jobs/{jobId}:
+    get:
+      summary: Get report job
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportJob'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/reports/jobs/{jobId}/download:
+    get:
+      summary: Get download URL
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadResponse'
+        '409':
+          description: Report not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/reports/jobs/{jobId}/file:
+    get:
+      summary: Download report file
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: File stream
+components:
+  schemas:
+    CreateReportJobRequest:
+      type: object
+      required:
+        - job_type
+        - format
+      properties:
+        job_type:
+          type: string
+          enum: [FEED_INTAKE_EXPORT, KPI_FEEDING_EXPORT, TELEMETRY_EXPORT, WEIGHVISION_EXPORT]
+        format:
+          type: string
+          enum: [csv, json]
+        farm_id:
+          type: string
+        barn_id:
+          type: string
+        batch_id:
+          type: string
+        start_date:
+          type: string
+          example: 2025-01-01
+        end_date:
+          type: string
+          example: 2025-01-31
+        filters:
+          type: object
+        idempotency_key:
+          type: string
+    ReportJob:
+      type: object
+      properties:
+        id:
+          type: string
+        tenant_id:
+          type: string
+        requested_by:
+          type: string
+        job_type:
+          type: string
+        format:
+          type: string
+        farm_id:
+          type: string
+          nullable: true
+        barn_id:
+          type: string
+          nullable: true
+        batch_id:
+          type: string
+          nullable: true
+        start_date:
+          type: string
+          nullable: true
+        end_date:
+          type: string
+          nullable: true
+        filters:
+          type: object
+          nullable: true
+        status:
+          type: string
+        progress_pct:
+          type: integer
+        file_path:
+          type: string
+          nullable: true
+        file_name:
+          type: string
+          nullable: true
+        mime_type:
+          type: string
+          nullable: true
+        size_bytes:
+          type: integer
+          nullable: true
+        sha256:
+          type: string
+          nullable: true
+        expires_at:
+          type: string
+          nullable: true
+        error_code:
+          type: string
+          nullable: true
+        error_message:
+          type: string
+          nullable: true
+        idempotency_key:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+        updated_at:
+          type: string
+    DownloadResponse:
+      type: object
+      properties:
+        download_url:
+          type: string
+        expires_at:
+          type: string
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            traceId:
+              type: string
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

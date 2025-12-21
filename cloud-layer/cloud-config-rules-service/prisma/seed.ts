@@ -1,17 +1,30 @@
 import { PrismaClient } from '@prisma/client'
+import { SEED_IDS } from './seed-constants'
 
 const prisma = new PrismaClient()
 
 async function main() {
-  console.log('Starting seed...')
+  console.log('Starting seed (SEED_COUNT=30)...')
 
-  // Clear existing data (optional - comment out if you want to keep existing data)
-  await prisma.thresholdRule.deleteMany({})
-  await prisma.targetCurve.deleteMany({})
+  const SEED_COUNT = parseInt(process.env.SEED_COUNT || '30', 10)
 
-  const tenantId = 'tenant-001'
-  const farmId = 'farm-001'
-  const barnId = 'barn-001'
+  // Guard: prevent seed in production
+  if (process.env.NODE_ENV === 'production' && !process.env.ALLOW_SEED_IN_PROD) {
+    console.error('ERROR: Seed is not allowed in production!')
+    console.error('Set ALLOW_SEED_IN_PROD=true if you really want to seed production.')
+    process.exit(1)
+  }
+
+  // Clear existing data (idempotent)
+  if (process.env.NODE_ENV !== 'production') {
+    await prisma.thresholdRule.deleteMany({})
+    await prisma.targetCurve.deleteMany({})
+  }
+
+  // Use fixed IDs from shared constants
+  const tenantId = SEED_IDS.TENANT_1
+  const farmId = SEED_IDS.FARM_1A
+  const barnId = SEED_IDS.BARN_1A_1
 
   // Create 10 ThresholdRule records
   const thresholdRules = [

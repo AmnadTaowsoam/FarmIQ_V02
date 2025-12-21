@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: edge-mqtt-broker
+  namespace: edge
+  labels:
+    app: edge-mqtt-broker
+spec:
+  selector:
+    app: edge-mqtt-broker
+  ports:
+    - name: mqtt
+      protocol: TCP
+      port: 1883
+      targetPort: 1883
+  # Use ClusterIP for internal access (recommended)
+  # For external access, use NodePort or LoadBalancer
+  type: ClusterIP
+  # Uncomment for NodePort (external access):
+  # type: NodePort
+  # nodePort: 30100
+  # Uncomment for LoadBalancer (cloud providers):
+  # type: LoadBalancer
+

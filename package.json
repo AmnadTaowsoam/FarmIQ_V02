@@ -6,5 +6,9 @@
     "api:lint": "pnpm -C packages/farmiq-api-client build",
     "contracts:generate": "pnpm -C packages/contracts generate",
     "contracts:build": "pnpm -C packages/contracts build"
+  },
+  "dependencies": {
+    "@types/amqplib": "^0.10.8",
+    "amqplib": "^0.10.9"
   }
 }

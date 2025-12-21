@@ -78,9 +78,50 @@ export function validateBody(schema: z.ZodSchema) {
 }
 
 // Specific middleware exports
+export const sensorSchema = z.object({
+  sensorId: z.string().min(1).max(255).regex(/^[a-zA-Z0-9_-]+$/),
+  type: z.string().min(1),
+  unit: z.string().min(1).max(10),
+  label: z.string().max(255).optional(),
+  barnId: z.string().uuid().optional(),
+  zone: z.string().max(100).optional(),
+  enabled: z.boolean().optional(),
+})
+
+export const sensorUpdateSchema = z.object({
+  label: z.string().max(255).optional(),
+  enabled: z.boolean().optional(),
+  barnId: z.string().uuid().nullable().optional(),
+  zone: z.string().max(100).nullable().optional(),
+  unit: z.string().min(1).max(10).optional(),
+  type: z.string().min(1).optional(),
+})
+
+export const sensorBindingSchema = z.object({
+  deviceId: z.string().uuid(),
+  protocol: z.enum(['mqtt', 'modbus', 'opcua', 'http']),
+  channel: z.string().max(255).optional(),
+  samplingRate: z.number().int().min(0).optional(),
+  effectiveFrom: z.string().datetime(),
+  effectiveTo: z.string().datetime().nullable().optional(),
+})
+
+export const sensorCalibrationSchema = z.object({
+  offset: z.number(),
+  gain: z.number().positive(),
+  method: z.string().min(1),
+  performedAt: z.string().datetime(),
+  performedBy: z.string().min(1),
+})
+
+// Specific middleware exports
 export const validateTenant = validateBody(tenantSchema)
 export const validateFarm = validateBody(farmSchema)
 export const validateBarn = validateBody(barnSchema)
 export const validateBatch = validateBody(batchSchema)
 export const validateDevice = validateBody(deviceSchema)
 export const validateStation = validateBody(stationSchema)
+export const validateSensor = validateBody(sensorSchema)
+export const validateSensorUpdate = validateBody(sensorUpdateSchema)
+export const validateSensorBinding = validateBody(sensorBindingSchema)
+export const validateSensorCalibration = validateBody(sensorCalibrationSchema)

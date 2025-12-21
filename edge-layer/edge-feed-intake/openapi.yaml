@@ -1,0 +1,74 @@
+openapi: 3.0.0
+info:
+  title: Edge Feed Intake Service API
+  version: 1.0.0
+  description: |
+    FarmIQ Edge Feed Intake Service - Feed intake ingestion from MQTT and silo telemetry.
+    
+    Ingestion modes:
+    - Mode A: MQTT feed.dispensed events
+    - Mode B: SILO delta computation from silo.weight telemetry (stub)
+servers:
+  - url: http://localhost:5109
+    description: Local development
+paths:
+  /api/health:
+    get:
+      summary: Health check
+      tags: [Health]
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+  /api/ready:
+    get:
+      summary: Readiness check
+      tags: [Health]
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ready
+                  db:
+                    type: string
+                    example: up
+        '503':
+          description: Service is not ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: not_ready
+                  db:
+                    type: string
+                    example: down
+                  error:
+                    type: string
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        traceId:
+          type: string
+

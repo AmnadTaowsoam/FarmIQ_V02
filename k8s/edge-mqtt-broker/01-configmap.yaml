@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: edge-mqtt-broker-config
+  namespace: edge
+  labels:
+    app: edge-mqtt-broker
+data:
+  mosquitto.conf: |
+    # Mosquitto Configuration for FarmIQ Edge Layer
+    persistence true
+    persistence_location /mosquitto/data/
+    log_dest stdout
+    log_type all
+    log_timestamp true
+    log_timestamp_format %Y-%m-%d %H:%M:%S
+    
+    # Listener
+    listener 1883
+    allow_anonymous true
+    
+    # Connection limits
+    max_connections 1000
+    max_inflight_messages 100
+    max_queued_messages 1000
+    
+    # Retained messages
+    retained_persistence true
+    
+    # Sys topics (for monitoring)
+    sys_interval 60
+    
+    # Message size limit (1MB)
+    message_size_limit 1048576
+  aclfile: |
+    # ACL file for FarmIQ Edge Layer
+    # Pattern-based ACLs for multi-tenancy
+    # %c is client ID placeholder
+    topic readwrite iot/telemetry/%c/#
+    topic readwrite iot/event/%c/#
+    topic readwrite iot/weighvision/%c/#
+    topic readwrite iot/status/%c/#
+    
+    # Admin pattern (if using password auth)
+    user admin
+    topic readwrite #

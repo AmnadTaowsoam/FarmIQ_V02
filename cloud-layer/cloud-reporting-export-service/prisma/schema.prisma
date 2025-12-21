@@ -1,0 +1,62 @@
+// Prisma schema for cloud-reporting-export-service
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ReportJobType {
+  FEED_INTAKE_EXPORT
+  KPI_FEEDING_EXPORT
+  TELEMETRY_EXPORT
+  WEIGHVISION_EXPORT
+}
+
+enum ReportFormat {
+  csv
+  json
+}
+
+enum ReportJobStatus {
+  queued
+  running
+  succeeded
+  failed
+  cancelled
+}
+
+model ReportJob {
+  id             String         @id @default(uuid()) @map("id")
+  tenantId       String         @map("tenant_id")
+  requestedBy    String         @map("requested_by")
+  jobType        ReportJobType  @map("job_type")
+  format         ReportFormat   @map("format")
+  farmId         String?        @map("farm_id")
+  barnId         String?        @map("barn_id")
+  batchId        String?        @map("batch_id")
+  startDate      DateTime?      @db.Date @map("start_date")
+  endDate        DateTime?      @db.Date @map("end_date")
+  filters        Json?          @map("filters")
+  status         ReportJobStatus @default(queued) @map("status")
+  progressPct    Int            @default(0) @map("progress_pct")
+  filePath       String?        @map("file_path")
+  fileName       String?        @map("file_name")
+  mimeType       String?        @map("mime_type")
+  sizeBytes      BigInt?        @map("size_bytes")
+  sha256         String?        @map("sha256")
+  expiresAt      DateTime?      @map("expires_at")
+  errorCode      String?        @map("error_code")
+  errorMessage   String?        @map("error_message")
+  idempotencyKey String?        @map("idempotency_key")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  @@unique([tenantId, idempotencyKey], name: "report_jobs_tenant_id_idempotency_key")
+  @@index([tenantId, createdAt(sort: Desc)], name: "report_jobs_tenant_created_at_idx")
+  @@map("report_jobs")
+}

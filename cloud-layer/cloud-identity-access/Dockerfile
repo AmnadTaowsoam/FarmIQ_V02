@@ -8,8 +8,8 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# Install dependencies
-RUN npm ci
+# Install dependencies (skip scripts to avoid Prisma postinstall network issues)
+RUN npm ci --ignore-scripts
 
 # Generate the Prisma client
 RUN npx prisma generate
@@ -23,6 +23,9 @@ RUN npm run build
 # Stage 2: Development image
 FROM node:24-alpine AS development
 
+# Install required libraries for Prisma (Alpine compatibility)
+RUN apk add --no-cache libc6-compat openssl libssl3
+
 # Set the working directory
 WORKDIR /usr/src/app
 
@@ -32,8 +35,8 @@ ENV NODE_ENV=development
 # Copy package.json and package-lock.json
 COPY package*.json ./
 
-# Install all dependencies (including dev dependencies)
-RUN npm ci
+# Install all dependencies (skip scripts to avoid Prisma postinstall network issues)
+RUN npm install --legacy-peer-deps --ignore-scripts
 
 # Copy prisma schema and generated client
 COPY --from=build /usr/src/app/prisma ./prisma

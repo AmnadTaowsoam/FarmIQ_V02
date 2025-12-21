@@ -1,0 +1,9 @@
+{
+  "tenantId": "__TENANT_ID__",
+  "feedLotId": "__FEED_LOT_ID__",
+  "sampledAt": "__SAMPLED_AT__",
+  "metric": "protein_pct",
+  "value": 21.8,
+  "unit": "%",
+  "method": "lab"
+}

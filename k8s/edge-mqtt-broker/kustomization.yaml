@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: edge
+
+resources:
+  - 00-namespace.yaml
+  - 01-configmap.yaml
+  - 01-secret.yaml
+  - 02-storage.yaml
+  - 03-statefulset.yaml
+  - 04-service.yaml
+
+commonLabels:
+  app: edge-mqtt-broker
+  layer: edge
+

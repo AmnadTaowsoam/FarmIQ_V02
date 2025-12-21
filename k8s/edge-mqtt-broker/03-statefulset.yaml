@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: edge-mqtt-broker
+  namespace: edge
+  labels:
+    app: edge-mqtt-broker
+spec:
+  serviceName: "edge-mqtt-broker"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: edge-mqtt-broker
+  template:
+    metadata:
+      labels:
+        app: edge-mqtt-broker
+      annotations:
+        # Datadog Autodiscovery for logs (mosquitto container)
+        ad.datadoghq.com/mosquitto.logs: '[{"source": "mosquitto", "service": "edge-mqtt-broker"}]'
+        # Datadog Autodiscovery for metrics (mosquitto-exporter sidecar)
+        ad.datadoghq.com/mosquitto-exporter.check_names: '["openmetrics"]'
+        ad.datadoghq.com/mosquitto-exporter.init_configs: '[{}]'
+        ad.datadoghq.com/mosquitto-exporter.instances: '[{"prometheus_url": "http://%%host%%:9234/metrics", "namespace": "mosquitto", "metrics": ["*"]}]'
+        
+    spec:
+      containers:
+        - name: mosquitto
+          image: eclipse-mosquitto:2.0
+          ports:
+            - containerPort: 1883
+              name: mqtt
+          volumeMounts:
+            - name: config
+              mountPath: /mosquitto/config/mosquitto.conf
+              subPath: mosquitto.conf
+            - name: aclfile
+              mountPath: /mosquitto/config/aclfile
+              subPath: aclfile
+              readOnly: true
+            - name: mqtt-data
+              mountPath: /mosquitto/data
+          env:
+            - name: MOSQUITTO_CONFIG_FILE
+              value: /mosquitto/config/mosquitto.conf
+          livenessProbe:
+            tcpSocket:
+              port: 1883
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            tcpSocket:
+              port: 1883
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+
+        - name: mosquitto-exporter
+          image: sapcc/mosquitto-exporter:latest
+          ports:
+            - containerPort: 9234
+              name: metrics
+          env:
+            - name: BROKER_ENDPOINT
+              value: "tcp://localhost:1883"
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
+
+      volumes:
+        - name: config
+          configMap:
+            name: edge-mqtt-broker-config
+        - name: aclfile
+          configMap:
+            name: edge-mqtt-broker-config
+        # Optional: mount passwordfile from secret if using password auth
+        # - name: passwordfile
+        #   secret:
+        #     secretName: edge-mqtt-broker-secret
+        #     items:
+        #       - key: passwordfile
+        #         path: passwordfile
+  volumeClaimTemplates:
+    - metadata:
+        name: mqtt-data
+        labels:
+          app: edge-mqtt-broker
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi

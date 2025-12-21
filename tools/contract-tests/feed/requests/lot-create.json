@@ -1,0 +1,8 @@
+{
+  "tenantId": "__TENANT_ID__",
+  "farmId": "__FARM_ID__",
+  "lotCode": "LOT-CT-001",
+  "quantityKg": 5000,
+  "receivedDate": "__RECEIVED_DATE__",
+  "supplierName": "Contract Test Supplier"
+}

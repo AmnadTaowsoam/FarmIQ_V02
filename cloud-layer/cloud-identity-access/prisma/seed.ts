@@ -3,12 +3,19 @@ import * as bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
-async function main() {
-  console.log('Starting seed...')
+// Guard: prevent seed in production
+if (process.env.NODE_ENV === 'production' && !process.env.ALLOW_SEED_IN_PROD) {
+  console.error('ERROR: Seed is not allowed in production!')
+  console.error('Set ALLOW_SEED_IN_PROD=true if you really want to seed production.')
+  process.exit(1)
+}
 
-  // Clear existing data (optional - comment out if you want to keep existing data)
-  await prisma.user.deleteMany({})
-  await prisma.role.deleteMany({})
+const SEED_COUNT = parseInt(process.env.SEED_COUNT || '30', 10)
+
+async function main() {
+  console.log(`Starting seed (SEED_COUNT=${SEED_COUNT})...`)
+
+  // Idempotent: Upsert roles (roles have unique name constraint)
 
   // Create roles first
   const roles = [
@@ -40,96 +47,106 @@ async function main() {
   // Hash password (default: password123)
   const hashedPassword = await bcrypt.hash('password123', 10)
 
-  // Create 10 users
-  const users = [
+  // Use fixed tenant IDs from constants
+  const TENANT_1 = '00000000-0000-4000-8000-000000000001'
+  const TENANT_2 = '00000000-0000-4000-8000-000000000002'
+
+  // Create users with fixed IDs for idempotency
+  const baseUsers = [
     {
+      id: '00000000-0000-4000-8000-000000010001',
       email: 'admin@farmiq.com',
       password: hashedPassword,
       tenantId: null, // Platform admin
-      roles: {
-        connect: [{ id: platformAdminRole!.id }],
-      },
+      roleId: platformAdminRole!.id,
     },
     {
+      id: '00000000-0000-4000-8000-000000010002',
       email: 'tenant1.admin@farmiq.com',
       password: hashedPassword,
-      tenantId: 'tenant-001',
-      roles: {
-        connect: [{ id: tenantAdminRole!.id }],
-      },
+      tenantId: TENANT_1,
+      roleId: tenantAdminRole!.id,
     },
     {
+      id: '00000000-0000-4000-8000-000000010003',
       email: 'tenant1.manager@farmiq.com',
       password: hashedPassword,
-      tenantId: 'tenant-001',
-      roles: {
-        connect: [{ id: farmManagerRole!.id }],
-      },
+      tenantId: TENANT_1,
+      roleId: farmManagerRole!.id,
     },
     {
-      email: 'tenant1.operator@farmiq.com',
-      password: hashedPassword,
-      tenantId: 'tenant-001',
-      roles: {
-        connect: [{ id: operatorRole!.id }],
-      },
-    },
-    {
-      email: 'tenant1.viewer@farmiq.com',
-      password: hashedPassword,
-      tenantId: 'tenant-001',
-      roles: {
-        connect: [{ id: viewerRole!.id }],
-      },
-    },
-    {
+      id: '00000000-0000-4000-8000-000000010004',
       email: 'tenant2.admin@farmiq.com',
       password: hashedPassword,
-      tenantId: 'tenant-002',
-      roles: {
-        connect: [{ id: tenantAdminRole!.id }],
-      },
+      tenantId: TENANT_2,
+      roleId: tenantAdminRole!.id,
     },
     {
+      id: '00000000-0000-4000-8000-000000010005',
       email: 'tenant2.manager@farmiq.com',
       password: hashedPassword,
-      tenantId: 'tenant-002',
-      roles: {
-        connect: [{ id: farmManagerRole!.id }],
-      },
-    },
-    {
-      email: 'device.sensor01@farmiq.com',
-      password: hashedPassword,
-      tenantId: 'tenant-001',
-      roles: {
-        connect: [{ id: deviceAgentRole!.id }],
-      },
-    },
-    {
-      email: 'device.sensor02@farmiq.com',
-      password: hashedPassword,
-      tenantId: 'tenant-001',
-      roles: {
-        connect: [{ id: deviceAgentRole!.id }],
-      },
-    },
-    {
-      email: 'tenant2.viewer@farmiq.com',
-      password: hashedPassword,
-      tenantId: 'tenant-002',
-      roles: {
-        connect: [{ id: viewerRole!.id }],
-      },
+      tenantId: TENANT_2,
+      roleId: farmManagerRole!.id,
     },
   ]
 
-  for (const user of users) {
-    await prisma.user.create({
-      data: user,
+  // Generate additional users up to SEED_COUNT
+  const additionalCount = Math.max(0, SEED_COUNT - baseUsers.length)
+  const users: Array<{
+    id: string
+    email: string
+    password: string
+    tenantId: string | null
+    roleId: string
+  }> = [...baseUsers]
+
+  for (let i = 0; i < additionalCount; i++) {
+    const num = (i + 6).toString(16).padStart(4, '0')
+    const tenantId = i % 2 === 0 ? TENANT_1 : TENANT_2
+    const role = i % 4 === 0 ? operatorRole!.id : viewerRole!.id
+
+    users.push({
+      id: `00000000-0000-4000-8000-00000001${num}`,
+      email: `user${i + 1}@farmiq.com`,
+      password: hashedPassword,
+      tenantId,
+      roleId: role,
     })
   }
-  console.log(`Created ${users.length} users`)
+
+  // Idempotent: Upsert users by ID
+  let createdCount = 0
+  for (const user of users) {
+    const existing = await prisma.user.findUnique({ where: { id: user.id } })
+    if (!existing) {
+      await prisma.user.create({
+        data: {
+          id: user.id,
+          email: user.email,
+          password: user.password,
+          tenantId: user.tenantId,
+          roles: {
+            connect: [{ id: user.roleId }],
+          },
+        },
+      })
+      createdCount++
+    } else {
+      // Update existing user
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          email: user.email,
+          password: user.password,
+          tenantId: user.tenantId,
+          roles: {
+            set: [{ id: user.roleId }],
+          },
+        },
+      })
+    }
+  }
+  console.log(`Upserted ${users.length} users (${createdCount} created, ${users.length - createdCount} updated)`)
 
   console.log('Seed completed successfully!')
 }

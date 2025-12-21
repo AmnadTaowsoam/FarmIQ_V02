@@ -1,0 +1,289 @@
+openapi: 3.0.0
+info:
+  title: Cloud WeighVision Read Model Service API
+  version: 1.0.0
+  description: Read model service for WeighVision sessions, measurements, and media
+servers:
+  - url: http://localhost:5132
+    description: Local development
+paths:
+  /api/health:
+    get:
+      summary: Health check endpoint
+      tags: [Health]
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
+  /api/ready:
+    get:
+      summary: Readiness check endpoint
+      tags: [Health]
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ready
+        '503':
+          description: Service is not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/weighvision/sessions:
+    get:
+      summary: Get weighvision sessions
+      tags: [WeighVision]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tenantId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: farmId
+          in: query
+          schema:
+            type: string
+        - name: barnId
+          in: query
+          schema:
+            type: string
+        - name: batchId
+          in: query
+          schema:
+            type: string
+        - name: stationId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [RUNNING, FINALIZED, CANCELLED]
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+            maximum: 1000
+        - name: cursor
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of weighvision sessions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WeighVisionSession'
+                  nextCursor:
+                    type: string
+                    nullable: true
+                  hasMore:
+                    type: boolean
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/weighvision/sessions/{sessionId}:
+    get:
+      summary: Get weighvision session by ID
+      tags: [WeighVision]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: tenantId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: WeighVision session details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WeighVisionSession'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    WeighVisionSession:
+      type: object
+      properties:
+        id:
+          type: string
+        tenantId:
+          type: string
+        farmId:
+          type: string
+          nullable: true
+        barnId:
+          type: string
+          nullable: true
+        batchId:
+          type: string
+          nullable: true
+        stationId:
+          type: string
+          nullable: true
+        sessionId:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        endedAt:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          type: string
+          enum: [RUNNING, FINALIZED, CANCELLED]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        measurements:
+          type: array
+          items:
+            $ref: '#/components/schemas/WeighVisionMeasurement'
+        media:
+          type: array
+          items:
+            $ref: '#/components/schemas/WeighVisionMedia'
+        inferences:
+          type: array
+          items:
+            $ref: '#/components/schemas/WeighVisionInference'
+    WeighVisionMeasurement:
+      type: object
+      properties:
+        id:
+          type: string
+        tenantId:
+          type: string
+        sessionId:
+          type: string
+        ts:
+          type: string
+          format: date-time
+        weightKg:
+          type: number
+        source:
+          type: string
+        metaJson:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    WeighVisionMedia:
+      type: object
+      properties:
+        id:
+          type: string
+        tenantId:
+          type: string
+        sessionId:
+          type: string
+        objectId:
+          type: string
+        path:
+          type: string
+        ts:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+    WeighVisionInference:
+      type: object
+      properties:
+        id:
+          type: string
+        tenantId:
+          type: string
+        sessionId:
+          type: string
+        modelVersion:
+          type: string
+        resultJson:
+          type: string
+        ts:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            traceId:
+              type: string
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+

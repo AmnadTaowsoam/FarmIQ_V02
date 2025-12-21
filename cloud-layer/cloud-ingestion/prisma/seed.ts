@@ -1,75 +1,60 @@
 import { PrismaClient } from '@prisma/client'
-import { v4 as uuidv4 } from 'uuid'
+import { SEED_IDS } from './seed-constants'
 
 const prisma = new PrismaClient()
 
+// Guard: prevent seed in production
+if (process.env.NODE_ENV === 'production' && !process.env.ALLOW_SEED_IN_PROD) {
+  console.error('ERROR: Seed is not allowed in production!')
+  console.error('Set ALLOW_SEED_IN_PROD=true if you really want to seed production.')
+  process.exit(1)
+}
+
+const SEED_COUNT = parseInt(process.env.SEED_COUNT || '30', 10)
+
 async function main() {
-  console.log('Starting seed...')
+  console.log(`Starting seed (SEED_COUNT=${SEED_COUNT})...`)
 
-  // Clear existing data (optional - comment out if you want to keep existing data)
-  await prisma.cloudDedupe.deleteMany({})
+  // Idempotent: Clear existing data (dev only)
+  if (process.env.NODE_ENV !== 'production') {
+    await prisma.cloudDedupe.deleteMany({})
+  }
 
-  // Create 10 CloudDedupe records
-  const dedupeRecords = [
-    {
-      tenantId: 'tenant-001',
-      eventId: uuidv4(),
-      firstSeenAt: new Date('2025-01-20T10:00:00Z'),
-    },
-    {
-      tenantId: 'tenant-001',
-      eventId: uuidv4(),
-      firstSeenAt: new Date('2025-01-20T10:05:00Z'),
-    },
-    {
-      tenantId: 'tenant-001',
-      eventId: uuidv4(),
-      firstSeenAt: new Date('2025-01-20T10:10:00Z'),
-    },
-    {
-      tenantId: 'tenant-001',
-      eventId: uuidv4(),
-      firstSeenAt: new Date('2025-01-20T10:15:00Z'),
-    },
-    {
-      tenantId: 'tenant-001',
-      eventId: uuidv4(),
-      firstSeenAt: new Date('2025-01-20T10:20:00Z'),
-    },
-    {
-      tenantId: 'tenant-002',
-      eventId: uuidv4(),
-      firstSeenAt: new Date('2025-01-20T11:00:00Z'),
-    },
-    {
-      tenantId: 'tenant-002',
-      eventId: uuidv4(),
-      firstSeenAt: new Date('2025-01-20T11:05:00Z'),
-    },
-    {
-      tenantId: 'tenant-002',
-      eventId: uuidv4(),
-      firstSeenAt: new Date('2025-01-20T11:10:00Z'),
-    },
-    {
-      tenantId: 'tenant-003',
-      eventId: uuidv4(),
-      firstSeenAt: new Date('2025-01-20T12:00:00Z'),
-    },
-    {
-      tenantId: 'tenant-003',
-      eventId: uuidv4(),
-      firstSeenAt: new Date('2025-01-20T12:05:00Z'),
-    },
-  ]
+  // Create CloudDedupe records: at least SEED_COUNT
+  const dedupeCount = Math.max(SEED_COUNT, 30)
+  const now = Date.now()
 
-  for (const record of dedupeRecords) {
-    await prisma.cloudDedupe.create({
-      data: record,
+  const dedupeRecords = []
+
+  for (let i = 0; i < dedupeCount; i++) {
+    const tenantId = i % 2 === 0 ? SEED_IDS.TENANT_1 : SEED_IDS.TENANT_2
+    const hoursAgo = Math.floor(i / 5)
+    const minutesOffset = (i % 5) * 12
+
+    dedupeRecords.push({
+      tenantId,
+      eventId: `event-${tenantId}-${i.toString().padStart(6, '0')}`,
+      firstSeenAt: new Date(now - (hoursAgo * 60 + minutesOffset) * 60 * 1000),
     })
   }
-  console.log(`Created ${dedupeRecords.length} dedupe records`)
 
+  // Upsert dedupe records (idempotent by unique constraint tenantId + eventId)
+  for (const record of dedupeRecords) {
+    await prisma.cloudDedupe.upsert({
+      where: {
+        tenantId_eventId: {
+          tenantId: record.tenantId,
+          eventId: record.eventId,
+        },
+      },
+      update: {
+        firstSeenAt: record.firstSeenAt,
+      },
+      create: record,
+    })
+  }
+
+  console.log(`Upserted ${dedupeRecords.length} cloud_dedupe records`)
   console.log('Seed completed successfully!')
 }
 
@@ -81,4 +66,3 @@ main()
   .finally(async () => {
     await prisma.$disconnect()
   })
-

@@ -134,7 +134,32 @@ docker compose logs cloud-analytics-service | Select-String "rabbitmq"
 ## Notes
 
 - For production (K8s), use Helm chart or StatefulSet with persistent volumes.
-- Datadog metrics: Enable RabbitMQ management plugin metrics endpoint for Datadog integration.
+- [x] Enable metrics for Datadog (documented below)
+- [x] Evidence: publish/consume test
+
+---
+
+## Observability (Datadog)
+
+### Metrics Collection strategy
+
+RabbitMQ `3.13-management` exposes metrics compatible with Datadog.
+
+**Steps to enable:**
+1. **Management Plugin**: Enabled by default in the image. Exposes UI and API at port `15672`.
+2. **Datadog Autodiscovery**: Add these labels to the Kubernetes Pod or Docker container:
+   ```yaml
+   labels:
+     ad.datadoghq.com/rabbitmq.check_names: '["rabbitmq"]'
+     ad.datadoghq.com/rabbitmq.init_configs: '[{}]'
+     ad.datadoghq.com/rabbitmq.instances: '[{"rabbitmq_api_url": "http://%%host%%:15672/api/", "username": "farmiq", "password": "farmiq_dev"}]'
+   ```
+3. **Prometheus Option**: The `rabbitmq_prometheus` plugin is available. Endpoint: `http://localhost:15672/metrics`.
+   - To use Prometheus scraping instead of the generic RabbitMQ check:
+     ```yaml
+     ad.datadoghq.com/rabbitmq.check_names: '["openmetrics"]'
+     ad.datadoghq.com/rabbitmq.init_configs: '[{}]'
+     ad.datadoghq.com/rabbitmq.instances: '[{"prometheus_url": "http://%%host%%:15672/metrics", "namespace": "rabbitmq", "metrics": ["*"]}]'
+     ```
 - Password security: In production, use secrets management (K8s secrets, Azure Key Vault, etc.).
 - High availability: For production, configure RabbitMQ cluster with mirrored queues.
-

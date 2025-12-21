@@ -1,0 +1,114 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// WeighVision Session (read model from RabbitMQ events)
+model WeighVisionSession {
+  id         String   @id @default(uuid())
+  tenantId   String
+  farmId     String?
+  barnId     String?
+  batchId    String?
+  stationId  String?
+  sessionId  String   // External session ID (from edge)
+  startedAt  DateTime
+  endedAt    DateTime?
+  status     String   // e.g., "RUNNING", "FINALIZED", "CANCELLED"
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  measurements WeighVisionMeasurement[]
+  media        WeighVisionMedia[]
+  inferences   WeighVisionInference[]
+
+  @@unique([tenantId, sessionId])
+  @@index([tenantId, barnId, startedAt(sort: Desc)])
+  @@index([tenantId, farmId, startedAt(sort: Desc)])
+  @@index([tenantId, stationId, startedAt(sort: Desc)])
+  @@map("weighvision_session")
+}
+
+// WeighVision Measurement (weight readings)
+model WeighVisionMeasurement {
+  id        String   @id @default(uuid())
+  tenantId  String
+  sessionId String   // External session ID (for querying)
+  sessionDbId String // Internal DB ID for relation
+  ts        DateTime
+  weightKg  Decimal  @db.Decimal(10, 3)
+  source    String   // e.g., "scale", "sensor", "manual"
+  metaJson  String?  @db.Text // JSON metadata
+  createdAt DateTime @default(now())
+
+  // Relation (using internal ID since Prisma doesn't support composite foreign keys)
+  session WeighVisionSession @relation(fields: [sessionDbId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, sessionId, ts(sort: Desc)])
+  @@index([tenantId, ts(sort: Desc)])
+  @@index([sessionDbId])
+  @@map("weighvision_measurement")
+}
+
+// WeighVision Media (images/videos associated with sessions)
+model WeighVisionMedia {
+  id        String   @id @default(uuid())
+  tenantId  String
+  sessionId String   // External session ID (for querying)
+  sessionDbId String // Internal DB ID for relation
+  objectId  String   // Storage object ID (e.g., S3 key, blob path)
+  path      String   // Full path/URL
+  ts        DateTime
+  createdAt DateTime @default(now())
+
+  // Relation (using internal ID since Prisma doesn't support composite foreign keys)
+  session WeighVisionSession @relation(fields: [sessionDbId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, sessionId, ts(sort: Desc)])
+  @@index([tenantId, objectId])
+  @@index([sessionDbId])
+  @@map("weighvision_media")
+}
+
+// WeighVision Inference (AI model results)
+model WeighVisionInference {
+  id          String   @id @default(uuid())
+  tenantId    String
+  sessionId   String   // External session ID (for querying)
+  sessionDbId String   // Internal DB ID for relation
+  modelVersion String  // e.g., "v1.0.0"
+  resultJson  String   @db.Text // JSON inference results
+  ts          DateTime
+  createdAt   DateTime @default(now())
+
+  // Relation (using internal ID since Prisma doesn't support composite foreign keys)
+  session WeighVisionSession @relation(fields: [sessionDbId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, sessionId, ts(sort: Desc)])
+  @@index([tenantId, modelVersion])
+  @@index([sessionDbId])
+  @@map("weighvision_inference")
+}
+
+// Event deduplication table (for idempotency)
+model WeighVisionEventDedupe {
+  id        String   @id @default(uuid())
+  tenantId  String
+  eventId   String   // From RabbitMQ event envelope
+  eventType String   // e.g., "weighvision.session.created"
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, eventId])
+  @@index([createdAt]) // For cleanup
+  @@map("weighvision_event_dedupe")
+}
+

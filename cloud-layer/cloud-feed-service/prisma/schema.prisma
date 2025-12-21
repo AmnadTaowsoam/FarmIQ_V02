@@ -1,0 +1,234 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Feed master data and intake records
+// All IDs use String type (UUID v7 should be generated in application code)
+
+model FeedFormula {
+  id             String   @id @default(uuid())
+  tenantId       String
+  name           String
+  species        String?  // broiler, layer, swine, fish
+  phase          String?
+  energyKcalPerKg Decimal? @db.Decimal(8, 2)
+  proteinPct     Decimal? @db.Decimal(5, 2)
+  fiberPct       Decimal? @db.Decimal(5, 2)
+  fatPct         Decimal? @db.Decimal(5, 2)
+  status         String   @default("active") // active, inactive
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  externalRef    String?
+
+  @@unique([tenantId, name])
+  @@unique([tenantId, externalRef], name: "FeedFormula_externalRef_key")
+  @@index([tenantId, name])
+  @@index([tenantId, species])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@map("feed_formula")
+}
+
+model FeedLot {
+  id            String    @id @default(uuid())
+  tenantId      String
+  farmId        String
+  supplierName  String?
+  lotCode       String
+  feedFormulaId String?
+  manufactureDate DateTime? @db.Date
+  receivedDate  DateTime? @db.Date
+  quantityKg    Decimal?  @db.Decimal(12, 3)
+  remainingKg   Decimal?  @db.Decimal(12, 3)
+  status        String    @default("active") // active, archived
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  externalRef   String?
+
+  @@unique([tenantId, lotCode])
+  @@unique([tenantId, externalRef], name: "FeedLot_externalRef_key")
+  @@index([tenantId, lotCode])
+  @@index([tenantId, farmId, receivedDate])
+  @@index([tenantId, feedFormulaId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@map("feed_lot")
+}
+
+model FeedDelivery {
+  id           String    @id @default(uuid())
+  tenantId     String
+  farmId       String
+  barnId       String?
+  feedLotId    String
+  deliveryRef  String?
+  deliveredAt  DateTime
+  quantityKg   Decimal   @db.Decimal(12, 3)
+  unitCost     Decimal?  @db.Decimal(12, 2)
+  currency     String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  externalRef  String?
+
+  @@unique([tenantId, deliveryRef], name: "FeedDelivery_deliveryRef_key")
+  @@unique([tenantId, externalRef], name: "FeedDelivery_externalRef_key")
+  @@index([tenantId, deliveredAt], map: "feed_delivery_tenantId_deliveredAt_idx")
+  @@index([tenantId, farmId, deliveredAt])
+  @@index([tenantId, barnId, deliveredAt])
+  @@index([tenantId, feedLotId])
+  @@index([tenantId, deliveredAt(sort: Desc)], map: "feed_delivery_tenantId_deliveredAt_desc_idx")
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@map("feed_delivery")
+}
+
+model FeedQualityResult {
+  id         String    @id @default(uuid())
+  tenantId   String
+  feedLotId  String
+  sampledAt  DateTime
+  metric     String
+  value      Decimal   @db.Decimal(12, 4)
+  unit       String?
+  method     String?
+  status     String    @default("valid") // valid, rejected
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  externalRef String?
+
+  @@unique([tenantId, externalRef], name: "FeedQualityResult_externalRef_key")
+  @@index([tenantId, sampledAt], map: "feed_quality_result_tenantId_sampledAt_idx")
+  @@index([tenantId, feedLotId])
+  @@index([tenantId, metric])
+  @@index([tenantId, status])
+  @@index([tenantId, sampledAt(sort: Desc)], map: "feed_quality_result_tenantId_sampledAt_desc_idx")
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@map("feed_quality_result")
+}
+
+model FeedIntakeRecord {
+  id              String    @id @default(uuid())
+  tenantId        String
+  farmId          String
+  barnId          String
+  batchId         String?
+  deviceId        String?
+  source          String    // MANUAL, API_IMPORT, SILO_AUTO
+  feedFormulaId   String?
+  feedLotId       String?
+  quantityKg      Decimal   @db.Decimal(12, 3)
+  occurredAt      DateTime
+  createdAt       DateTime  @default(now())
+  ingestedAt      DateTime?
+  eventId         String?
+  externalRef     String?
+  idempotencyKey  String?
+  sequence        Int?
+  notes           String?
+  createdByUserId String?
+
+  @@unique([tenantId, eventId], name: "FeedIntakeRecord_eventId_key")
+  @@unique([tenantId, externalRef], name: "FeedIntakeRecord_externalRef_key")
+  @@unique([tenantId, idempotencyKey], name: "FeedIntakeRecord_idempotencyKey_key")
+  @@index([tenantId, occurredAt(sort: Desc)])
+  @@index([tenantId, farmId, occurredAt])
+  @@index([tenantId, barnId, occurredAt])
+  @@index([tenantId, batchId, occurredAt])
+  @@index([tenantId, deviceId, occurredAt])
+  @@index([tenantId, source, occurredAt])
+  @@index([tenantId, feedFormulaId])
+  @@index([tenantId, feedLotId])
+  @@index([tenantId, barnId, sequence])
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@index([tenantId, ingestedAt(sort: Desc)])
+  @@index([tenantId, createdByUserId])
+  @@map("feed_intake_record")
+}
+
+model FeedProgram {
+  id          String    @id @default(uuid())
+  tenantId    String
+  farmId      String?
+  barnId      String?
+  name        String
+  status      String    @default("active") // active, inactive
+  startDate   DateTime? @db.Date
+  endDate     DateTime? @db.Date
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  externalRef String?
+
+  @@unique([tenantId, name])
+  @@unique([tenantId, externalRef], name: "FeedProgram_externalRef_key")
+  @@index([tenantId, name])
+  @@index([tenantId, farmId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@map("feed_program")
+}
+
+model FeedInventorySnapshot {
+  id         String    @id @default(uuid())
+  tenantId   String
+  farmId     String?
+  barnId     String?
+  feedLotId  String?
+  snapshotAt DateTime
+  quantityKg Decimal   @db.Decimal(12, 3)
+  createdAt  DateTime  @default(now())
+  source     String    // MANUAL, SENSOR
+  externalRef String?
+
+  @@unique([tenantId, externalRef], name: "FeedInventorySnapshot_externalRef_key")
+  @@index([tenantId, snapshotAt], map: "feed_inventory_snapshot_tenantId_snapshotAt_idx")
+  @@index([tenantId, farmId, snapshotAt])
+  @@index([tenantId, barnId, snapshotAt])
+  @@index([tenantId, feedLotId])
+  @@index([tenantId, source])
+  @@index([tenantId, snapshotAt(sort: Desc)], map: "feed_inventory_snapshot_tenantId_snapshotAt_desc_idx")
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@map("feed_inventory_snapshot")
+}
+
+// KPI tables (for daily rollups)
+model KpiDaily {
+  id                 String    @id @default(uuid())
+  tenantId           String
+  farmId             String
+  barnId             String
+  batchId            String?
+  recordDate         DateTime  @db.Date
+  fcr                Decimal?  @db.Decimal(10, 4)
+  adgG               Decimal?  @db.Decimal(10, 3)
+  sgrPct             Decimal?  @db.Decimal(10, 4)
+  totalFeedKg        Decimal?  @db.Decimal(14, 3)
+  weightGainKg       Decimal?  @db.Decimal(14, 3)
+  animalCount        Int?
+  mortalityCount     Int       @default(0)
+  intakeMissingFlag  Boolean   @default(false)
+  weightMissingFlag  Boolean   @default(false)
+  sourceWindowStart  DateTime?
+  sourceWindowEnd    DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@unique([tenantId, barnId, recordDate])
+  @@index([tenantId, recordDate])
+  @@index([tenantId, farmId, recordDate])
+  @@index([tenantId, barnId, recordDate])
+  @@index([tenantId, batchId, recordDate])
+  @@index([intakeMissingFlag])
+  @@index([weightMissingFlag])
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@map("kpi_daily")
+}
+

@@ -8,22 +8,92 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Notification {
-  id         String   @id @default(uuid())
-  tenantId   String
-  channel    String   // "webhook", "email", "sms" (MVP: webhook only)
-  to         String   // Recipient (URL for webhook, email for email, etc.)
-  title      String
-  message    String
-  severity   String   @default("info") // "info", "warning", "critical"
-  status     String   @default("pending") // "pending", "sent", "failed"
-  attempts   Int      @default(0)
-  lastError  String?
-  createdAt  DateTime @default(now())
-  sentAt     DateTime?
+enum NotificationSeverity {
+  info
+  warning
+  critical
+}
 
-  @@index([tenantId, status, createdAt(sort: Desc)])
-  @@index([tenantId, channel, createdAt(sort: Desc)])
+enum NotificationChannel {
+  in_app
+  webhook
+  email
+  sms
+}
+
+enum NotificationStatus {
+  created
+  queued
+  sent
+  failed
+  canceled
+}
+
+enum NotificationTargetType {
+  user
+  role
+  topic
+}
+
+enum NotificationAttemptStatus {
+  success
+  fail
+  retrying
+}
+
+model Notification {
+  id             String              @id @default(uuid())
+  tenantId       String              @map("tenant_id")
+  farmId         String?             @map("farm_id")
+  barnId         String?             @map("barn_id")
+  batchId        String?             @map("batch_id")
+  severity       NotificationSeverity @default(info)
+  channel        NotificationChannel
+  title          String
+  message        String
+  payloadJson    Json?               @map("payload_json")
+  status         NotificationStatus  @default(created)
+  dedupeKey      String?             @map("dedupe_key")
+  idempotencyKey String?             @map("idempotency_key")
+  externalRef    String?             @map("external_ref")
+  createdBy      String?             @map("created_by")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+  targets        NotificationTarget[]
+  deliveryAttempts NotificationDeliveryAttempt[]
+
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@index([tenantId, farmId, barnId, batchId, createdAt(sort: Desc)])
+  @@unique([tenantId, idempotencyKey], name: "notifications_tenant_idempotency_key")
+  @@unique([tenantId, externalRef], name: "notifications_tenant_external_ref")
   @@map("notifications")
 }
 
+model NotificationTarget {
+  id             String               @id @default(uuid())
+  tenantId       String               @map("tenant_id")
+  notificationId String               @map("notification_id")
+  targetType     NotificationTargetType @map("target_type")
+  targetValue    String               @map("target_value")
+  notification   Notification         @relation(fields: [notificationId], references: [id])
+
+  @@index([tenantId, notificationId])
+  @@map("notification_targets")
+}
+
+model NotificationDeliveryAttempt {
+  id             String                @id @default(uuid())
+  tenantId       String                @map("tenant_id")
+  notificationId String                @map("notification_id")
+  attemptNo      Int                   @map("attempt_no")
+  provider       NotificationChannel
+  destination    String?
+  status         NotificationAttemptStatus
+  errorMessage   String?               @map("error_message")
+  responseCode   Int?                  @map("response_code")
+  createdAt      DateTime              @default(now()) @map("created_at")
+  notification   Notification          @relation(fields: [notificationId], references: [id])
+
+  @@index([tenantId, notificationId, createdAt(sort: Desc)])
+  @@map("notification_delivery_attempts")
+}

@@ -2,6 +2,7 @@
   "compilerOptions": {
     "target": "ES2020",
     "module": "commonjs",
+    "moduleResolution": "node",
     "outDir": "./dist",
     "rootDir": ".",
     "strict": true,
@@ -10,8 +11,14 @@
     "forceConsistentCasingInFileNames": true,
     "sourceMap": true,
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
+    "emitDecoratorMetadata": true
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts", "scripts"],
+  "ts-node": {
+    "compilerOptions": {
+      "module": "commonjs",
+      "moduleResolution": "node"
+    }
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts", "scripts", "prisma/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

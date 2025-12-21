@@ -3,6 +3,12 @@ import dashboardRoutes from './dashboardRoutes'
 import publicVariableRoutes from './public-variable-routes'
 import configRoutes from './configRoutes'
 import auditRoutes from './auditRoutes'
+import feedRoutes from './feedRoutes'
+import barnRecordsRoutes from './barnRecordsRoutes'
+import tenantRegistryRoutes from './tenantRegistryRoutes'
+import sensorsRoutes from './sensorsRoutes'
+import weighvisionRoutes from './weighvisionRoutes'
+import reportingRoutes from './reportingRoutes'
 
 /**
  *
@@ -17,6 +23,24 @@ export function setupRoutes(app: Express): void {
 
   // Audit routes
   app.use('/api/v1/audit', auditRoutes)
+
+  // Feed service proxy routes
+  app.use('/api/v1', feedRoutes)
+
+  // Barn records service proxy routes
+  app.use('/api/v1', barnRecordsRoutes)
+
+  // Tenant registry service proxy routes
+  app.use('/api/v1', tenantRegistryRoutes)
+
+  // Sensor module proxy routes (part of tenant-registry)
+  app.use('/api/v1', sensorsRoutes)
+
+  // WeighVision read model proxy routes
+  app.use('/api/v1/weighvision', weighvisionRoutes)
+
+  // Reporting export service proxy routes
+  app.use('/api/v1/reports', reportingRoutes)
 
   // Keep existing public variable route for frontend config
   app.use('/api/public-variable-frontend', publicVariableRoutes)

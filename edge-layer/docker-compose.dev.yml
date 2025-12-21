@@ -95,6 +95,9 @@ services:
     volumes:
       - ./edge-telemetry-timeseries/src:/app/src:ro
       - ./edge-telemetry-timeseries/package.json:/app/package.json:ro
+      - ./edge-telemetry-timeseries/prisma:/app/prisma:ro
+      - ./edge-telemetry-timeseries/tsconfig.json:/app/tsconfig.json:ro
+      - ./edge-telemetry-timeseries/tsconfig.prisma.json:/app/tsconfig.prisma.json:ro
     environment:
       - NODE_ENV=development
       - APP_PORT=3000
@@ -110,6 +113,9 @@ services:
     volumes:
       - ./edge-weighvision-session/src:/app/src:ro
       - ./edge-weighvision-session/package.json:/app/package.json:ro
+      - ./edge-weighvision-session/prisma:/app/prisma:ro
+      - ./edge-weighvision-session/tsconfig.json:/app/tsconfig.json:ro
+      - ./edge-weighvision-session/tsconfig.prisma.json:/app/tsconfig.prisma.json:ro
     environment:
       - NODE_ENV=development
       - APP_PORT=3000
