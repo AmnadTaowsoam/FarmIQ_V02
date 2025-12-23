@@ -145,6 +145,26 @@ $results += @{Service="cloud-config-rules-service"; Success=$success}
 $success = Seed-PrismaService -ComposeFile $CLOUD_COMPOSE -Service "cloud-audit-log-service" -ServiceName "cloud-audit-log-service"
 $results += @{Service="cloud-audit-log-service"; Success=$success}
 
+# cloud-notification-service
+$success = Seed-PrismaService -ComposeFile $CLOUD_COMPOSE -Service "cloud-notification-service" -ServiceName "cloud-notification-service"
+$results += @{Service="cloud-notification-service"; Success=$success}
+
+# cloud-feed-service
+$success = Seed-PrismaService -ComposeFile $CLOUD_COMPOSE -Service "cloud-feed-service" -ServiceName "cloud-feed-service"
+$results += @{Service="cloud-feed-service"; Success=$success}
+
+# cloud-barn-records-service
+$success = Seed-PrismaService -ComposeFile $CLOUD_COMPOSE -Service "cloud-barn-records-service" -ServiceName "cloud-barn-records-service"
+$results += @{Service="cloud-barn-records-service"; Success=$success}
+
+# cloud-weighvision-readmodel
+$success = Seed-PrismaService -ComposeFile $CLOUD_COMPOSE -Service "cloud-weighvision-readmodel" -ServiceName "cloud-weighvision-readmodel"
+$results += @{Service="cloud-weighvision-readmodel"; Success=$success}
+
+# cloud-reporting-export-service
+$success = Seed-PrismaService -ComposeFile $CLOUD_COMPOSE -Service "cloud-reporting-export-service" -ServiceName "cloud-reporting-export-service"
+$results += @{Service="cloud-reporting-export-service"; Success=$success}
+
 # ============================================
 # EDGE LAYER SERVICES
 # ============================================

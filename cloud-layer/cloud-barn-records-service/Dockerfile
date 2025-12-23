@@ -1,5 +1,5 @@
 # Stage 1: Build the application
-FROM node:24-alpine AS build
+FROM node:20-alpine AS build
 
 # Set the working directory
 WORKDIR /usr/src/app
@@ -7,6 +7,15 @@ WORKDIR /usr/src/app
 # Copy package.json and package-lock.json
 COPY package*.json ./
 COPY prisma ./prisma/
+
+# Install OpenSSL for Prisma
+RUN apk add --no-cache openssl openssl-dev
+
+# Configure npm for better network reliability
+RUN npm config set fetch-retries 5 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    npm config set maxsockets 5
 
 # Install dependencies (skip scripts to avoid Prisma postinstall network issues)
 RUN npm install --legacy-peer-deps --ignore-scripts
@@ -21,7 +30,7 @@ COPY . .
 RUN npm run build
 
 # Stage 2: Development image
-FROM node:24-alpine AS development
+FROM node:20-alpine AS development
 
 # Set the working directory
 WORKDIR /usr/src/app
@@ -31,6 +40,15 @@ ENV NODE_ENV=development
 
 # Copy package.json and package-lock.json
 COPY package*.json ./
+
+# Install OpenSSL for Prisma
+RUN apk add --no-cache openssl openssl-dev
+
+# Configure npm for better network reliability
+RUN npm config set fetch-retries 5 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    npm config set maxsockets 5
 
 # Install all dependencies (skip scripts to avoid Prisma postinstall network issues)
 RUN npm install --legacy-peer-deps --ignore-scripts
@@ -61,7 +79,7 @@ CMD curl --fail http://localhost:3000/api/health || exit 1
 CMD ["npm", "run", "dev"]
 
 # Stage 3: Production image
-FROM node:24-alpine AS production
+FROM node:20-alpine AS production
 
 # Set the working directory
 WORKDIR /usr/src/app
@@ -71,6 +89,12 @@ ENV NODE_ENV=production
 
 # Copy package.json and package-lock.json
 COPY package*.json ./
+
+# Configure npm for better network reliability
+RUN npm config set fetch-retries 5 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    npm config set maxsockets 5
 
 # Install only production dependencies
 RUN npm install --only=production --legacy-peer-deps

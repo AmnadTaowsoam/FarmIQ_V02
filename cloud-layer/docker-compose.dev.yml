@@ -92,7 +92,7 @@ services:
       - NODE_ENV=development
       - APP_PORT=3000
       - LOG_LEVEL=debug
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_identity_access
       - DD_ENV=${DD_ENV:-dev}
       - DD_SERVICE=cloud-identity-access
       - DD_VERSION=${DD_VERSION:-local}
@@ -119,7 +119,7 @@ services:
       - NODE_ENV=development
       - APP_PORT=3000
       - LOG_LEVEL=debug
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_tenant_registry
       - DD_ENV=${DD_ENV:-dev}
       - DD_SERVICE=cloud-tenant-registry
       - DD_VERSION=${DD_VERSION:-local}
@@ -145,7 +145,8 @@ services:
       - NODE_ENV=development
       - APP_PORT=3000
       - LOG_LEVEL=debug
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_ingestion
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
       - DD_ENV=${DD_ENV:-dev}
       - DD_SERVICE=cloud-ingestion
       - DD_VERSION=${DD_VERSION:-local}
@@ -155,6 +156,8 @@ services:
       - farmiq-net
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
 
   cloud-telemetry-service:
@@ -167,11 +170,13 @@ services:
     volumes:
       - ./cloud-telemetry-service/src:/usr/src/app/src:ro
       - ./cloud-telemetry-service/package.json:/usr/src/app/package.json:ro
+      - ./cloud-telemetry-service/prisma:/usr/src/app/prisma:ro
     environment:
       - NODE_ENV=development
       - APP_PORT=3000
       - LOG_LEVEL=debug
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_telemetry
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
       - DD_ENV=${DD_ENV:-dev}
       - DD_SERVICE=cloud-telemetry-service
       - DD_VERSION=${DD_VERSION:-local}
@@ -181,6 +186,8 @@ services:
       - farmiq-net
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
 
   cloud-analytics-service:
@@ -195,7 +202,7 @@ services:
     environment:
       - LOG_LEVEL=DEBUG
       - PORT=8000
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_analytics
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
       - DD_ENV=${DD_ENV:-dev}
       - DD_SERVICE=cloud-analytics-service
@@ -225,7 +232,7 @@ services:
       - NODE_ENV=development
       - APP_PORT=3000
       - LOG_LEVEL=debug
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_api_gateway_bff
       - IDENTITY_BASE_URL=http://cloud-identity-access:3000
       - REGISTRY_BASE_URL=http://cloud-tenant-registry:3000
       - TELEMETRY_BASE_URL=http://cloud-telemetry-service:3000
@@ -263,7 +270,7 @@ services:
       - NODE_ENV=development
       - APP_PORT=3000
       - LOG_LEVEL=debug
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_config_rules
       - DD_ENV=${DD_ENV:-dev}
       - DD_SERVICE=cloud-config-rules-service
       - DD_VERSION=${DD_VERSION:-local}
@@ -290,7 +297,7 @@ services:
       - NODE_ENV=development
       - APP_PORT=3000
       - LOG_LEVEL=debug
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_audit_log
       - DD_ENV=${DD_ENV:-dev}
       - DD_SERVICE=cloud-audit-log-service
       - DD_VERSION=${DD_VERSION:-local}
@@ -317,7 +324,7 @@ services:
       - NODE_ENV=development
       - APP_PORT=3000
       - LOG_LEVEL=debug
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_notification
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
       - WORKER_CONCURRENCY=1
       - DD_ENV=${DD_ENV:-dev}
@@ -349,7 +356,7 @@ services:
       - NODE_ENV=development
       - APP_PORT=3000
       - LOG_LEVEL=debug
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_reporting_export
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
       - REPORT_DOWNLOAD_SECRET=${REPORT_DOWNLOAD_SECRET:-dev-report-secret}
       - EXPORT_ROOT=/data/exports
@@ -383,7 +390,7 @@ services:
       - NODE_ENV=development
       - APP_PORT=3000
       - LOG_LEVEL=debug
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_feed
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
       - DD_ENV=${DD_ENV:-dev}
       - DD_SERVICE=cloud-feed-service
@@ -414,7 +421,7 @@ services:
       - NODE_ENV=development
       - APP_PORT=3000
       - LOG_LEVEL=debug
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_barn_records
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
       - DD_ENV=${DD_ENV:-dev}
       - DD_SERVICE=cloud-barn-records-service
@@ -445,7 +452,7 @@ services:
       - NODE_ENV=development
       - APP_PORT=3000
       - LOG_LEVEL=debug
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_weighvision_readmodel
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
       - DD_ENV=${DD_ENV:-dev}
       - DD_SERVICE=cloud-weighvision-readmodel

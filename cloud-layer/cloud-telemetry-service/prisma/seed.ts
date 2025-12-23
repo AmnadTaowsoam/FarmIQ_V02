@@ -151,8 +151,44 @@ async function main() {
     })
   }
 
-  // Upsert aggregate records
-  for (const record of aggRecords) {
+  // Upsert aggregate records (filter out records with null farmId/barnId as they can't be used in composite key)
+  // Type guard function to filter valid records
+  type ValidAggRecord = {
+    tenantId: string
+    farmId: string
+    barnId: string
+    deviceId: string
+    metric: string
+    bucketStart: Date
+    bucketSize: string
+    avgValue: Prisma.Decimal
+    minValue: Prisma.Decimal
+    maxValue: Prisma.Decimal
+    count: number
+  };
+  
+  const validAggRecords: ValidAggRecord[] = [];
+  
+  for (const r of aggRecords) {
+    // Only process records with non-null farmId and barnId
+    if (r.farmId && r.barnId) {
+      validAggRecords.push({
+        tenantId: r.tenantId,
+        farmId: r.farmId,
+        barnId: r.barnId,
+        deviceId: r.deviceId,
+        metric: r.metric,
+        bucketStart: r.bucketStart,
+        bucketSize: r.bucketSize,
+        avgValue: r.avgValue,
+        minValue: r.minValue,
+        maxValue: r.maxValue,
+        count: r.count,
+      });
+    }
+  }
+  
+  for (const record of validAggRecords) {
     await prisma.telemetryAgg.upsert({
       where: {
         tenantId_farmId_barnId_deviceId_metric_bucketStart_bucketSize: {
@@ -171,13 +207,25 @@ async function main() {
         maxValue: record.maxValue,
         count: record.count,
       },
-      create: record,
+      create: {
+        tenantId: record.tenantId,
+        farmId: record.farmId,
+        barnId: record.barnId,
+        deviceId: record.deviceId,
+        metric: record.metric,
+        bucketStart: record.bucketStart,
+        bucketSize: record.bucketSize,
+        avgValue: record.avgValue,
+        minValue: record.minValue,
+        maxValue: record.maxValue,
+        count: record.count,
+      },
     })
   }
-  console.log(`Upserted ${aggRecords.length} telemetry_agg records`)
+  console.log(`Upserted ${validAggRecords.length} telemetry_agg records`)
 
   console.log('Seed completed successfully!')
-  console.log(`Summary: ${rawRecords.length} raw records, ${aggRecords.length} aggregate records`)
+  console.log(`Summary: ${rawRecords.length} raw records, ${validAggRecords.length} aggregate records`)
 }
 
 main()

@@ -26,8 +26,20 @@ async function main() {
   const farmId = SEED_IDS.FARM_1A
   const barnId = SEED_IDS.BARN_1A_1
 
-  // Create 10 ThresholdRule records
-  const thresholdRules = [
+  // Create SEED_COUNT ThresholdRule records (minimum 30)
+  const ruleCount = Math.max(SEED_COUNT, 30)
+  const thresholdRules: Array<{
+    tenantId: string
+    farmId: string | null
+    barnId: string | null
+    metric: string
+    op: string
+    value: number
+    durationSec: number | null
+    severity: string
+    enabled: boolean
+    updatedBy: string
+  }> = [
     {
       tenantId,
       farmId,
@@ -150,6 +162,41 @@ async function main() {
     },
   ]
 
+  // Generate additional threshold rules up to SEED_COUNT
+  const metrics = ['temperature', 'humidity', 'weight', 'co2', 'ammonia', 'pressure', 'light']
+  const ops = ['gt', 'lt', 'gte', 'lte', 'eq']
+  const severities = ['info', 'warning', 'critical']
+  const farmIds = [SEED_IDS.FARM_1A, SEED_IDS.FARM_1B, SEED_IDS.FARM_2A, SEED_IDS.FARM_2B]
+  const barnIds = [SEED_IDS.BARN_1A_1, SEED_IDS.BARN_1A_2, SEED_IDS.BARN_1B_1, SEED_IDS.BARN_1B_2, SEED_IDS.BARN_2A_1, SEED_IDS.BARN_2A_2]
+
+  for (let i = 10; i < ruleCount; i++) {
+    const configFarmId = farmIds[i % farmIds.length]
+    const configBarnId = barnIds[i % barnIds.length]
+    const configTenantId = i % 2 === 0 ? SEED_IDS.TENANT_1 : SEED_IDS.TENANT_2
+    const metric = metrics[i % metrics.length]
+    const op = ops[i % ops.length]
+    const severity = severities[i % severities.length]
+
+    thresholdRules.push({
+      tenantId: configTenantId,
+      farmId: configFarmId,
+      barnId: i % 3 === 0 ? null : configBarnId, // Some rules are farm-level
+      metric,
+      op,
+      value: metric === 'temperature' ? 20 + (i % 15) :
+             metric === 'humidity' ? 50 + (i % 30) :
+             metric === 'weight' ? 0.5 + (i % 20) * 0.1 :
+             metric === 'co2' ? 500 + (i % 500) :
+             metric === 'ammonia' ? 5 + (i % 10) :
+             metric === 'pressure' ? 1000 + (i % 100) :
+             50 + (i % 50),
+      durationSec: 300 + (i % 600) * 60,
+      severity,
+      enabled: i % 5 !== 0, // Most enabled, some disabled
+      updatedBy: i % 2 === 0 ? 'system' : 'admin-user',
+    })
+  }
+
   for (const rule of thresholdRules) {
     await prisma.thresholdRule.create({
       data: rule,
@@ -157,8 +204,18 @@ async function main() {
   }
   console.log(`Created ${thresholdRules.length} threshold rules`)
 
-  // Create 10 TargetCurve records
-  const targetCurves = [
+  // Create SEED_COUNT TargetCurve records (minimum 30)
+  const curveCount = Math.max(SEED_COUNT, 30)
+  const targetCurves: Array<{
+    tenantId: string
+    farmId: string | null
+    barnId: string | null
+    species: string
+    day: number
+    targetWeight: number | null
+    targetFcr: number | null
+    updatedBy: string
+  }> = [
     {
       tenantId,
       farmId,
@@ -260,6 +317,47 @@ async function main() {
       updatedBy: 'admin-user',
     },
   ]
+
+  // Generate additional target curves up to SEED_COUNT
+  const species = ['broiler', 'layer', 'swine', 'fish']
+  const days = Array.from({ length: 50 }, (_, i) => i + 1)
+
+  for (let i = 10; i < curveCount; i++) {
+    const configSpecies = species[i % species.length]
+    const configFarmId = farmIds[i % farmIds.length]
+    const configBarnId = barnIds[i % barnIds.length]
+    const configTenantId = i % 2 === 0 ? SEED_IDS.TENANT_1 : SEED_IDS.TENANT_2
+    const day = days[i % days.length]
+    
+    // Calculate target weight based on species and day
+    let targetWeight = 0
+    let targetFcr: number | null = null
+    
+    if (configSpecies === 'broiler') {
+      targetWeight = 0.05 + (day * 0.08) // Broiler growth curve
+      targetFcr = day > 7 ? 1.2 + (day / 50) : null
+    } else if (configSpecies === 'layer') {
+      targetWeight = 0.04 + (day * 0.06) // Layer growth curve
+      targetFcr = day > 7 ? 1.1 + (day / 100) : null
+    } else if (configSpecies === 'swine') {
+      targetWeight = 0.5 + (day * 0.2) // Swine growth curve
+      targetFcr = day > 7 ? 2.0 + (day / 30) : null
+    } else {
+      targetWeight = 0.01 + (day * 0.05) // Fish growth curve
+      targetFcr = day > 7 ? 1.0 + (day / 80) : null
+    }
+
+    targetCurves.push({
+      tenantId: configTenantId,
+      farmId: configFarmId,
+      barnId: i % 3 === 0 ? null : configBarnId, // Some curves are farm-level
+      species: configSpecies,
+      day,
+      targetWeight,
+      targetFcr,
+      updatedBy: i % 2 === 0 ? 'system' : 'admin-user',
+    })
+  }
 
   for (const curve of targetCurves) {
     await prisma.targetCurve.create({

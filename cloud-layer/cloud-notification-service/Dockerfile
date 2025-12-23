@@ -1,5 +1,5 @@
 # Stage 1: Build the application
-FROM node:24-alpine AS build
+FROM node:20-alpine AS build
 
 # Set the working directory
 WORKDIR /usr/src/app
@@ -7,6 +7,15 @@ WORKDIR /usr/src/app
 # Copy package.json and package-lock.json
 COPY package*.json ./
 COPY prisma ./prisma/
+
+# Install OpenSSL 3 for Prisma engines
+RUN apk add --no-cache openssl libssl3
+
+# Configure npm for better network reliability
+RUN npm config set fetch-retries 5 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    npm config set maxsockets 5
 
 # Install dependencies (skip scripts to avoid Prisma postinstall network issues)
 RUN npm install --legacy-peer-deps --ignore-scripts
@@ -21,7 +30,7 @@ COPY . .
 RUN npm run build
 
 # Stage 2: Development image
-FROM node:24-alpine AS development
+FROM node:20-alpine AS development
 
 # Install required libraries for Prisma (Alpine compatibility)
 RUN apk add --no-cache libc6-compat openssl libssl3
@@ -35,13 +44,22 @@ ENV NODE_ENV=development
 # Copy package.json and package-lock.json
 COPY package*.json ./
 
+# Configure npm for better network reliability
+RUN npm config set fetch-retries 5 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    npm config set maxsockets 5
+
 # Install all dependencies (skip scripts to avoid Prisma postinstall network issues)
 RUN npm install --legacy-peer-deps --ignore-scripts
 
-# Copy prisma schema and generated client
+# Copy prisma schema and generated client from build stage
 COPY --from=build /usr/src/app/prisma ./prisma
 COPY --from=build /usr/src/app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=build /usr/src/app/node_modules/@prisma ./node_modules/@prisma
+
+# Regenerate Prisma client in development stage to ensure correct binary
+RUN npx prisma generate
 
 # Copy source code (will be overridden by volume in docker-compose.dev.yml)
 COPY --from=build /usr/src/app/src ./src
@@ -64,7 +82,10 @@ CMD curl --fail http://localhost:3000/api/health || exit 1
 CMD ["npm", "run", "dev"]
 
 # Stage 3: Production image
-FROM node:24-alpine AS production
+FROM node:20-alpine AS production
+
+# Install OpenSSL 3 for Prisma engines
+RUN apk add --no-cache openssl libssl3
 
 # Set the working directory
 WORKDIR /usr/src/app
@@ -74,6 +95,12 @@ ENV NODE_ENV=production
 
 # Copy package.json and package-lock.json
 COPY package*.json ./
+
+# Configure npm for better network reliability
+RUN npm config set fetch-retries 5 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    npm config set maxsockets 5
 
 # Install only production dependencies
 RUN npm install --only=production --legacy-peer-deps

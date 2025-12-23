@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, Prisma } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
@@ -8,8 +8,28 @@ async function main() {
   // Clear existing data (optional - comment out if you want to keep existing data)
   await prisma.auditEvent.deleteMany({})
 
-  // Create 10 AuditEvent records
-  const auditEvents = [
+  // Guard: prevent seed in production
+  if (process.env.NODE_ENV === 'production' && !process.env.ALLOW_SEED_IN_PROD) {
+    console.error('ERROR: Seed is not allowed in production!')
+    console.error('Set ALLOW_SEED_IN_PROD=true if you really want to seed production.')
+    process.exit(1)
+  }
+
+  const SEED_COUNT = parseInt(process.env.SEED_COUNT || '30', 10)
+
+  // Create SEED_COUNT AuditEvent records (minimum 30)
+  const auditCount = Math.max(SEED_COUNT, 30)
+  const auditEvents: Array<{
+    tenantId: string
+    actorId: string
+    actorRole: string
+    action: string
+    resourceType: string
+    resourceId: string | null
+    summary: string
+    metadataJson?: Prisma.InputJsonValue
+    requestId?: string | null
+  }> = [
     {
       tenantId: 'tenant-001',
       actorId: 'user-001',
@@ -161,6 +181,35 @@ async function main() {
       requestId: 'req-010',
     },
   ]
+
+  // Generate additional events up to SEED_COUNT
+  const actions = ['create', 'update', 'delete', 'view', 'acknowledge']
+  const resourceTypes = ['farm', 'barn', 'batch', 'threshold', 'target_curve', 'telemetry', 'alert', 'audit']
+  const tenantIds = ['tenant-001', 'tenant-002']
+  const actorRoles = ['tenant_admin', 'farm_manager', 'operator', 'viewer', 'system']
+
+  for (let i = 10; i < auditCount; i++) {
+    const tenantId = tenantIds[i % tenantIds.length]
+    const action = actions[i % actions.length]
+    const resourceType = resourceTypes[i % resourceTypes.length]
+    const actorRole = actorRoles[i % actorRoles.length]
+    
+    auditEvents.push({
+      tenantId,
+      actorId: `user-${(i % 10) + 1}`,
+      actorRole,
+      action,
+      resourceType,
+      resourceId: `${resourceType}-${(i % 20) + 1}`,
+      summary: `${action.charAt(0).toUpperCase() + action.slice(1)} ${resourceType}: ${resourceType}-${(i % 20) + 1}`,
+      metadataJson: {
+        index: i,
+        timestamp: new Date().toISOString(),
+        resource_type: resourceType,
+      },
+      requestId: `req-${(i + 1).toString().padStart(3, '0')}`,
+    })
+  }
 
   for (const event of auditEvents) {
     await prisma.auditEvent.create({

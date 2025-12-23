@@ -48,13 +48,16 @@ export async function setupTelemetryConsumer(
     const exchange = 'farmiq.telemetry.exchange'
     await channel.assertExchange(exchange, 'topic', { durable: true })
 
+    // DLQ Exchange: farmiq.dlq.exchange (direct)
+    await channel.assertExchange('farmiq.dlq.exchange', 'direct', { durable: true })
+
     // Queue: farmiq.cloud-telemetry-service.ingest.queue
     const queue = 'farmiq.cloud-telemetry-service.ingest.queue'
     await channel.assertQueue(queue, {
       durable: true,
       arguments: {
-        'x-dead-letter-exchange': 'farmiq.telemetry.exchange',
-        'x-dead-letter-routing-key': 'telemetry.ingested.dlq',
+        'x-message-ttl': 86400000, // 24 hours
+        'x-dead-letter-exchange': 'farmiq.dlq.exchange',
       },
     })
 
