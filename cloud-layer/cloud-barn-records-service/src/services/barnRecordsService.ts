@@ -2,9 +2,60 @@ import { PrismaClient, Prisma } from '@prisma/client'
 import { logger } from '../utils/logger'
 import { Decimal } from '@prisma/client/runtime/library'
 import { newUuidV7 } from '../utils/uuid'
-import { publishBarnRecordCreatedEvent } from '../utils/eventPublisher'
+import { publishBarnRecordCreatedEvent, publishBarnDailyCountsUpsertedEvent } from '../utils/eventPublisher'
 
 const prisma = new PrismaClient()
+
+type ListFilters = {
+  farmId?: string
+  barnId?: string
+  batchId?: string | null
+  start?: Date
+  end?: Date
+  cursor?: string
+  limit?: number
+}
+
+type DateField = 'occurredAt' | 'recordDate' | 'hatchDate'
+
+async function listByModel(
+  model: keyof PrismaClient,
+  tenantId: string,
+  dateField: DateField,
+  filters?: ListFilters
+) {
+  const limit = Math.min(filters?.limit || 25, 100)
+  const where: Record<string, any> = {
+    tenantId,
+    ...(filters?.farmId ? { farmId: filters.farmId } : {}),
+    ...(filters?.barnId ? { barnId: filters.barnId } : {}),
+    ...(filters?.batchId ? { batchId: filters.batchId } : {}),
+  }
+
+  if (filters?.start || filters?.end) {
+    where[dateField] = {
+      ...(filters.start ? { gte: filters.start } : {}),
+      ...(filters.end ? { lte: filters.end } : {}),
+    }
+  }
+
+  const items = await (prisma[model] as any).findMany({
+    where,
+    take: limit + 1,
+    ...(filters?.cursor ? { skip: 1, cursor: { id: filters.cursor } } : {}),
+    orderBy: { [dateField]: 'desc' },
+  })
+
+  const hasNext = items.length > limit
+  if (hasNext) {
+    items.pop()
+  }
+
+  return {
+    items,
+    nextCursor: hasNext ? items[items.length - 1].id : null,
+  }
+}
 
 // Input types for barn records
 export interface CreateMorbidityEventInput {
@@ -556,6 +607,18 @@ export async function createDailyCount(
       })
     })
 
+    await publishBarnDailyCountsUpsertedEvent({
+      tenantId,
+      farmId: input.farmId,
+      barnId: input.barnId,
+      batchId: input.batchId,
+      recordDate: input.recordDate,
+      animalCount: input.animalCount,
+      averageWeightKg: input.averageWeightKg ?? null,
+      mortalityCount: input.mortalityCount ?? 0,
+      cullCount: input.cullCount ?? 0,
+    })
+
     return event
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -615,6 +678,34 @@ export async function listDailyCounts(
     items,
     nextCursor: hasNext ? items[items.length - 1].id : null,
   }
+}
+
+export async function listMorbidityEvents(tenantId: string, filters?: ListFilters) {
+  return listByModel('barnMorbidityEvent', tenantId, 'occurredAt', filters)
+}
+
+export async function listMortalityEvents(tenantId: string, filters?: ListFilters) {
+  return listByModel('barnMortalityEvent', tenantId, 'occurredAt', filters)
+}
+
+export async function listVaccineEvents(tenantId: string, filters?: ListFilters) {
+  return listByModel('barnVaccineEvent', tenantId, 'occurredAt', filters)
+}
+
+export async function listTreatmentEvents(tenantId: string, filters?: ListFilters) {
+  return listByModel('barnTreatmentEvent', tenantId, 'occurredAt', filters)
+}
+
+export async function listWelfareChecks(tenantId: string, filters?: ListFilters) {
+  return listByModel('barnWelfareCheck', tenantId, 'occurredAt', filters)
+}
+
+export async function listHousingConditions(tenantId: string, filters?: ListFilters) {
+  return listByModel('barnHousingCondition', tenantId, 'occurredAt', filters)
+}
+
+export async function listGeneticProfiles(tenantId: string, filters?: ListFilters) {
+  return listByModel('barnGeneticProfile', tenantId, 'hatchDate', filters)
 }
 
 /**

@@ -60,7 +60,7 @@ export async function publishBarnRecordCreated(
       record_id: string
       [key: string]: any
     }
-  }
+}
 ): Promise<void> {
   if (!channel) {
     logger.warn('RabbitMQ channel not available, attempting to reconnect...')
@@ -118,6 +118,73 @@ export async function publishBarnRecordCreated(
       service: 'cloud-barn-records-service',
     })
     // Don't throw - event publishing failure should not break the API
+  }
+}
+
+export async function publishBarnDailyCountsUpserted(
+  envelope: {
+    event_id: string
+    event_type: string
+    tenant_id: string
+    farm_id?: string | null
+    barn_id?: string | null
+    batch_id?: string | null
+    occurred_at: string
+    trace_id?: string
+    payload: Record<string, any>
+  }
+): Promise<void> {
+  if (!channel) {
+    logger.warn('RabbitMQ channel not available, attempting to reconnect...')
+    await connectRabbitMQ()
+  }
+
+  if (!channel) {
+    logger.warn('RabbitMQ channel still not available, skipping event publish', {
+      eventId: envelope.event_id,
+      service: 'cloud-barn-records-service',
+    })
+    return
+  }
+
+  try {
+    const exchange = 'farmiq.sync.exchange'
+    await channel.assertExchange(exchange, 'topic', { durable: true })
+
+    const routingKey = 'barn.daily_counts.upserted'
+
+    const success = channel.publish(
+      exchange,
+      routingKey,
+      Buffer.from(JSON.stringify(envelope)),
+      {
+        persistent: true,
+        headers: {
+          'x-trace-id': envelope.trace_id || '',
+          'x-request-id': envelope.event_id,
+        },
+      }
+    )
+
+    if (success) {
+      logger.info('Published barn.daily_counts.upserted event', {
+        eventId: envelope.event_id,
+        tenantId: envelope.tenant_id,
+        barnId: envelope.barn_id,
+        service: 'cloud-barn-records-service',
+      })
+    } else {
+      logger.warn('Failed to publish barn.daily_counts.upserted event (buffer full)', {
+        eventId: envelope.event_id,
+        service: 'cloud-barn-records-service',
+      })
+    }
+  } catch (error) {
+    logger.error('Error publishing barn.daily_counts.upserted event', {
+      error,
+      eventId: envelope.event_id,
+      service: 'cloud-barn-records-service',
+    })
   }
 }
 

@@ -1,4 +1,4 @@
-import { publishBarnRecordCreated } from './rabbitmq'
+import { publishBarnRecordCreated, publishBarnDailyCountsUpserted } from './rabbitmq'
 import { logger } from './logger'
 import { newUuidV7 } from './uuid'
 
@@ -51,6 +51,49 @@ export async function publishBarnRecordCreatedEvent(
       recordType,
       recordId,
       tenantId,
+      service: 'cloud-barn-records-service',
+    })
+  }
+}
+
+export async function publishBarnDailyCountsUpsertedEvent(params: {
+  tenantId: string
+  farmId: string | null
+  barnId: string | null
+  batchId: string | null | undefined
+  recordDate: Date
+  animalCount: number
+  averageWeightKg?: number | null
+  mortalityCount?: number | null
+  cullCount?: number | null
+  traceId?: string
+}) {
+  try {
+    const eventId = newUuidV7()
+    const envelope = {
+      event_id: eventId,
+      event_type: 'barn.daily_counts.upserted',
+      tenant_id: params.tenantId,
+      farm_id: params.farmId,
+      barn_id: params.barnId,
+      batch_id: params.batchId || null,
+      occurred_at: params.recordDate.toISOString(),
+      trace_id: params.traceId,
+      payload: {
+        record_date: params.recordDate.toISOString().split('T')[0],
+        animal_count: params.animalCount,
+        average_weight_kg: params.averageWeightKg,
+        mortality_count: params.mortalityCount,
+        cull_count: params.cullCount,
+      },
+    }
+
+    await publishBarnDailyCountsUpserted(envelope)
+  } catch (error) {
+    logger.error('Failed to publish barn.daily_counts.upserted event', {
+      error,
+      tenantId: params.tenantId,
+      barnId: params.barnId,
       service: 'cloud-barn-records-service',
     })
   }

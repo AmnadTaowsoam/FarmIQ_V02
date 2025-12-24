@@ -31,44 +31,97 @@ export async function getSessions(params: {
     cursor,
   } = params
 
-  const where: any = {
-    tenantId,
+  // Use raw SQL query since Prisma client may not recognize manually created tables
+  let query = `
+    SELECT 
+      s.*,
+      COALESCE(
+        (SELECT json_agg(m ORDER BY m.ts DESC) 
+         FROM (SELECT * FROM weighvision_measurement WHERE "sessionDbId" = s.id ORDER BY ts DESC LIMIT 10) m),
+        '[]'::json
+      ) as measurements,
+      COALESCE(
+        (SELECT json_agg(med ORDER BY med.ts DESC)
+         FROM (SELECT * FROM weighvision_media WHERE "sessionDbId" = s.id ORDER BY ts DESC LIMIT 5) med),
+        '[]'::json
+      ) as media,
+      COALESCE(
+        (SELECT json_agg(inf ORDER BY inf.ts DESC)
+         FROM (SELECT * FROM weighvision_inference WHERE "sessionDbId" = s.id ORDER BY ts DESC LIMIT 5) inf),
+        '[]'::json
+      ) as inferences
+    FROM weighvision_session s
+    WHERE s."tenantId" = $1
+  `
+  
+  const queryParams: any[] = [tenantId]
+  let paramIndex = 2
+  
+  if (farmId) {
+    query += ` AND s."farmId" = $${paramIndex}`
+    queryParams.push(farmId)
+    paramIndex++
   }
-
-  if (farmId) where.farmId = farmId
-  if (barnId) where.barnId = barnId
-  if (batchId) where.batchId = batchId
-  if (stationId) where.stationId = stationId
-  if (status) where.status = status
-  if (from || to) {
-    where.startedAt = {}
-    if (from) where.startedAt.gte = from
-    if (to) where.startedAt.lte = to
+  if (barnId) {
+    query += ` AND s."barnId" = $${paramIndex}`
+    queryParams.push(barnId)
+    paramIndex++
   }
-
+  if (batchId) {
+    query += ` AND s."batchId" = $${paramIndex}`
+    queryParams.push(batchId)
+    paramIndex++
+  }
+  if (stationId) {
+    query += ` AND s."stationId" = $${paramIndex}`
+    queryParams.push(stationId)
+    paramIndex++
+  }
+  if (status) {
+    query += ` AND s.status = $${paramIndex}`
+    queryParams.push(status)
+    paramIndex++
+  }
+  if (from) {
+    query += ` AND s."startedAt" >= $${paramIndex}`
+    queryParams.push(from)
+    paramIndex++
+  }
+  if (to) {
+    query += ` AND s."startedAt" <= $${paramIndex}`
+    queryParams.push(to)
+    paramIndex++
+  }
   if (cursor) {
-    where.id = { gt: cursor }
+    query += ` AND s.id > $${paramIndex}`
+    queryParams.push(cursor)
+    paramIndex++
   }
-
-  const sessions = await prisma.weighVisionSession.findMany({
-    where,
-    orderBy: { startedAt: 'desc' },
-    take: limit + 1, // Fetch one extra to determine if there's a next page
-    include: {
-      measurements: {
-        orderBy: { ts: 'desc' },
-        take: 10, // Include latest 10 measurements
-      },
-      media: {
-        orderBy: { ts: 'desc' },
-        take: 5, // Include latest 5 media items
-      },
-      inferences: {
-        orderBy: { ts: 'desc' },
-        take: 5, // Include latest 5 inferences
-      },
-    },
-  })
+  
+  query += ` ORDER BY s."startedAt" DESC LIMIT $${paramIndex}`
+  queryParams.push(limit + 1)
+  
+  // Use Prisma.sql for type safety, but cast to any for dynamic queries
+  const sessionsRaw = await prisma.$queryRawUnsafe(query, ...queryParams) as any[]
+  
+  // Transform raw results
+  const sessions = sessionsRaw.map((row: any) => ({
+    id: row.id,
+    tenantId: row.tenantId,
+    farmId: row.farmId,
+    barnId: row.barnId,
+    batchId: row.batchId,
+    stationId: row.stationId,
+    sessionId: row.sessionId,
+    startedAt: row.startedAt,
+    endedAt: row.endedAt,
+    status: row.status,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    measurements: row.measurements || [],
+    media: row.media || [],
+    inferences: row.inferences || [],
+  }))
 
   const hasNext = sessions.length > limit
   const items = hasNext ? sessions.slice(0, limit) : sessions
@@ -85,27 +138,57 @@ export async function getSessions(params: {
  * Get weighvision session by ID
  */
 export async function getSessionById(tenantId: string, sessionId: string) {
-  const session = await prisma.weighVisionSession.findUnique({
-    where: {
-      tenantId_sessionId: {
-        tenantId,
-        sessionId,
-      },
-    },
-    include: {
-      measurements: {
-        orderBy: { ts: 'asc' },
-      },
-      media: {
-        orderBy: { ts: 'asc' },
-      },
-      inferences: {
-        orderBy: { ts: 'asc' },
-      },
-    },
-  })
-
-  return session
+  // Use raw SQL query since Prisma client may not recognize manually created tables
+  const query = `
+    SELECT 
+      s.*,
+      COALESCE(
+        (SELECT json_agg(m ORDER BY m.ts ASC)
+         FROM weighvision_measurement m
+         WHERE m."sessionDbId" = s.id),
+        '[]'::json
+      ) as measurements,
+      COALESCE(
+        (SELECT json_agg(med ORDER BY med.ts ASC)
+         FROM weighvision_media med
+         WHERE med."sessionDbId" = s.id),
+        '[]'::json
+      ) as media,
+      COALESCE(
+        (SELECT json_agg(inf ORDER BY inf.ts ASC)
+         FROM weighvision_inference inf
+         WHERE inf."sessionDbId" = s.id),
+        '[]'::json
+      ) as inferences
+    FROM weighvision_session s
+    WHERE s."tenantId" = $1 AND s."sessionId" = $2
+    LIMIT 1
+  `
+  
+  const results = await prisma.$queryRawUnsafe(query, tenantId, sessionId) as any[]
+  
+  if (results.length === 0) {
+    return null
+  }
+  
+  const row = results[0]
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    farmId: row.farmId,
+    barnId: row.barnId,
+    batchId: row.batchId,
+    stationId: row.stationId,
+    sessionId: row.sessionId,
+    startedAt: row.startedAt,
+    endedAt: row.endedAt,
+    status: row.status,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    measurements: Array.isArray(row.measurements) ? row.measurements : [],
+    media: Array.isArray(row.media) ? row.media : [],
+    inferences: Array.isArray(row.inferences) ? row.inferences : [],
+  }
 }
 
 /**
@@ -520,6 +603,236 @@ export async function handleMediaStored(event: WeighVisionEvent) {
       tenantId: event.tenant_id,
     })
     throw error
+  }
+}
+
+/**
+ * Get weighvision analytics (trends, distributions, statistics)
+ */
+export async function getAnalytics(params: {
+  tenantId: string
+  farmId?: string
+  barnId?: string
+  batchId?: string
+  startDate: Date
+  endDate: Date
+  aggregation?: 'daily' | 'weekly' | 'monthly'
+}) {
+  const {
+    tenantId,
+    farmId,
+    barnId,
+    batchId,
+    startDate,
+    endDate,
+    aggregation = 'daily',
+  } = params
+
+  const where: any = {
+    tenantId,
+    status: 'FINALIZED',
+    startedAt: {
+      gte: startDate,
+      lte: endDate,
+    },
+  }
+
+  if (farmId) where.farmId = farmId
+  if (barnId) where.barnId = barnId
+  if (batchId) where.batchId = batchId
+
+  // Get all finalized sessions with measurements using raw SQL (Prisma client may not recognize manually created tables)
+  let sessionsQuery = `
+    SELECT 
+      s.*,
+      COALESCE(
+        (SELECT json_agg(m ORDER BY m.ts ASC)
+         FROM weighvision_measurement m
+         WHERE m."sessionDbId" = s.id),
+        '[]'::json
+      ) as measurements
+    FROM weighvision_session s
+    WHERE s."tenantId" = $1
+      AND s.status = 'FINALIZED'
+      AND s."startedAt" >= $2
+      AND s."startedAt" <= $3
+  `
+  
+  const queryParams: any[] = [tenantId, startDate, endDate]
+  let paramIndex = 4
+  
+  if (farmId) {
+    sessionsQuery += ` AND s."farmId" = $${paramIndex}`
+    queryParams.push(farmId)
+    paramIndex++
+  }
+  if (barnId) {
+    sessionsQuery += ` AND s."barnId" = $${paramIndex}`
+    queryParams.push(barnId)
+    paramIndex++
+  }
+  if (batchId) {
+    sessionsQuery += ` AND s."batchId" = $${paramIndex}`
+    queryParams.push(batchId)
+    paramIndex++
+  }
+  
+  sessionsQuery += ` ORDER BY s."startedAt" ASC`
+  
+  const sessionsRaw = await prisma.$queryRawUnsafe(sessionsQuery, ...queryParams) as any[]
+  
+  // Transform raw results to match expected format
+  const sessions = sessionsRaw.map((row: any) => ({
+    id: row.id,
+    tenantId: row.tenantId,
+    farmId: row.farmId,
+    barnId: row.barnId,
+    batchId: row.batchId,
+    stationId: row.stationId,
+    sessionId: row.sessionId,
+    startedAt: row.startedAt,
+    endedAt: row.endedAt,
+    status: row.status,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    measurements: Array.isArray(row.measurements) ? row.measurements : [],
+  }))
+
+  // Collect all weights
+  const allWeights: number[] = []
+  const weightByDate: Record<string, number[]> = {}
+
+  for (const session of sessions) {
+    for (const measurement of session.measurements) {
+      const weight = Number(measurement.weightKg)
+      if (isNaN(weight) || weight <= 0) continue
+
+      allWeights.push(weight)
+
+      // Group by date based on aggregation
+      const date = new Date(measurement.ts)
+      let dateKey: string
+
+      if (aggregation === 'daily') {
+        dateKey = date.toISOString().split('T')[0]
+      } else if (aggregation === 'weekly') {
+        const weekStart = new Date(date)
+        weekStart.setDate(date.getDate() - date.getDay())
+        dateKey = weekStart.toISOString().split('T')[0]
+      } else {
+        // monthly
+        const month = date.getMonth() + 1
+        dateKey = `${date.getFullYear()}-${String(month).padStart(2, '0')}`
+      }
+
+      if (!weightByDate[dateKey]) {
+        weightByDate[dateKey] = []
+      }
+      weightByDate[dateKey].push(weight)
+    }
+  }
+
+  // Calculate statistics
+  const calculateStats = (weights: number[]) => {
+    if (weights.length === 0) return null
+
+    const sorted = [...weights].sort((a, b) => a - b)
+    const sum = weights.reduce((a, b) => a + b, 0)
+    const avg = sum / weights.length
+    const variance = weights.reduce((acc, w) => acc + Math.pow(w - avg, 2), 0) / weights.length
+    const stddev = Math.sqrt(variance)
+    const cv = avg > 0 ? stddev / avg : 0
+
+    // Percentiles
+    const p10 = sorted[Math.floor(sorted.length * 0.1)] || sorted[0]
+    const p25 = sorted[Math.floor(sorted.length * 0.25)] || sorted[0]
+    const p50 = sorted[Math.floor(sorted.length * 0.5)] || sorted[0]
+    const p75 = sorted[Math.floor(sorted.length * 0.75)] || sorted[sorted.length - 1]
+    const p90 = sorted[Math.floor(sorted.length * 0.9)] || sorted[sorted.length - 1]
+
+    // Uniformity: percentage within ±10% of average
+    const withinRange = weights.filter(w => Math.abs(w - avg) / avg <= 0.1).length
+    const uniformity = weights.length > 0 ? (withinRange / weights.length) * 100 : 0
+
+    return {
+      avg,
+      min: sorted[0],
+      max: sorted[sorted.length - 1],
+      stddev,
+      cv,
+      p10,
+      p25,
+      p50,
+      p75,
+      p90,
+      uniformity,
+      iqr: p75 - p25,
+    }
+  }
+
+  const overallStats = calculateStats(allWeights)
+
+  // Build weight trend
+  const weightTrend = Object.entries(weightByDate)
+    .map(([date, weights]) => {
+      const stats = calculateStats(weights)
+      if (!stats) return null
+
+      return {
+        date,
+        avg_weight_kg: stats.avg,
+        min_weight_kg: stats.min,
+        max_weight_kg: stats.max,
+        p10_weight_kg: stats.p10,
+        p25_weight_kg: stats.p25,
+        p50_weight_kg: stats.p50,
+        p75_weight_kg: stats.p75,
+        p90_weight_kg: stats.p90,
+      }
+    })
+    .filter(Boolean)
+    .sort((a, b) => (a?.date || '').localeCompare(b?.date || ''))
+
+  // Build distribution bins
+  const bins: Array<{ range: string; count: number }> = []
+  if (allWeights.length > 0) {
+    const min = Math.min(...allWeights)
+    const max = Math.max(...allWeights)
+    const binCount = 10
+    const binWidth = (max - min) / binCount
+
+    for (let i = 0; i < binCount; i++) {
+      const binMin = min + i * binWidth
+      const binMax = min + (i + 1) * binWidth
+      const count = allWeights.filter(w => w >= binMin && (i === binCount - 1 ? w <= binMax : w < binMax)).length
+
+      bins.push({
+        range: `${binMin.toFixed(1)}-${binMax.toFixed(1)}`,
+        count,
+      })
+    }
+  }
+
+  return {
+    weight_trend: weightTrend,
+    statistics: overallStats
+      ? {
+          current_avg_weight_kg: overallStats.avg,
+          current_stddev_kg: overallStats.stddev,
+          uniformity_percent: overallStats.uniformity,
+          cv: overallStats.cv,
+          iqr_kg: overallStats.iqr,
+        }
+      : {
+          current_avg_weight_kg: 0,
+          current_stddev_kg: 0,
+          uniformity_percent: 0,
+          cv: 0,
+          iqr_kg: 0,
+        },
+    distribution: {
+      bins,
+    },
   }
 }
 

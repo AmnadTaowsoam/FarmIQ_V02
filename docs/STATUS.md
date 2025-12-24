@@ -1523,6 +1523,26 @@ curl http://localhost:5123/api/health  # Telemetry Service
   - 📝 Weight data source: cloud-telemetry-service TelemetryRaw/TelemetryAgg tables via HTTP API
   - Updated: cloud-layer/FEED-MODULE-IMPLEMENTATION-STATUS.md with KPI implementation details
 
+### 2025-01-XX (Feeding KPI Refactoring - Final Architecture)
+- **Feeding KPI Refactoring Completed (CursorAI)**:
+  - ✅ Refactored Feeding KPI to be owned by cloud-analytics-service (final architecture, no future migration)
+  - ✅ BFF: Added route GET /api/v1/kpi/feeding -> cloud-analytics-service
+  - ✅ BFF: Added query normalization (accept startDate/endDate OR start/end)
+  - ✅ BFF: Ensured consistent JSON shapes with empty series (never hangs)
+  - ✅ analytics-service: Added Prisma model/table feeding_kpi_daily
+  - ✅ analytics-service: Implemented KPI compute logic (biomass, weight_gain, fcr, adg_kg, sgr_pct)
+  - ✅ analytics-service: Implemented GET /api/v1/kpi/feeding endpoint
+  - ✅ analytics-service: Added RabbitMQ consumer for event-driven recompute (feed.intake.upserted, barn.daily_counts.upserted, weighvision.weight_aggregate.upserted)
+  - ✅ barn-records: Verified POST/GET /api/v1/barn-records/daily-counts endpoints exist
+  - ✅ barn-records: Verified DB indexes on (tenant_id,farm_id,barn_id,batch_id,date)
+  - ✅ feed-service: Verified POST/GET /api/v1/feed/intake-records endpoints exist
+  - ✅ feed-service: Verified feed.intake.upserted event publishing on upsert
+  - ✅ weighvision-readmodel: Added GET /api/v1/weighvision/weight-aggregates endpoint
+  - ✅ weighvision-readmodel: Verified weighvision.weight_aggregate.upserted event publishing
+  - 📝 Created docs/audits/final-kpi-contract.md with final contracts
+  - 📝 Created docs/audits/kpi-test-commands.md with curl commands
+  - ⚠️ TODO: Update seed scripts for all services (30+ records each)
+
 ### 2025-02-04 (RabbitMQ Integration & Edge Feed Intake)
 - **RabbitMQ Integration Completed (CursorAI)**:
   - ✅ cloud-feed-service: Added RabbitMQ consumer for `feed.intake.recorded` events from `farmiq.sync.exchange`

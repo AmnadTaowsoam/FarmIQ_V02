@@ -2,6 +2,8 @@ import express from 'express'
 import {
   getSessionsHandler,
   getSessionByIdHandler,
+  getAnalyticsHandler,
+  getWeightAggregatesHandler,
 } from '../controllers/weighvisionController'
 import { jwtAuthMiddleware } from '../middlewares/authMiddleware'
 
@@ -96,6 +98,100 @@ router.get('/sessions', getSessionsHandler)
  *         description: Session not found
  */
 router.get('/sessions/:sessionId', getSessionByIdHandler)
+
+/**
+ * @swagger
+ * /api/v1/weighvision/analytics:
+ *   get:
+ *     summary: Get weighvision analytics
+ *     tags: [WeighVision]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: tenantId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: farm_id
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: barn_id
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: batch_id
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: start_date
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: end_date
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: aggregation
+ *         schema:
+ *           type: string
+ *           enum: [daily, weekly, monthly]
+ *           default: daily
+ *     responses:
+ *       200:
+ *         description: WeighVision analytics data
+ */
+router.get('/analytics', getAnalyticsHandler)
+
+/**
+ * @swagger
+ * /api/v1/weighvision/weight-aggregates:
+ *   get:
+ *     summary: Get weighvision weight aggregates
+ *     tags: [WeighVision]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: tenant_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: farm_id
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: barn_id
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: batch_id
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: start
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: end
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *     responses:
+ *       200:
+ *         description: Weight aggregates per day
+ */
+router.get('/weight-aggregates', getWeightAggregatesHandler)
 
 export default router
 

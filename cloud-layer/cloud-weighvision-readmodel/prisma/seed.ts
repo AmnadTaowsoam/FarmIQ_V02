@@ -46,12 +46,22 @@ async function main() {
   console.log(`Starting seed (SEED_COUNT=${SEED_COUNT})...`)
 
   // Idempotent: Clear existing data (dev only)
+  // Skip clearing if tables don't exist (they will be created by migration)
   if (process.env.NODE_ENV !== 'production') {
-    await prisma.weighVisionEventDedupe.deleteMany({})
-    await prisma.weighVisionInference.deleteMany({})
-    await prisma.weighVisionMedia.deleteMany({})
-    await prisma.weighVisionMeasurement.deleteMany({})
-    await prisma.weighVisionSession.deleteMany({})
+    try {
+      await prisma.weighVisionEventDedupe.deleteMany({})
+      await prisma.weighVisionWeightAggregate.deleteMany({})
+      await prisma.weighVisionInference.deleteMany({})
+      await prisma.weighVisionMedia.deleteMany({})
+      await prisma.weighVisionMeasurement.deleteMany({})
+      await prisma.weighVisionSession.deleteMany({})
+    } catch (error: any) {
+      // If tables don't exist, that's okay - they'll be created
+      if (error.code !== 'P2021') {
+        throw error
+      }
+      console.log('Tables may not exist yet, skipping clear step')
+    }
   }
 
   const sessionCount = Math.max(SEED_COUNT, 30)
@@ -136,6 +146,33 @@ async function main() {
   }
 
   console.log(`Created ${sessionCount} weighvision sessions with related data`)
+
+  for (let i = 0; i < sessionCount; i++) {
+    const tenantId = i % 2 === 0 ? SEED_IDS.TENANT_1 : SEED_IDS.TENANT_2
+    const farmId = farmIds[i % farmIds.length]
+    const barnId = barnIds[i % barnIds.length]
+    const batchId = batchIds[i % batchIds.length]
+    const recordDate = new Date(now.getTime() - (i * 24 * 60 * 60 * 1000))
+    recordDate.setHours(0, 0, 0, 0)
+
+    await prisma.weighVisionWeightAggregate.create({
+      data: {
+        tenantId,
+        farmId,
+        barnId,
+        batchId,
+        recordDate,
+        avgWeightKg: new Prisma.Decimal(1.0 + (i % 20) * 0.1),
+        p10WeightKg: new Prisma.Decimal(0.9 + (i % 20) * 0.1),
+        p50WeightKg: new Prisma.Decimal(1.0 + (i % 20) * 0.1),
+        p90WeightKg: new Prisma.Decimal(1.1 + (i % 20) * 0.1),
+        sampleCount: 50 + (i % 100),
+        qualityPassRate: new Prisma.Decimal(75 + (i % 20)),
+      },
+    })
+  }
+
+  console.log(`Created ${sessionCount} weighvision weight aggregates`)
   console.log('Seed completed successfully!')
 }
 

@@ -1,5 +1,6 @@
 import { PrismaClient, Prisma } from '@prisma/client'
 import { logger } from '../utils/logger'
+import { publishFeedIntakeUpserted } from '../utils/rabbitmq'
 import { Decimal } from '@prisma/client/runtime/library'
 
 const prisma = new PrismaClient()
@@ -535,6 +536,26 @@ export async function createFeedIntakeRecord(
   tenantId: string
 ) {
   try {
+    const publishUpserted = async (record: { id: string; occurredAt: Date; quantityKg: Decimal }) => {
+      await publishFeedIntakeUpserted({
+        event_id: record.id,
+        event_type: 'feed.intake.upserted',
+        tenant_id: tenantId,
+        farm_id: input.farmId,
+        barn_id: input.barnId,
+        batch_id: input.batchId || null,
+        occurred_at: record.occurredAt.toISOString(),
+        payload: {
+          record_id: record.id,
+          record_date: record.occurredAt.toISOString().split('T')[0],
+          quantity_kg: parseFloat(record.quantityKg.toString()),
+          source: input.source,
+          feed_lot_id: input.feedLotId || null,
+          feed_formula_id: input.feedFormulaId || null,
+        },
+      })
+    }
+
     // Check idempotency by event_id (for edge events)
     if (input.eventId) {
       const existing = await prisma.feedIntakeRecord.findUnique({
@@ -546,6 +567,7 @@ export async function createFeedIntakeRecord(
         },
       })
       if (existing) {
+        await publishUpserted(existing)
         return existing
       }
     }
@@ -561,6 +583,7 @@ export async function createFeedIntakeRecord(
         },
       })
       if (existing) {
+        await publishUpserted(existing)
         return existing
       }
     }
@@ -576,11 +599,12 @@ export async function createFeedIntakeRecord(
         },
       })
       if (existing) {
+        await publishUpserted(existing)
         return existing
       }
     }
 
-    return await prisma.feedIntakeRecord.create({
+    const record = await prisma.feedIntakeRecord.create({
       data: {
         tenantId,
         farmId: input.farmId,
@@ -601,6 +625,10 @@ export async function createFeedIntakeRecord(
         createdByUserId: input.createdByUserId,
       },
     })
+
+    await publishUpserted(record)
+
+    return record
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2002') {

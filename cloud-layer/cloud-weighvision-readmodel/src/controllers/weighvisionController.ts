@@ -1,5 +1,5 @@
 import { Request, Response } from 'express'
-import { getSessions, getSessionById } from '../services/weighvisionService'
+import { getSessions, getSessionById, getAnalytics, listWeightAggregates } from '../services/weighvisionService'
 import { logger } from '../utils/logger'
 import { getTenantIdFromRequest } from '../utils/tenantScope'
 
@@ -114,6 +114,151 @@ export async function getSessionByIdHandler(req: Request, res: Response) {
       error: {
         code: 'INTERNAL_ERROR',
         message: 'Failed to fetch weighvision session',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+  }
+}
+
+/**
+ * Get weighvision analytics
+ */
+export async function getAnalyticsHandler(req: Request, res: Response) {
+  try {
+    const tenantId = getTenantIdFromRequest(res, req.query.tenantId as string)
+    if (!tenantId) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'tenantId is required',
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+    }
+
+    const farmId = req.query.farm_id as string | undefined
+    const barnId = req.query.barn_id as string | undefined
+    const batchId = req.query.batch_id as string | undefined
+    const startDateStr = req.query.start_date as string
+    const endDateStr = req.query.end_date as string
+    const aggregation = (req.query.aggregation as 'daily' | 'weekly' | 'monthly') || 'daily'
+
+    if (!startDateStr || !endDateStr) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'start_date and end_date are required',
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+    }
+
+    const startDate = new Date(startDateStr)
+    const endDate = new Date(endDateStr)
+
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid date format. Use ISO 8601 format (YYYY-MM-DD)',
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+    }
+
+    if (startDate > endDate) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'start_date must be before end_date',
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+    }
+
+    const result = await getAnalytics({
+      tenantId,
+      farmId,
+      barnId,
+      batchId,
+      startDate,
+      endDate,
+      aggregation,
+    })
+
+    res.json({ data: result })
+  } catch (error) {
+    logger.error('Error in getAnalyticsHandler:', error)
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to fetch weighvision analytics',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+  }
+}
+
+/**
+ * Get weighvision weight aggregates
+ */
+export async function getWeightAggregatesHandler(req: Request, res: Response) {
+  try {
+    const tenantId = getTenantIdFromRequest(res, req.query.tenant_id as string || req.query.tenantId as string)
+    if (!tenantId) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'tenantId is required',
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+    }
+
+    const farmId = req.query.farm_id as string | undefined || req.query.farmId as string | undefined
+    const barnId = req.query.barn_id as string | undefined || req.query.barnId as string | undefined
+    const batchId = req.query.batch_id as string | undefined || req.query.batchId as string | undefined
+    const startDateStr = (req.query.start as string) || (req.query.start_date as string) || (req.query.startDate as string)
+    const endDateStr = (req.query.end as string) || (req.query.end_date as string) || (req.query.endDate as string)
+
+    if (!startDateStr || !endDateStr) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'start and end are required',
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+    }
+
+    const startDate = new Date(startDateStr)
+    const endDate = new Date(endDateStr)
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid date format. Use ISO 8601 format (YYYY-MM-DD)',
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+    }
+
+    const items = await listWeightAggregates({
+      tenantId,
+      farmId,
+      barnId,
+      batchId,
+      startDate,
+      endDate,
+    })
+
+    return res.json({ items })
+  } catch (error) {
+    logger.error('Error in getWeightAggregatesHandler:', error)
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to fetch weighvision weight aggregates',
         traceId: res.locals.traceId || 'unknown',
       },
     })

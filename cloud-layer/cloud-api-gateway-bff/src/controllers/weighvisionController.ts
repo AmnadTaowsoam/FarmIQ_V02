@@ -150,3 +150,134 @@ export async function getSessionByIdHandler(req: Request, res: Response) {
   }
 }
 
+/**
+ * Get weighvision analytics (proxy to weighvision-readmodel)
+ */
+export async function getAnalyticsHandler(req: Request, res: Response) {
+  try {
+    // Get tenantId from JWT or query param
+    const tenantId = res.locals.tenantId || req.query.tenantId as string || req.query.tenant_id as string
+    if (!tenantId) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'tenantId is required',
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+    }
+
+    const farmId = req.query.farm_id as string | undefined || req.query.farmId as string | undefined
+    const barnId = req.query.barn_id as string | undefined || req.query.barnId as string | undefined
+    const batchId = req.query.batch_id as string | undefined || req.query.batchId as string | undefined
+    const startDate = req.query.start_date as string
+    const endDate = req.query.end_date as string
+    const aggregation = (req.query.aggregation as 'daily' | 'weekly' | 'monthly') || 'daily'
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'start_date and end_date are required',
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+    }
+
+    const result = await weighvisionService.getAnalytics({
+      tenantId,
+      farmId,
+      barnId,
+      batchId,
+      startDate,
+      endDate,
+      aggregation,
+    })
+
+    logger.info('WeighVision analytics retrieved', {
+      tenantId,
+      traceId: res.locals.traceId,
+    })
+
+    res.json(result)
+  } catch (error: any) {
+    logger.error('Error in getAnalyticsHandler', {
+      error: error.message,
+      traceId: res.locals.traceId,
+    })
+
+    // Map downstream errors to standard error envelope
+    if (error.response?.status) {
+      res.status(error.response.status).json(error.response.data || {
+        error: {
+          code: 'DOWNSTREAM_ERROR',
+          message: error.message || 'Failed to fetch weighvision analytics',
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+    } else {
+      res.status(500).json({
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to fetch weighvision analytics',
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+    }
+  }
+}
+
+/**
+ * Get weighvision weight aggregates (proxy to weighvision-readmodel)
+ */
+export async function getWeightAggregatesHandler(req: Request, res: Response) {
+  try {
+    const tenantId = getTenantIdFromRequest(res, req.query.tenant_id as string || req.query.tenantId as string)
+    if (!tenantId) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'tenantId is required',
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+    }
+
+    const farmId = req.query.farm_id as string | undefined || req.query.farmId as string | undefined
+    const barnId = req.query.barn_id as string | undefined || req.query.barnId as string | undefined
+    const batchId = req.query.batch_id as string | undefined || req.query.batchId as string | undefined
+    const start = (req.query.start as string) || (req.query.start_date as string) || (req.query.startDate as string)
+    const end = (req.query.end as string) || (req.query.end_date as string) || (req.query.endDate as string)
+
+    if (!start || !end) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'start and end are required',
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+    }
+
+    const result = await weighvisionService.getWeightAggregates({
+      tenantId,
+      farmId,
+      barnId,
+      batchId,
+      start,
+      end,
+    })
+
+    res.json(result)
+  } catch (error: any) {
+    logger.error('Error fetching weighvision weight aggregates:', error)
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: error.message || 'Failed to fetch weighvision weight aggregates',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+  }
+}
+

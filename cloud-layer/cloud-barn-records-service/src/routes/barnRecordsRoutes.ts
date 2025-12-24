@@ -9,6 +9,13 @@ import {
   createWelfareCheckHandler,
   createHousingConditionHandler,
   createGeneticProfileHandler,
+  listMorbidityEventsHandler,
+  listMortalityEventsHandler,
+  listVaccineEventsHandler,
+  listTreatmentEventsHandler,
+  listWelfareChecksHandler,
+  listHousingConditionsHandler,
+  listGeneticProfilesHandler,
 } from '../controllers/barnRecordsController'
 import { jwtAuthMiddleware, requireRole } from '../middlewares/authMiddleware'
 import {
@@ -34,6 +41,12 @@ router.post(
   validateMorbidityEvent,
   createMorbidityEventHandler
 )
+router.get(
+  '/morbidity',
+  jwtAuthMiddleware,
+  requireRole('tenant_admin', 'farm_manager', 'house_operator', 'viewer'),
+  listMorbidityEventsHandler
+)
 
 /**
  * Mortality Events
@@ -44,6 +57,12 @@ router.post(
   requireRole('tenant_admin', 'farm_manager', 'house_operator'),
   validateMortalityEvent,
   createMortalityEventHandler
+)
+router.get(
+  '/mortality',
+  jwtAuthMiddleware,
+  requireRole('tenant_admin', 'farm_manager', 'house_operator', 'viewer'),
+  listMortalityEventsHandler
 )
 
 /**
@@ -56,6 +75,12 @@ router.post(
   validateVaccineEvent,
   createVaccineEventHandler
 )
+router.get(
+  '/vaccines',
+  jwtAuthMiddleware,
+  requireRole('tenant_admin', 'farm_manager', 'viewer'),
+  listVaccineEventsHandler
+)
 
 /**
  * Treatment Events
@@ -66,6 +91,12 @@ router.post(
   requireRole('tenant_admin', 'farm_manager'),
   validateTreatmentEvent,
   createTreatmentEventHandler
+)
+router.get(
+  '/treatments',
+  jwtAuthMiddleware,
+  requireRole('tenant_admin', 'farm_manager', 'viewer'),
+  listTreatmentEventsHandler
 )
 
 /**
@@ -95,6 +126,12 @@ router.post(
   validateWelfareCheck,
   createWelfareCheckHandler
 )
+router.get(
+  '/welfare-checks',
+  jwtAuthMiddleware,
+  requireRole('tenant_admin', 'farm_manager', 'house_operator', 'viewer'),
+  listWelfareChecksHandler
+)
 
 /**
  * Housing Conditions
@@ -106,6 +143,12 @@ router.post(
   validateHousingCondition,
   createHousingConditionHandler
 )
+router.get(
+  '/housing-conditions',
+  jwtAuthMiddleware,
+  requireRole('tenant_admin', 'farm_manager', 'house_operator', 'viewer'),
+  listHousingConditionsHandler
+)
 
 /**
  * Genetic Profiles
@@ -116,6 +159,12 @@ router.post(
   requireRole('tenant_admin', 'farm_manager'),
   validateGeneticProfile,
   createGeneticProfileHandler
+)
+router.get(
+  '/genetics',
+  jwtAuthMiddleware,
+  requireRole('tenant_admin', 'farm_manager', 'viewer'),
+  listGeneticProfilesHandler
 )
 
 export default router

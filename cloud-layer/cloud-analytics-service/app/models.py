@@ -13,6 +13,7 @@ class CloudEventEnvelope(BaseModel):
 
     farm_id: Optional[str] = None
     barn_id: Optional[str] = None
+    batch_id: Optional[str] = None
     device_id: Optional[str] = None
     session_id: Optional[str] = None
 

@@ -8,9 +8,12 @@ from typing import Optional
 import aio_pika
 from aio_pika.abc import AbstractIncomingMessage
 
+from datetime import date
+
 from app.analytics.compute import compute_from_event
 from app.config import Settings
 from app.db import AnalyticsDb
+from app.kpi_service import FeedingKpiService
 from app.logging_ import trace_id_ctx
 from app.models import AnalyticsResult, CloudEventEnvelope
 
@@ -64,8 +67,9 @@ class RabbitConsumer:
 
         exchanges_and_keys = [
             ("farmiq.telemetry.exchange", ["telemetry.ingested", "telemetry.aggregated"]),
-            ("farmiq.weighvision.exchange", ["weighvision.session.finalized", "inference.completed"]),
+            ("farmiq.weighvision.exchange", ["weighvision.session.finalized", "inference.completed", "weighvision.weight_aggregate.upserted"]),
             ("farmiq.media.exchange", ["media.stored"]),
+            ("farmiq.sync.exchange", ["feed.intake.upserted", "barn.daily_counts.upserted"]),
         ]
 
         for exchange_name, keys in exchanges_and_keys:
@@ -147,3 +151,80 @@ class RabbitConsumer:
 
             for result in computed.results:
                 await self._db.insert_result(result)
+
+            # Handle KPI recompute events
+            if envelope.event_type in ("feed.intake.upserted", "barn.daily_counts.upserted", "weighvision.weight_aggregate.upserted"):
+                await self._recompute_kpi_for_event(envelope)
+
+    async def _recompute_kpi_for_event(self, envelope: CloudEventEnvelope) -> None:
+        """Recompute KPI for the date affected by the event."""
+        if not envelope.barn_id:
+            logger.warning("Cannot recompute KPI: missing barn_id", extra={"event_id": envelope.event_id})
+            return
+
+        # Extract date from event
+        event_date = envelope.occurred_at.date()
+        if isinstance(event_date, str):
+            from datetime import datetime
+            event_date = datetime.fromisoformat(event_date.replace("Z", "+00:00")).date()
+
+        # Get date range (target date ± 1 day to compute weight gain)
+        start_date = event_date
+        end_date = event_date
+
+        kpi_service = FeedingKpiService(self._db, self._settings)
+
+        # Fetch data sources
+        weight_data = await kpi_service.get_weight_aggregates(
+            tenant_id=envelope.tenant_id,
+            farm_id=envelope.farm_id,
+            barn_id=envelope.barn_id,
+            batch_id=envelope.payload.get("batch_id") if isinstance(envelope.payload, dict) else None,
+            start=start_date,
+            end=end_date,
+        )
+
+        feed_data = await kpi_service.get_feed_intake(
+            tenant_id=envelope.tenant_id,
+            farm_id=envelope.farm_id,
+            barn_id=envelope.barn_id,
+            batch_id=envelope.payload.get("batch_id") if isinstance(envelope.payload, dict) else None,
+            start=start_date,
+            end=end_date,
+        )
+
+        daily_counts = await kpi_service.get_daily_counts(
+            tenant_id=envelope.tenant_id,
+            farm_id=envelope.farm_id,
+            barn_id=envelope.barn_id,
+            batch_id=envelope.payload.get("batch_id") if isinstance(envelope.payload, dict) else None,
+            start=start_date,
+            end=end_date,
+        )
+
+        # Compute KPI for target date
+        batch_id = envelope.payload.get("batch_id") if isinstance(envelope.payload, dict) else None
+        kpi_data = await kpi_service.compute_kpi_for_date(
+            tenant_id=envelope.tenant_id,
+            farm_id=envelope.farm_id,
+            barn_id=envelope.barn_id,
+            batch_id=batch_id,
+            target_date=event_date,
+            weight_data=weight_data,
+            feed_data=feed_data,
+            daily_counts=daily_counts,
+        )
+
+        if kpi_data:
+            await kpi_service.upsert_kpi(kpi_data)
+            logger.info("Recomputed KPI for event", extra={
+                "event_id": envelope.event_id,
+                "event_type": envelope.event_type,
+                "date": str(event_date),
+                "tenant_id": envelope.tenant_id,
+                "barn_id": envelope.barn_id,
+            })
+
+            # Handle KPI recompute events
+            if envelope.event_type in ("feed.intake.upserted", "barn.daily_counts.upserted", "weighvision.weight_aggregate.upserted"):
+                await self._recompute_kpi_for_event(envelope)

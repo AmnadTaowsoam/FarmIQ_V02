@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import logging
 import json
-from datetime import datetime
+import math
+from datetime import datetime, timedelta
 from typing import Any, Optional
 
 import asyncpg
@@ -101,7 +102,102 @@ class AnalyticsDb:
                 """
             )
 
+            # Feeding KPI daily materialized table
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS feeding_kpi_daily (
+                  tenant_id TEXT NOT NULL,
+                  farm_id TEXT,
+                  barn_id TEXT NOT NULL,
+                  batch_id TEXT,
+                  date DATE NOT NULL,
+                  animal_count INTEGER,
+                  avg_weight_kg DOUBLE PRECISION,
+                  biomass_kg DOUBLE PRECISION,
+                  weight_gain_kg DOUBLE PRECISION,
+                  total_feed_kg DOUBLE PRECISION,
+                  fcr DOUBLE PRECISION,
+                  adg_kg DOUBLE PRECISION,
+                  sgr_pct DOUBLE PRECISION,
+                  intake_missing_flag BOOLEAN DEFAULT FALSE,
+                  weight_missing_flag BOOLEAN DEFAULT FALSE,
+                  quality_flag BOOLEAN DEFAULT TRUE,
+                  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                  PRIMARY KEY (tenant_id, barn_id, batch_id, date)
+                );
+                """
+            )
+
+            await conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS feeding_kpi_daily_tenant_barn_date_idx
+                  ON feeding_kpi_daily(tenant_id, barn_id, date DESC);
+                """
+            )
+
+            await conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS feeding_kpi_daily_tenant_farm_barn_date_idx
+                  ON feeding_kpi_daily(tenant_id, farm_id, barn_id, date DESC);
+                """
+            )
+
+            await conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS feeding_kpi_daily_tenant_barn_batch_date_idx
+                  ON feeding_kpi_daily(tenant_id, barn_id, batch_id, date DESC);
+                """
+            )
+
             # unique constraint above covers idempotency per source event
+
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS feeding_kpi_daily (
+                  id TEXT PRIMARY KEY,
+                  tenant_id TEXT NOT NULL,
+                  farm_id TEXT NOT NULL DEFAULT '',
+                  barn_id TEXT NOT NULL,
+                  batch_id TEXT NOT NULL DEFAULT '',
+                  record_date DATE NOT NULL,
+                  total_feed_kg DOUBLE PRECISION NULL,
+                  avg_weight_kg DOUBLE PRECISION NULL,
+                  p10_weight_kg DOUBLE PRECISION NULL,
+                  p50_weight_kg DOUBLE PRECISION NULL,
+                  p90_weight_kg DOUBLE PRECISION NULL,
+                  sample_count INTEGER NULL,
+                  quality_pass_rate DOUBLE PRECISION NULL,
+                  animal_count INTEGER NULL,
+                  biomass_kg DOUBLE PRECISION NULL,
+                  weight_gain_kg DOUBLE PRECISION NULL,
+                  fcr DOUBLE PRECISION NULL,
+                  adg_kg DOUBLE PRECISION NULL,
+                  sgr_pct DOUBLE PRECISION NULL,
+                  intake_missing_flag BOOLEAN NOT NULL DEFAULT FALSE,
+                  weight_missing_flag BOOLEAN NOT NULL DEFAULT FALSE,
+                  low_quality_flag BOOLEAN NOT NULL DEFAULT FALSE,
+                  source_weight TEXT NULL,
+                  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                  UNIQUE (tenant_id, farm_id, barn_id, batch_id, record_date)
+                );
+                """
+            )
+
+            await conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS feeding_kpi_daily_tenant_barn_date_idx
+                  ON feeding_kpi_daily(tenant_id, barn_id, record_date DESC);
+                """
+            )
+
+            await conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS feeding_kpi_daily_tenant_farm_barn_batch_date_idx
+                  ON feeding_kpi_daily(tenant_id, farm_id, barn_id, batch_id, record_date DESC);
+                """
+            )
 
     async def try_mark_event_seen(self, tenant_id: str, event_id: str) -> bool:
         assert self._pool is not None
@@ -233,3 +329,282 @@ class AnalyticsDb:
         async with self._pool.acquire() as conn:
             rows = await conn.fetch(sql, *args)
         return [AnalyticsResult(**dict(r)) for r in rows]
+
+    def _normalize_key(self, farm_id: Optional[str], batch_id: Optional[str]) -> tuple[str, str]:
+        return farm_id or "", batch_id or ""
+
+    async def upsert_feed_intake(
+        self,
+        *,
+        tenant_id: str,
+        farm_id: Optional[str],
+        barn_id: str,
+        batch_id: Optional[str],
+        record_date: datetime,
+        quantity_kg: float,
+    ) -> None:
+        assert self._pool is not None
+        farm_key, batch_key = self._normalize_key(farm_id, batch_id)
+        async with self._pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO feeding_kpi_daily
+                  (id, tenant_id, farm_id, barn_id, batch_id, record_date, total_feed_kg)
+                VALUES ($1,$2,$3,$4,$5,$6,$7)
+                ON CONFLICT (tenant_id, farm_id, barn_id, batch_id, record_date) DO UPDATE
+                  SET total_feed_kg = COALESCE(feeding_kpi_daily.total_feed_kg, 0) + EXCLUDED.total_feed_kg,
+                      updated_at = now()
+                """,
+                f"feed-{tenant_id}-{barn_id}-{record_date.date().isoformat()}",
+                tenant_id,
+                farm_key,
+                barn_id,
+                batch_key,
+                record_date.date(),
+                quantity_kg,
+            )
+
+    async def upsert_daily_counts(
+        self,
+        *,
+        tenant_id: str,
+        farm_id: Optional[str],
+        barn_id: str,
+        batch_id: Optional[str],
+        record_date: datetime,
+        animal_count: Optional[int],
+        avg_weight_kg: Optional[float],
+    ) -> None:
+        assert self._pool is not None
+        farm_key, batch_key = self._normalize_key(farm_id, batch_id)
+        async with self._pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO feeding_kpi_daily
+                  (id, tenant_id, farm_id, barn_id, batch_id, record_date, animal_count, avg_weight_kg, source_weight)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+                ON CONFLICT (tenant_id, farm_id, barn_id, batch_id, record_date) DO UPDATE
+                  SET animal_count = EXCLUDED.animal_count,
+                      avg_weight_kg = CASE
+                        WHEN feeding_kpi_daily.source_weight = 'weighvision' THEN feeding_kpi_daily.avg_weight_kg
+                        ELSE EXCLUDED.avg_weight_kg
+                      END,
+                      source_weight = CASE
+                        WHEN feeding_kpi_daily.source_weight = 'weighvision' THEN feeding_kpi_daily.source_weight
+                        ELSE 'barn_daily_count'
+                      END,
+                      updated_at = now()
+                """,
+                f"count-{tenant_id}-{barn_id}-{record_date.date().isoformat()}",
+                tenant_id,
+                farm_key,
+                barn_id,
+                batch_key,
+                record_date.date(),
+                animal_count,
+                avg_weight_kg,
+                'barn_daily_count',
+            )
+
+    async def upsert_weight_aggregate(
+        self,
+        *,
+        tenant_id: str,
+        farm_id: Optional[str],
+        barn_id: str,
+        batch_id: Optional[str],
+        record_date: datetime,
+        avg_weight_kg: Optional[float],
+        p10_weight_kg: Optional[float],
+        p50_weight_kg: Optional[float],
+        p90_weight_kg: Optional[float],
+        sample_count: Optional[int],
+        quality_pass_rate: Optional[float],
+    ) -> None:
+        assert self._pool is not None
+        farm_key, batch_key = self._normalize_key(farm_id, batch_id)
+        async with self._pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO feeding_kpi_daily
+                  (id, tenant_id, farm_id, barn_id, batch_id, record_date, avg_weight_kg,
+                   p10_weight_kg, p50_weight_kg, p90_weight_kg, sample_count, quality_pass_rate, source_weight)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+                ON CONFLICT (tenant_id, farm_id, barn_id, batch_id, record_date) DO UPDATE
+                  SET avg_weight_kg = EXCLUDED.avg_weight_kg,
+                      p10_weight_kg = EXCLUDED.p10_weight_kg,
+                      p50_weight_kg = EXCLUDED.p50_weight_kg,
+                      p90_weight_kg = EXCLUDED.p90_weight_kg,
+                      sample_count = EXCLUDED.sample_count,
+                      quality_pass_rate = EXCLUDED.quality_pass_rate,
+                      source_weight = 'weighvision',
+                      updated_at = now()
+                """,
+                f"wv-{tenant_id}-{barn_id}-{record_date.date().isoformat()}",
+                tenant_id,
+                farm_key,
+                barn_id,
+                batch_key,
+                record_date.date(),
+                avg_weight_kg,
+                p10_weight_kg,
+                p50_weight_kg,
+                p90_weight_kg,
+                sample_count,
+                quality_pass_rate,
+                'weighvision',
+            )
+
+    async def recompute_kpi_for_date(
+        self,
+        *,
+        tenant_id: str,
+        farm_id: Optional[str],
+        barn_id: str,
+        batch_id: Optional[str],
+        record_date: datetime,
+        quality_threshold_pct: float,
+    ) -> None:
+        assert self._pool is not None
+        farm_key, batch_key = self._normalize_key(farm_id, batch_id)
+        prev_date = record_date.date() - timedelta(days=1)
+
+        async with self._pool.acquire() as conn:
+            current = await conn.fetchrow(
+                """
+                SELECT * FROM feeding_kpi_daily
+                WHERE tenant_id = $1 AND farm_id = $2 AND barn_id = $3 AND batch_id = $4 AND record_date = $5
+                """,
+                tenant_id,
+                farm_key,
+                barn_id,
+                batch_key,
+                record_date.date(),
+            )
+            if not current:
+                return
+
+            prev = await conn.fetchrow(
+                """
+                SELECT avg_weight_kg, animal_count
+                FROM feeding_kpi_daily
+                WHERE tenant_id = $1 AND farm_id = $2 AND barn_id = $3 AND batch_id = $4 AND record_date = $5
+                """,
+                tenant_id,
+                farm_key,
+                barn_id,
+                batch_key,
+                prev_date,
+            )
+
+            avg_weight = current.get("avg_weight_kg")
+            animal_count = current.get("animal_count")
+            total_feed = current.get("total_feed_kg")
+            quality_pass_rate = current.get("quality_pass_rate")
+
+            biomass = avg_weight * animal_count if avg_weight is not None and animal_count else None
+            prev_biomass = None
+            prev_avg_weight = None
+            if prev:
+                prev_avg_weight = prev.get("avg_weight_kg")
+                prev_animal_count = prev.get("animal_count")
+                if prev_avg_weight is not None and prev_animal_count:
+                    prev_biomass = prev_avg_weight * prev_animal_count
+
+            weight_gain = biomass - prev_biomass if biomass is not None and prev_biomass is not None else None
+
+            fcr = None
+            if total_feed is not None and weight_gain is not None and weight_gain > 0:
+                fcr = total_feed / weight_gain
+
+            adg_kg = None
+            if weight_gain is not None and weight_gain > 0 and animal_count:
+                adg_kg = weight_gain / animal_count
+
+            sgr_pct = None
+            if avg_weight is not None and prev_avg_weight is not None and avg_weight > 0 and prev_avg_weight > 0:
+                sgr_pct = (math.log(avg_weight) - math.log(prev_avg_weight)) * 100
+
+            intake_missing = total_feed is None or total_feed <= 0
+            weight_missing = avg_weight is None or not animal_count
+            low_quality = quality_pass_rate is not None and quality_pass_rate < quality_threshold_pct
+
+            await conn.execute(
+                """
+                UPDATE feeding_kpi_daily
+                SET biomass_kg = $1,
+                    weight_gain_kg = $2,
+                    fcr = $3,
+                    adg_kg = $4,
+                    sgr_pct = $5,
+                    intake_missing_flag = $6,
+                    weight_missing_flag = $7,
+                    low_quality_flag = $8,
+                    updated_at = now()
+                WHERE tenant_id = $9 AND farm_id = $10 AND barn_id = $11 AND batch_id = $12 AND record_date = $13
+                """,
+                biomass,
+                weight_gain,
+                fcr,
+                adg_kg,
+                sgr_pct,
+                intake_missing,
+                weight_missing,
+                low_quality,
+                tenant_id,
+                farm_key,
+                barn_id,
+                batch_key,
+                record_date.date(),
+            )
+
+    async def query_feeding_kpi_series(
+        self,
+        *,
+        tenant_id: str,
+        farm_id: Optional[str],
+        barn_id: str,
+        batch_id: Optional[str],
+        start_date: datetime,
+        end_date: datetime,
+    ) -> list[dict[str, Any]]:
+        assert self._pool is not None
+        farm_key, batch_key = self._normalize_key(farm_id, batch_id)
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT *
+                FROM feeding_kpi_daily
+                WHERE tenant_id = $1 AND farm_id = $2 AND barn_id = $3 AND batch_id = $4
+                  AND record_date >= $5 AND record_date <= $6
+                ORDER BY record_date ASC
+                """,
+                tenant_id,
+                farm_key,
+                barn_id,
+                batch_key,
+                start_date.date(),
+                end_date.date(),
+            )
+
+        series: list[dict[str, Any]] = []
+        for row in rows:
+            series.append(
+                {
+                    "record_date": row["record_date"].isoformat(),
+                    "total_feed_kg": row["total_feed_kg"],
+                    "weight_gain_kg": row["weight_gain_kg"],
+                    "animal_count": row["animal_count"],
+                    "avg_weight_kg": row["avg_weight_kg"],
+                    "fcr": row["fcr"],
+                    "adg_kg": row["adg_kg"],
+                    "adg_g": row["adg_kg"] * 1000 if row["adg_kg"] is not None else None,
+                    "sgr_pct": row["sgr_pct"],
+                    "intake_missing_flag": row["intake_missing_flag"],
+                    "weight_missing_flag": row["weight_missing_flag"],
+                    "low_quality_flag": row["low_quality_flag"],
+                    "source_weight": row["source_weight"],
+                    "quality_pass_rate": row["quality_pass_rate"],
+                }
+            )
+        return series

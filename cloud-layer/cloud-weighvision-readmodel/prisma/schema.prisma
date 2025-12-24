@@ -112,3 +112,25 @@ model WeighVisionEventDedupe {
   @@map("weighvision_event_dedupe")
 }
 
+model WeighVisionWeightAggregate {
+  id               String   @id @default(uuid())
+  tenantId         String
+  farmId           String?
+  barnId           String?
+  batchId          String?
+  recordDate       DateTime @db.Date
+  avgWeightKg      Decimal? @db.Decimal(10, 3)
+  p10WeightKg      Decimal? @db.Decimal(10, 3)
+  p50WeightKg      Decimal? @db.Decimal(10, 3)
+  p90WeightKg      Decimal? @db.Decimal(10, 3)
+  sampleCount      Int      @default(0)
+  qualityPassRate  Decimal? @db.Decimal(5, 2)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([tenantId, farmId, barnId, batchId, recordDate], name: "WeighVisionWeightAggregate_unique_key")
+  @@index([tenantId, recordDate])
+  @@index([tenantId, farmId, barnId, batchId, recordDate])
+  @@map("weighvision_weight_aggregate")
+}
+

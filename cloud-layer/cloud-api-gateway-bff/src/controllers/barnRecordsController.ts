@@ -54,6 +54,12 @@ function handleDownstreamResponse(
   }
 }
 
+function normalizeDateRange(query: Record<string, unknown>): { start?: string; end?: string } {
+  const start = (query.start as string) || (query.startDate as string) || undefined
+  const end = (query.end as string) || (query.endDate as string) || undefined
+  return { start, end }
+}
+
 /**
  * POST /api/v1/barn-records/mortality
  */
@@ -463,6 +469,9 @@ export async function listDailyCountsHandler(req: Request, res: Response): Promi
     }
   })
   query.tenantId = tenantId
+  const { start, end } = normalizeDateRange(req.query as Record<string, unknown>)
+  if (start) query.start = start
+  if (end) query.end = end
 
   try {
     const result = await barnRecordsServiceClient.listDailyCounts({
@@ -479,7 +488,11 @@ export async function listDailyCountsHandler(req: Request, res: Response): Promi
       requestId: res.locals.requestId,
     })
 
-    handleDownstreamResponse(result, res)
+    if (result.ok && result.data) {
+      handleDownstreamResponse(result, res)
+      return
+    }
+    res.status(200).json({ items: [], nextCursor: null })
   } catch (error) {
     logger.error('Error in listDailyCountsHandler', error)
     res.status(500).json({

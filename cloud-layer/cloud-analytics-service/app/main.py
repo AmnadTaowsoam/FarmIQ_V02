@@ -14,6 +14,7 @@ from app.db import AnalyticsDb
 from app.logging_ import configure_logging, request_id_ctx, trace_id_ctx
 from app.rabbitmq import RabbitConsumer
 from app.routes import router as analytics_router
+from app.routes import router as kpi_router
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         await db.connect()
         await db.ensure_schema()
         app.state.db = db
+        app.state.settings = settings
 
         consumer: RabbitConsumer | None = None
         if settings.consumer_enabled:
@@ -132,6 +134,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {"status": "ready", "db": True, "rabbitmq": rabbit_ok}
 
     app.include_router(analytics_router, prefix="/api/v1/analytics", tags=["Analytics"])
+    # Include KPI routes directly under /api/v1/kpi (feeding endpoint is in same router)
+    app.include_router(kpi_router, prefix="/api/v1", tags=["KPI"])
     return app
 
 

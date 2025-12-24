@@ -4,6 +4,19 @@ import { getTenantIdFromRequest } from '../utils/tenantScope'
 import * as feedService from '../services/feedService'
 import * as kpiService from '../services/kpiService'
 
+function getQueryValue(req: Request, camel: string, snake: string): string | undefined {
+  return (req.query[camel] as string | undefined) || (req.query[snake] as string | undefined)
+}
+
+function parseDateRange(req: Request) {
+  const startStr = getQueryValue(req, 'start', 'start') || getQueryValue(req, 'startDate', 'start_date')
+  const endStr = getQueryValue(req, 'end', 'end') || getQueryValue(req, 'endDate', 'end_date')
+  return {
+    start: startStr ? new Date(startStr) : undefined,
+    end: endStr ? new Date(endStr) : undefined,
+  }
+}
+
 /**
  * POST /api/v1/feed/formulas
  */
@@ -216,7 +229,7 @@ export async function listFeedIntakeRecordsHandler(
   res: Response
 ): Promise<void> {
   try {
-    const tenantId = getTenantIdFromRequest(res, req.query.tenantId as string)
+    const tenantId = getTenantIdFromRequest(res, getQueryValue(req, 'tenantId', 'tenant_id'))
     if (!tenantId) {
       res.status(400).json({
         error: {
@@ -228,13 +241,15 @@ export async function listFeedIntakeRecordsHandler(
       return
     }
 
+    const { start, end } = parseDateRange(req)
+
     const result = await feedService.listFeedIntakeRecords(tenantId, {
-      farmId: req.query.farmId as string | undefined,
-      barnId: req.query.barnId as string | undefined,
-      batchId: req.query.batchId as string | undefined,
-      start: req.query.start ? new Date(req.query.start as string) : undefined,
-      end: req.query.end ? new Date(req.query.end as string) : undefined,
-      cursor: req.query.cursor as string | undefined,
+      farmId: getQueryValue(req, 'farmId', 'farm_id'),
+      barnId: getQueryValue(req, 'barnId', 'barn_id'),
+      batchId: getQueryValue(req, 'batchId', 'batch_id'),
+      start,
+      end,
+      cursor: getQueryValue(req, 'cursor', 'cursor'),
       limit: req.query.limit
         ? parseInt(req.query.limit as string, 10)
         : undefined,

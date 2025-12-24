@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model FeedingKpiDaily {
+  id                String   @id
+  tenantId          String
+  farmId            String   @default("")
+  barnId            String
+  batchId           String   @default("")
+  recordDate        DateTime @db.Date
+  totalFeedKg       Float?
+  avgWeightKg       Float?
+  p10WeightKg       Float?
+  p50WeightKg       Float?
+  p90WeightKg       Float?
+  sampleCount       Int?
+  qualityPassRate   Float?
+  animalCount       Int?
+  biomassKg         Float?
+  weightGainKg      Float?
+  fcr               Float?
+  adgKg             Float?
+  sgrPct            Float?
+  intakeMissingFlag Boolean  @default(false)
+  weightMissingFlag Boolean  @default(false)
+  lowQualityFlag    Boolean  @default(false)
+  sourceWeight      String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([tenantId, farmId, barnId, batchId, recordDate])
+  @@index([tenantId, barnId, recordDate])
+  @@index([tenantId, farmId, barnId, batchId, recordDate])
+  @@map("feeding_kpi_daily")
+}

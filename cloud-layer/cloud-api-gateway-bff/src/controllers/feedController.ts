@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { logger } from '../utils/logger'
 import { getTenantIdFromRequest } from '../utils/tenantScope'
 import { feedServiceClient } from '../services/feedService'
+import { getFeedingKpiSeries } from '../services/analyticsService'
 
 /**
  * Helper to build headers for downstream calls
@@ -58,6 +59,12 @@ function handleDownstreamResponse(
   }
 }
 
+function normalizeDateRange(query: Record<string, unknown>): { start?: string; end?: string } {
+  const start = (query.start as string) || (query.startDate as string) || undefined
+  const end = (query.end as string) || (query.endDate as string) || undefined
+  return { start, end }
+}
+
 /**
  * GET /api/v1/kpi/feeding
  */
@@ -76,50 +83,95 @@ export async function getFeedingKpiHandler(req: Request, res: Response): Promise
     return
   }
 
-  const barnId = req.query.barnId as string
+  const barnId = req.query.barnId as string | undefined
+  const farmId = req.query.farmId as string | undefined
   const batchId = req.query.batchId as string | undefined
-  const startDate = req.query.startDate as string
-  const endDate = req.query.endDate as string
+  const { start, end } = normalizeDateRange(req.query as Record<string, unknown>)
 
-  if (!barnId || !startDate || !endDate) {
-    res.status(400).json({
-      error: {
-        code: 'VALIDATION_ERROR',
-        message: 'barnId, startDate, and endDate are required',
-        traceId: res.locals.traceId || 'unknown',
+  if (!start || !end || !barnId) {
+    res.status(200).json({
+      meta: {
+        tenant_id: tenantId,
+        farm_id: farmId || null,
+        barn_id: barnId || null,
+        batch_id: batchId || null,
+        start: start || null,
+        end: end || null,
+        source: 'analytics-service',
+        note: 'Missing required params for KPI series; returning empty series.',
       },
+      series: [],
+      items: [],
     })
     return
   }
 
   try {
-    const result = await feedServiceClient.getFeedingKpi({
+    const result = await getFeedingKpiSeries({
       tenantId,
+      farmId,
       barnId,
       batchId,
-      startDate,
-      endDate,
-      headers: buildDownstreamHeaders(req, res),
+      start,
+      end,
     })
 
     const duration = Date.now() - startTime
     logger.info('Feed KPI request completed', {
       route: '/api/v1/kpi/feeding',
-      downstreamService: 'feed-service',
+      downstreamService: 'analytics-service',
       duration_ms: duration,
       status_code: result.status,
       requestId: res.locals.requestId,
     })
 
-    handleDownstreamResponse(result, res)
+    if (result.ok && result.data) {
+      const series = (result.data as any).series || (result.data as any).items || []
+      res.status(200).json({
+        meta: (result.data as any).meta || {
+          tenant_id: tenantId,
+          farm_id: farmId || null,
+          barn_id: barnId || null,
+          batch_id: batchId || null,
+          start,
+          end,
+          source: 'analytics-service',
+        },
+        series,
+        items: series,
+      })
+      return
+    }
+
+    res.status(200).json({
+      meta: {
+        tenant_id: tenantId,
+        farm_id: farmId || null,
+        barn_id: barnId || null,
+        batch_id: batchId || null,
+        start,
+        end,
+        source: 'analytics-service',
+        upstream_status: result.status,
+      },
+      series: [],
+      items: [],
+    })
   } catch (error) {
     logger.error('Error in getFeedingKpiHandler', error)
-    res.status(500).json({
-      error: {
-        code: 'INTERNAL_ERROR',
-        message: 'Failed to fetch feeding KPIs',
-        traceId: res.locals.traceId || 'unknown',
+    res.status(200).json({
+      meta: {
+        tenant_id: tenantId,
+        farm_id: farmId || null,
+        barn_id: barnId || null,
+        batch_id: batchId || null,
+        start,
+        end,
+        source: 'analytics-service',
+        note: 'Failed to fetch feeding KPIs; returning empty series.',
       },
+      series: [],
+      items: [],
     })
   }
 }
@@ -199,6 +251,9 @@ export async function listIntakeRecordsHandler(req: Request, res: Response): Pro
     }
   })
   query.tenantId = tenantId
+  const { start, end } = normalizeDateRange(req.query as Record<string, unknown>)
+  if (start) query.start = start
+  if (end) query.end = end
 
   try {
     const result = await feedServiceClient.listIntakeRecords({
@@ -215,7 +270,12 @@ export async function listIntakeRecordsHandler(req: Request, res: Response): Pro
       requestId: res.locals.requestId,
     })
 
-    handleDownstreamResponse(result, res)
+    if (result.ok && result.data) {
+      handleDownstreamResponse(result, res)
+      return
+    }
+
+    res.status(200).json({ items: [], nextCursor: null })
   } catch (error) {
     logger.error('Error in listIntakeRecordsHandler', error)
     res.status(500).json({
