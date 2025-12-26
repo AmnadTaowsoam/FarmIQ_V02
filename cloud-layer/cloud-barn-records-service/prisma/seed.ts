@@ -277,35 +277,39 @@ async function main() {
   const strains = ['Ross 308', 'Cobb 500', 'Hubbard']
   const breedLines = ['Line A', 'Line B', 'Line C']
 
-  for (let i = 0; i < Math.min(recordCount, 8); i++) {
-    const tenantId = i % 2 === 0 ? SEED_IDS.TENANT_1 : SEED_IDS.TENANT_2
-    const batchId = batchIds[i % batchIds.length]
+	  for (let i = 0; i < Math.min(recordCount, 8); i++) {
+	    const tenantId = i % 2 === 0 ? SEED_IDS.TENANT_1 : SEED_IDS.TENANT_2
+	    const batchId = batchIds[i % batchIds.length]
 
-    await prisma.barnGeneticProfile.upsert({
+	    await prisma.barnGeneticProfile.upsert({
       where: {
         BarnGeneticProfile_batch_key: {
           tenantId,
           batchId,
         },
-      },
-      update: {
-        strain: strains[i % strains.length],
-        breedLine: breedLines[i % breedLines.length],
-        supplier: `Supplier ${(i % 3) + 1}`,
-        hatchDate: new Date(now.getTime() - (i * 30 * 24 * 60 * 60 * 1000)),
-        externalRef: `genetic-ext-${i}`,
-      },
-      create: {
-        tenantId,
-        batchId,
-        strain: strains[i % strains.length],
-        breedLine: breedLines[i % breedLines.length],
-        supplier: `Supplier ${(i % 3) + 1}`,
-        hatchDate: new Date(now.getTime() - (i * 30 * 24 * 60 * 60 * 1000)),
-        externalRef: `genetic-ext-${i}`,
-      },
-    })
-  }
+	      },
+	      update: {
+	        speciesCode: 'chicken',
+	        geneticLineCode: i % 3 === 0 ? null : 'COBB500',
+	        strain: strains[i % strains.length],
+	        breedLine: breedLines[i % breedLines.length],
+	        supplier: `Supplier ${(i % 3) + 1}`,
+	        hatchDate: new Date(now.getTime() - (i * 30 * 24 * 60 * 60 * 1000)),
+	        externalRef: `genetic-ext-${i}`,
+	      },
+	      create: {
+	        tenantId,
+	        batchId,
+	        speciesCode: 'chicken',
+	        geneticLineCode: i % 3 === 0 ? null : 'COBB500',
+	        strain: strains[i % strains.length],
+	        breedLine: breedLines[i % breedLines.length],
+	        supplier: `Supplier ${(i % 3) + 1}`,
+	        hatchDate: new Date(now.getTime() - (i * 30 * 24 * 60 * 60 * 1000)),
+	        externalRef: `genetic-ext-${i}`,
+	      },
+	    })
+	  }
   console.log(`Created ${Math.min(recordCount, 8)} genetic profiles`)
 
   console.log('Seed completed successfully!')

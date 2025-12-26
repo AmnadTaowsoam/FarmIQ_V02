@@ -697,6 +697,12 @@ export async function createGeneticProfileHandler(
     const input: barnRecordsService.CreateGeneticProfileInput = {
       tenantId,
       batchId: req.body.batchId,
+      speciesCode: req.body.speciesCode,
+      geneticLineCode: req.body.geneticLineCode ?? null,
+      growthTargetSetId: req.body.growthTargetSetId ?? null,
+      envTargetSetId: req.body.envTargetSetId ?? null,
+      lightingTargetSetId: req.body.lightingTargetSetId ?? null,
+      ventilationTargetSetId: req.body.ventilationTargetSetId ?? null,
       strain: req.body.strain,
       breedLine: req.body.breedLine,
       supplier: req.body.supplier,
@@ -708,6 +714,8 @@ export async function createGeneticProfileHandler(
 
     res.status(201).json({
       id: profile.id,
+      speciesCode: profile.speciesCode,
+      geneticLineCode: profile.geneticLineCode,
       strain: profile.strain,
     })
   } catch (error) {

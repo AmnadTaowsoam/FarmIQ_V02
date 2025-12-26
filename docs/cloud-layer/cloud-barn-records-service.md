@@ -175,6 +175,12 @@ flowchart TB
 | id | uuidv7 | no | gen_random_uuid() | pk | pk | Genetic profile id |
 | tenant_id | uuidv7 | no | none | fk tenant | idx (tenant_id, batch_id) | Tenant scope |
 | batch_id | uuidv7 | no | none | fk batch | uniq (tenant_id, batch_id) | Batch scope |
+| species_code | text | no | `"chicken"` (dev default) | none | none | Species code (catalog-driven via `cloud-standards-service`) |
+| genetic_line_code | text | yes | null | none | none | Genetic line code (optional; catalog-driven) |
+| growth_target_set_id | uuid | yes | null | none | none | Optional override to a growth TARGET set in `cloud-standards-service` |
+| env_target_set_id | uuid | yes | null | none | none | Optional override to an env limits TARGET set in `cloud-standards-service` |
+| lighting_target_set_id | uuid | yes | null | none | none | Optional override to a lighting TARGET set in `cloud-standards-service` |
+| ventilation_target_set_id | uuid | yes | null | none | none | Optional override to a ventilation TARGET set in `cloud-standards-service` |
 | strain | text | yes | null | none | none | Strain |
 | breed_line | text | yes | null | none | none | Breed line |
 | supplier | text | yes | null | none | none | Supplier |

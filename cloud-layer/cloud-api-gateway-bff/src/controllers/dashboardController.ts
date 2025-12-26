@@ -29,6 +29,51 @@ function buildDownstreamHeaders(req: Request, tenantId: string): Record<string, 
   return headers
 }
 
+function resolveTimeWindow(req: Request): { from: string; to: string; bucket: '5m' | '1h' | '1d' } {
+  const now = new Date()
+  const to = typeof req.query.to === 'string' ? req.query.to : now.toISOString()
+
+  const fromQuery = typeof req.query.from === 'string' ? req.query.from : undefined
+  const preset = typeof req.query.timeRange === 'string' ? req.query.timeRange : '24h'
+
+  if (fromQuery) {
+    // If caller provides explicit from/to, default to 1h bucket unless overridden
+    const bucket =
+      req.query.bucket === '5m' || req.query.bucket === '1h' || req.query.bucket === '1d'
+        ? (req.query.bucket as '5m' | '1h' | '1d')
+        : '1h'
+    return { from: fromQuery, to, bucket }
+  }
+
+  const start = new Date(now)
+  let bucket: '5m' | '1h' | '1d' = '1h'
+
+  switch (preset) {
+    case '24h':
+      start.setHours(start.getHours() - 24)
+      bucket = '5m'
+      break
+    case '7d':
+      start.setDate(start.getDate() - 7)
+      bucket = '1h'
+      break
+    case '30d':
+      start.setDate(start.getDate() - 30)
+      bucket = '1d'
+      break
+    case '90d':
+      start.setDate(start.getDate() - 90)
+      bucket = '1d'
+      break
+    default:
+      // Keep sane defaults
+      start.setHours(start.getHours() - 24)
+      bucket = '5m'
+  }
+
+  return { from: start.toISOString(), to, bucket }
+}
+
 export async function getOverview(req: Request, res: Response) {
   try {
     const tenantId = getTenantIdFromRequest(res, req.query.tenantId as string)
@@ -43,7 +88,8 @@ export async function getOverview(req: Request, res: Response) {
     }
 
     const headers = buildDownstreamHeaders(req, tenantId)
-    const data = await fetchOverview({ tenantId, headers })
+    const window = resolveTimeWindow(req)
+    const data = await fetchOverview({ tenantId, headers, ...window })
     return res.json(data)
   } catch (error) {
     logger.error('Error in getOverview', { error })

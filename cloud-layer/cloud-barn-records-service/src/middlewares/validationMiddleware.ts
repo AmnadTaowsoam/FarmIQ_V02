@@ -112,6 +112,12 @@ export const housingConditionSchema = z.object({
 export const geneticProfileSchema = z.object({
   tenantId: z.string().uuid().optional(),
   batchId: z.string().uuid(),
+  speciesCode: z.string().min(1),
+  geneticLineCode: z.string().optional().nullable(),
+  growthTargetSetId: z.string().uuid().optional().nullable(),
+  envTargetSetId: z.string().uuid().optional().nullable(),
+  lightingTargetSetId: z.string().uuid().optional().nullable(),
+  ventilationTargetSetId: z.string().uuid().optional().nullable(),
   strain: z.string().optional().nullable(),
   breedLine: z.string().optional().nullable(),
   supplier: z.string().optional().nullable(),

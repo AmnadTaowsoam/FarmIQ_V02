@@ -9,6 +9,8 @@ import tenantRegistryRoutes from './tenantRegistryRoutes'
 import sensorsRoutes from './sensorsRoutes'
 import weighvisionRoutes from './weighvisionRoutes'
 import reportingRoutes from './reportingRoutes'
+import opsRoutes from './opsRoutes'
+import standardsRoutes from './standardsRoutes'
 
 /**
  *
@@ -41,6 +43,12 @@ export function setupRoutes(app: Express): void {
 
   // Reporting export service proxy routes
   app.use('/api/v1/reports', reportingRoutes)
+
+  // Ops aggregation routes (health/sync status)
+  app.use('/api/v1/ops', opsRoutes)
+
+  // Standards service proxy routes
+  app.use('/api/v1/standards', standardsRoutes)
 
   // Keep existing public variable route for frontend config
   app.use('/api/public-variable-frontend', publicVariableRoutes)

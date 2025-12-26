@@ -1,0 +1,833 @@
+openapi: 3.0.3
+info:
+  title: FarmIQ Cloud Standards Service
+  version: 1.1.0
+  description: |
+    Reference / Standard / Target master standards service.
+
+    Extensible design:
+    - Animals are data-driven via catalogs (`species_catalog`, `genetic_line_catalog`).
+    - Standard types are data-driven via registry (`standard_schema`).
+servers:
+  - url: /
+security:
+  - bearerAuth: []
+tags:
+  - name: Health
+  - name: Standards
+  - name: Catalog
+  - name: Imports
+paths:
+  /api/health:
+    get:
+      tags: [Health]
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema: { type: string }
+
+  /api/ready:
+    get:
+      tags: [Health]
+      summary: Readiness check (DB connectivity)
+      responses:
+        "200":
+          description: Ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+        "503":
+          description: Not ready
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
+  /api/v1/standards/sets:
+    get:
+      tags: [Standards]
+      summary: List standard sets
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 200, default: 25 }
+        - in: query
+          name: speciesCode
+          schema: { type: string, example: chicken }
+        - in: query
+          name: geneticLineCode
+          schema: { type: string, example: COBB500 }
+        - in: query
+          name: standardSchemaCode
+          schema: { type: string, example: GROWTH }
+        - in: query
+          name: speciesId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: geneticLineId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: standardSchemaId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: setType
+          schema: { $ref: "#/components/schemas/SetType" }
+        - in: query
+          name: scope
+          schema: { $ref: "#/components/schemas/Scope" }
+        - in: query
+          name: unitSystem
+          schema: { $ref: "#/components/schemas/UnitSystem" }
+        - in: query
+          name: sex
+          schema: { $ref: "#/components/schemas/Sex" }
+        - in: query
+          name: isActive
+          schema: { type: boolean }
+        - in: query
+          name: versionTag
+          schema: { type: string }
+      responses:
+        "200":
+          description: List
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaginatedStandardSet" }
+    post:
+      tags: [Standards]
+      summary: Create set (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateStandardSet" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StandardSetEnvelope" }
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
+  /api/v1/standards/sets/{setId}:
+    get:
+      tags: [Standards]
+      summary: Get set
+      parameters:
+        - in: path
+          name: setId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StandardSetEnvelope" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    patch:
+      tags: [Standards]
+      summary: Patch set metadata (admin)
+      parameters:
+        - in: path
+          name: setId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateStandardSet" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StandardSetEnvelope" }
+
+  /api/v1/standards/sets/{setId}/rows:
+    get:
+      tags: [Standards]
+      summary: List rows
+      parameters:
+        - in: path
+          name: setId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: dimType
+          schema: { $ref: "#/components/schemas/DimType" }
+        - in: query
+          name: from
+          schema: { type: number }
+        - in: query
+          name: to
+          schema: { type: number }
+        - in: query
+          name: phase
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StandardRowListEnvelope" }
+    put:
+      tags: [Standards]
+      summary: Bulk upsert rows (admin)
+      parameters:
+        - in: path
+          name: setId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpsertRows" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StandardRowListEnvelope" }
+
+  /api/v1/standards/resolve:
+    get:
+      tags: [Standards]
+      summary: Resolve active set by scope precedence
+      parameters:
+        - in: query
+          name: tenantId
+          required: true
+          schema: { type: string }
+        - in: query
+          name: farmId
+          schema: { type: string }
+        - in: query
+          name: houseId
+          schema: { type: string }
+        - in: query
+          name: flockId
+          schema: { type: string }
+        - in: query
+          name: speciesCode
+          required: true
+          schema: { type: string, example: chicken }
+        - in: query
+          name: geneticLineCode
+          schema: { type: string, example: COBB500 }
+        - in: query
+          name: standardSchemaCode
+          required: true
+          schema: { type: string, example: GROWTH }
+        - in: query
+          name: setType
+          schema: { $ref: "#/components/schemas/SetType" }
+        - in: query
+          name: unitSystem
+          schema: { $ref: "#/components/schemas/UnitSystem" }
+        - in: query
+          name: sex
+          schema: { $ref: "#/components/schemas/Sex" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResolveEnvelope" }
+
+  /api/v1/standards/sets/{setId}/clone:
+    post:
+      tags: [Standards]
+      summary: Clone set (admin)
+      parameters:
+        - in: path
+          name: setId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CloneSet" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StandardSetEnvelope" }
+
+  /api/v1/standards/sets/{setId}/adjust:
+    post:
+      tags: [Standards]
+      summary: Adjust into derived target (admin)
+      parameters:
+        - in: path
+          name: setId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdjustSet" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StandardSetEnvelope" }
+
+  /api/v1/standards/imports/csv:
+    post:
+      tags: [Imports]
+      summary: Import CSV (dryRun + commit)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, standardSchemaCode, speciesCode, setType, scope, unitSystem, sex, versionTag]
+              properties:
+                file: { type: string, format: binary }
+                standardSchemaCode: { type: string, example: GROWTH }
+                speciesCode: { type: string, example: chicken }
+                geneticLineCode: { type: string, example: COBB500 }
+                setType: { $ref: "#/components/schemas/SetType" }
+                scope: { $ref: "#/components/schemas/Scope" }
+                unitSystem: { $ref: "#/components/schemas/UnitSystem" }
+                sex: { $ref: "#/components/schemas/Sex" }
+                versionTag: { type: string }
+                mode:
+                  type: string
+                  enum: [create_new_set, update_existing_set]
+                  default: create_new_set
+                setId: { type: string, format: uuid }
+                tenantId: { type: string }
+                farmId: { type: string }
+                houseId: { type: string }
+                flockId: { type: string }
+                dryRun: { type: boolean, default: true }
+      responses:
+        "200":
+          description: Dry-run preview or commit result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportCsvEnvelope" }
+
+  /api/v1/standards/imports/{jobId}:
+    get:
+      tags: [Imports]
+      summary: Get import job status
+      parameters:
+        - in: path
+          name: jobId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportJobEnvelope" }
+
+  /api/v1/standards/catalog/species:
+    get:
+      tags: [Catalog]
+      summary: List species catalog
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SpeciesCatalogListEnvelope" }
+    post:
+      tags: [Catalog]
+      summary: Upsert species (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpsertSpeciesCatalog" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SpeciesCatalogEnvelope" }
+
+  /api/v1/standards/catalog/breeder-companies:
+    get:
+      tags: [Catalog]
+      summary: List breeder companies
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BreederCompanyListEnvelope" }
+    post:
+      tags: [Catalog]
+      summary: Upsert breeder company (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpsertBreederCompany" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BreederCompanyEnvelope" }
+
+  /api/v1/standards/catalog/genetic-lines:
+    get:
+      tags: [Catalog]
+      summary: List genetic line catalog
+      parameters:
+        - in: query
+          name: speciesCode
+          schema: { type: string }
+        - in: query
+          name: breederCompanyName
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GeneticLineListEnvelope" }
+    post:
+      tags: [Catalog]
+      summary: Upsert genetic line (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpsertGeneticLineCatalog" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GeneticLineEnvelope" }
+
+  /api/v1/standards/catalog/standard-schemas:
+    get:
+      tags: [Catalog]
+      summary: List standard schemas registry
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StandardSchemaListEnvelope" }
+    post:
+      tags: [Catalog]
+      summary: Upsert standard schema (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpsertStandardSchema" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StandardSchemaEnvelope" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ErrorEnvelope:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            traceId: { type: string }
+
+    SetType:
+      type: string
+      enum: [REFERENCE, STANDARD, TARGET]
+    Scope:
+      type: string
+      enum: [GLOBAL, TENANT, FARM, HOUSE, FLOCK]
+    UnitSystem:
+      type: string
+      enum: [METRIC, IMPERIAL]
+    Sex:
+      type: string
+      enum: [AS_HATCHED, MALE, FEMALE, MIXED]
+    DimType:
+      type: string
+      enum: [AGE_DAY, AGE_WEEK, BODY_WEIGHT_G, PHASE]
+
+    SpeciesCatalog:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name: { type: string }
+        scientificName: { type: string, nullable: true }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    BreederCompany:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        country: { type: string, nullable: true }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    GeneticLineCatalog:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        speciesId: { type: string, format: uuid }
+        breederCompanyId: { type: string, format: uuid }
+        code: { type: string, nullable: true }
+        name: { type: string }
+        isActive: { type: boolean }
+        species: { $ref: "#/components/schemas/SpeciesCatalog" }
+        breederCompany: { $ref: "#/components/schemas/BreederCompany" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    StandardSchema:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        displayName: { type: string }
+        dimTypeDefault: { $ref: "#/components/schemas/DimType" }
+        csvColumnsJson: { type: object }
+        payloadSchemaJson: { type: object }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    SourceDocument:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string, nullable: true }
+        doi: { type: string, nullable: true }
+        url: { type: string, nullable: true }
+        fileHash: { type: string, nullable: true }
+        note: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    StandardSet:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        setType: { $ref: "#/components/schemas/SetType" }
+        unitSystem: { $ref: "#/components/schemas/UnitSystem" }
+        sex: { $ref: "#/components/schemas/Sex" }
+        scope: { $ref: "#/components/schemas/Scope" }
+        tenantId: { type: string, nullable: true }
+        farmId: { type: string, nullable: true }
+        houseId: { type: string, nullable: true }
+        flockId: { type: string, nullable: true }
+        speciesId: { type: string, format: uuid }
+        geneticLineId: { type: string, format: uuid, nullable: true }
+        standardSchemaId: { type: string, format: uuid }
+        versionTag: { type: string }
+        isActive: { type: boolean }
+        derivedFromSetId: { type: string, format: uuid, nullable: true }
+        adjustmentJson: { type: object, nullable: true }
+        sourceDocumentId: { type: string, format: uuid, nullable: true }
+        dayStart: { type: integer, nullable: true }
+        dayEnd: { type: integer, nullable: true }
+        isDaily: { type: boolean }
+        sourceDocument: { $ref: "#/components/schemas/SourceDocument" }
+        species: { $ref: "#/components/schemas/SpeciesCatalog" }
+        geneticLine: { $ref: "#/components/schemas/GeneticLineCatalog", nullable: true }
+        standardSchema: { $ref: "#/components/schemas/StandardSchema" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    StandardSetEnvelope:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/StandardSet" }
+
+    PaginatedStandardSet:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/StandardSet" }
+        meta:
+          type: object
+          properties:
+            total: { type: integer }
+            page: { type: integer }
+            pageSize: { type: integer }
+
+    StandardRow:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        setId: { type: string, format: uuid }
+        rowKey: { type: string }
+        dimType: { $ref: "#/components/schemas/DimType" }
+        dimFrom: { type: number }
+        dimTo: { type: number, nullable: true }
+        phase: { type: string, nullable: true }
+        payloadJson: { type: object }
+        isInterpolated: { type: boolean }
+        note: { type: string, nullable: true }
+
+    StandardRowListEnvelope:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/StandardRow" }
+
+    CreateStandardSet:
+      type: object
+      required: [name, setType, standardSchemaCode, speciesCode, unitSystem, sex, scope, versionTag]
+      properties:
+        name: { type: string }
+        setType: { $ref: "#/components/schemas/SetType" }
+        standardSchemaCode: { type: string, example: GROWTH }
+        speciesCode: { type: string, example: chicken }
+        geneticLineCode: { type: string, example: COBB500 }
+        unitSystem: { $ref: "#/components/schemas/UnitSystem" }
+        sex: { $ref: "#/components/schemas/Sex" }
+        scope: { $ref: "#/components/schemas/Scope" }
+        tenantId: { type: string }
+        farmId: { type: string }
+        houseId: { type: string }
+        flockId: { type: string }
+        versionTag: { type: string }
+        isActive: { type: boolean }
+        dayStart: { type: integer }
+        dayEnd: { type: integer }
+        isDaily: { type: boolean }
+        sourceDocument: { type: object }
+
+    UpdateStandardSet:
+      type: object
+      properties:
+        name: { type: string }
+        versionTag: { type: string }
+        isActive: { type: boolean }
+        sourceDocument: { type: object }
+
+    UpsertRows:
+      type: object
+      required: [rows]
+      properties:
+        rows:
+          type: array
+          items:
+            type: object
+            required: [dimType, dimFrom, payloadJson]
+            properties:
+              rowKey: { type: string }
+              dimType: { $ref: "#/components/schemas/DimType" }
+              dimFrom: { type: number }
+              dimTo: { type: number }
+              phase: { type: string }
+              payloadJson: { type: object }
+              note: { type: string }
+              isInterpolated: { type: boolean }
+
+    CloneSet:
+      type: object
+      required: [newSetType, scope, versionTag]
+      properties:
+        newSetType: { type: string, enum: [STANDARD, TARGET] }
+        scope: { $ref: "#/components/schemas/Scope" }
+        tenantId: { type: string }
+        farmId: { type: string }
+        houseId: { type: string }
+        flockId: { type: string }
+        versionTag: { type: string }
+        copyRows: { type: boolean, default: true }
+
+    AdjustSet:
+      type: object
+      required: [scope, versionTag]
+      properties:
+        scope: { $ref: "#/components/schemas/Scope" }
+        tenantId: { type: string }
+        farmId: { type: string }
+        houseId: { type: string }
+        flockId: { type: string }
+        versionTag: { type: string }
+        method: { type: string, enum: [percent, offset, phase], default: percent }
+        percent: { type: number }
+        offset: { type: number }
+        phases:
+          type: array
+          items:
+            type: object
+            properties:
+              from: { type: number }
+              to: { type: number }
+              percent: { type: number }
+              offset: { type: number }
+
+    ResolveEnvelope:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            resolvedSetId: { type: string, format: uuid, nullable: true }
+            scopeUsed: { $ref: "#/components/schemas/Scope", nullable: true }
+            versionTag: { type: string, nullable: true }
+            setType: { $ref: "#/components/schemas/SetType", nullable: true }
+
+    ImportJob:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string, enum: [DRAFT, VALIDATED, COMMITTED, FAILED] }
+        setId: { type: string, format: uuid, nullable: true }
+        filename: { type: string }
+        fileHash: { type: string }
+        uploadedBy: { type: string, nullable: true }
+        uploadedAt: { type: string, format: date-time }
+        dryRun: { type: boolean }
+        summaryJson: { type: object, nullable: true }
+        errorJson: { type: object, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    ImportJobEnvelope:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/ImportJob" }
+
+    ImportCsvEnvelope:
+      type: object
+      properties:
+        data:
+          oneOf:
+            - type: object
+              properties:
+                jobId: { type: string, format: uuid }
+                dryRun: { type: boolean }
+                errors: { type: array, items: { type: object } }
+                preview: { type: array, items: { type: object } }
+            - type: object
+              properties:
+                jobId: { type: string, format: uuid }
+                dryRun: { type: boolean }
+                setId: { type: string, format: uuid }
+
+    SpeciesCatalogEnvelope:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/SpeciesCatalog" }
+    SpeciesCatalogListEnvelope:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/SpeciesCatalog" }
+    UpsertSpeciesCatalog:
+      type: object
+      required: [code, name]
+      properties:
+        code: { type: string }
+        name: { type: string }
+        scientificName: { type: string }
+        isActive: { type: boolean }
+
+    BreederCompanyEnvelope:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/BreederCompany" }
+    BreederCompanyListEnvelope:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/BreederCompany" }
+    UpsertBreederCompany:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        country: { type: string }
+        isActive: { type: boolean }
+
+    GeneticLineEnvelope:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/GeneticLineCatalog" }
+    GeneticLineListEnvelope:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/GeneticLineCatalog" }
+    UpsertGeneticLineCatalog:
+      type: object
+      required: [speciesCode, breederCompanyName, name]
+      properties:
+        speciesCode: { type: string }
+        breederCompanyName: { type: string }
+        code: { type: string }
+        name: { type: string }
+        isActive: { type: boolean }
+
+    StandardSchemaEnvelope:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/StandardSchema" }
+    StandardSchemaListEnvelope:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/StandardSchema" }
+    UpsertStandardSchema:
+      type: object
+      required: [code, displayName, dimTypeDefault, csvColumnsJson, payloadSchemaJson]
+      properties:
+        code: { type: string }
+        displayName: { type: string }
+        dimTypeDefault: { $ref: "#/components/schemas/DimType" }
+        csvColumnsJson: { type: object }
+        payloadSchemaJson: { type: object }
+        isActive: { type: boolean }

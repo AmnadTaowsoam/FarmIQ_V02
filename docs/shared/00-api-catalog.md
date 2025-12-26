@@ -300,6 +300,34 @@ All FarmIQ services must follow `shared/01-api-standards.md`:
 - **Data ownership**: `tenant`, `farm`, `barn`, `batch`, `device`, `sensor`, `sensor_binding`, `sensor_calibration`
 - **Implementation notes**: `boilerplates/Backend-node`
 
+### `cloud-standards-service`
+
+- **Purpose**: Reference/Standard/Target master data for operational targets and limits (growth, ventilation, lighting, environment).
+- **Base path**: `/api`
+- **Auth**: JWT + RBAC (writes admin-only).
+- **/api-docs**: `GET /api-docs`
+- **Core endpoints (examples)**
+  - `GET /api/health`
+  - `GET /api/ready` (recommended)
+  - `GET /api-docs`
+  - `GET /api-docs/openapi.json` (or `openapi.yaml`)
+  - `GET /api/v1/standards/sets`
+  - `GET /api/v1/standards/sets/{setId}`
+  - `GET /api/v1/standards/sets/{setId}/rows`
+  - `GET /api/v1/standards/resolve` (precedence: FLOCK>HOUSE>FARM>TENANT>GLOBAL; key params: `speciesCode`, `geneticLineCode?`, `standardSchemaCode`)
+  - `GET /api/v1/standards/catalog/species`
+  - `GET /api/v1/standards/catalog/genetic-lines`
+  - `GET /api/v1/standards/catalog/standard-schemas`
+  - Admin:
+    - `POST /api/v1/standards/sets`
+    - `PATCH /api/v1/standards/sets/{setId}`
+    - `PUT /api/v1/standards/sets/{setId}/rows`
+    - `POST /api/v1/standards/sets/{setId}/clone`
+    - `POST /api/v1/standards/sets/{setId}/adjust`
+    - `POST /api/v1/standards/imports/csv` (dryRun + commit)
+- **Data ownership**: `standard_set`, `standard_row`, `source_document`, `import_job`, plus catalogs `species_catalog`, `genetic_line_catalog`, `breeder_company`, `standard_schema`
+- **Implementation notes**: `boilerplates/Backend-node`
+
 ### `cloud-feed-service`
 
 - **Purpose**: Feed master data and authoritative feed intake records.
@@ -412,6 +440,7 @@ All FarmIQ services must follow `shared/01-api-standards.md`:
   - `/api/v1/analytics/kpis`
   - `/api/v1/analytics/anomalies`
   - `/api/v1/analytics/forecasts`
+  - `/api/v1/analytics/kpi/growth-deviation` (resolves standards via `cloud-standards-service` + batch genetics via `cloud-barn-records-service`)
 - **Data ownership**: analytics tables
 - **Implementation notes**: `boilerplates/Backend-python`
 
@@ -431,6 +460,7 @@ All FarmIQ services must follow `shared/01-api-standards.md`:
   - `PUT /api/v1/config/thresholds` - Upsert thresholds
   - `GET /api/v1/config/targets` - Get target curves
   - `PUT /api/v1/config/targets` - Upsert target curves
+- **Integration note**: Phase-2 rules can reference standards dynamically (via `cloud-standards-service resolve + rows`) instead of static thresholds.
 - **Data ownership**: `config_threshold_rules`, `config_target_curves`
 - **Implementation notes**: `boilerplates/Backend-node`
 

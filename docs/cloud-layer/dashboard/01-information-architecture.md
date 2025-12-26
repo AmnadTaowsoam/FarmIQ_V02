@@ -22,6 +22,7 @@
 - WeighVision
 - Sensors
 - Feeding & FCR
+- Reference Standards
 - AI Insights
 - Alerts
 - Reports & Export
@@ -51,6 +52,10 @@
 - `/devices` - Devices list
 - `/devices/:deviceId` - Device detail
 - `/telemetry` - Telemetry explorer
+- `/standards` - Reference standards library
+- `/standards/sets/:setId` - Standard set details/editor
+- `/standards/targets/new` - Target builder (admin)
+- `/standards/import` - Import CSV (admin)
 - `/weighvision/sessions` - WeighVision sessions list
 - `/weighvision/sessions/:sessionId` - Session detail
 - `/weighvision/analytics` - Weight analytics dashboard
@@ -186,7 +191,25 @@
 
 ---
 
-### 6. AI Insights
+### 6. Reference Standards
+**Purpose**: Manage reference/standard/target master data that drives operational targets and limits.
+
+**Pages**:
+- Standards Library (list/filter sets)
+- Set Details / Editor (metadata + rows)
+- Target Builder (clone + adjust)
+- Import CSV (validate + commit)
+
+**User Questions**:
+- What reference benchmark are we using?
+- What is our tenant baseline standard?
+- How are farm/barn targets adjusted and which one is active?
+
+**Roles**: All authenticated users (view), Tenant Admin/Platform Admin (write/import/adjust).
+
+---
+
+### 7. AI Insights
 **Purpose**: AI-driven insights, anomalies, and recommendations.
 
 **Pages**:
@@ -203,7 +226,7 @@
 
 ---
 
-### 7. Alerts
+### 8. Alerts
 **Purpose**: Alert management and notification center.
 
 **Pages**:
@@ -217,7 +240,7 @@
 
 ---
 
-### 8. Reports & Export
+### 9. Reports & Export
 **Purpose**: Data export and KPI reporting.
 
 **Pages**:

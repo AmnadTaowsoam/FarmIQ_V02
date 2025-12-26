@@ -36,6 +36,7 @@ Last updated: 2025-12-21 (Runtime integration verified + seed data enhanced)
 | cloud-feed-service | cloud | 5130 | OK | OK | done | CursorAI |
 | cloud-barn-records-service | cloud | 5131 | OK | OK | done | CursorAI |
 | cloud-weighvision-readmodel | cloud | 5132 | OK | OK | done | CursorAI |
+| cloud-standards-service | cloud | 5133 | - | - | doing | Codex |
 | dashboard-web | ui | 5142 | OK | OK | doing | Antigravity |
 
 ### Contracts Freeze

@@ -1,8 +1,37 @@
 import { Request, Response } from 'express'
 import { createWeighVisionServiceClient } from '../services/weighvisionService'
 import { logger } from '../utils/logger'
+import { getTenantIdFromRequest } from '../utils/tenantScope'
 
 const weighvisionService = createWeighVisionServiceClient()
+
+function emptySessionsPayload() {
+  return {
+    items: [],
+    nextCursor: null,
+    hasMore: false,
+    meta: { downstream_available: false },
+  }
+}
+
+function emptyAnalyticsPayload() {
+  return {
+    data: null,
+    meta: { downstream_available: false },
+  }
+}
+
+function isRetryableDownstreamStatus(status: number) {
+  return status === 502 || status === 503 || status === 504 || status >= 500
+}
+
+function parseStatusFromErrorMessage(message?: string): number | null {
+  if (!message) return null
+  const match = message.match(/:\s*(\d{3})\b/)
+  if (!match) return null
+  const status = Number(match[1])
+  return Number.isFinite(status) ? status : null
+}
 
 /**
  * Get weighvision sessions (proxy to weighvision-readmodel)
@@ -57,24 +86,30 @@ export async function getSessionsHandler(req: Request, res: Response) {
       traceId: res.locals.traceId,
     })
 
-    // Map downstream errors to standard error envelope
+    // Dev-friendly fallback: if downstream readmodel is unavailable, return empty list instead of 5xx.
+    const status =
+      error.response?.status || parseStatusFromErrorMessage(error.message) || 500
+    if (isRetryableDownstreamStatus(status)) {
+      return res.json(emptySessionsPayload())
+    }
+
     if (error.response?.status) {
-      res.status(error.response.status).json(error.response.data || {
+      return res.status(error.response.status).json(error.response.data || {
         error: {
           code: 'DOWNSTREAM_ERROR',
           message: error.message || 'Failed to fetch weighvision sessions',
           traceId: res.locals.traceId || 'unknown',
         },
       })
-    } else {
-      res.status(500).json({
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: 'Failed to fetch weighvision sessions',
-          traceId: res.locals.traceId || 'unknown',
-        },
-      })
     }
+
+    return res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to fetch weighvision sessions',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
   }
 }
 
@@ -122,11 +157,22 @@ export async function getSessionByIdHandler(req: Request, res: Response) {
     })
 
     // Map downstream errors to standard error envelope
-    if (error.response?.status === 404) {
+    const status =
+      error.response?.status || parseStatusFromErrorMessage(error.message) || 500
+
+    if (status === 404) {
       res.status(404).json({
         error: {
           code: 'NOT_FOUND',
           message: 'WeighVision session not found',
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+    } else if (isRetryableDownstreamStatus(status)) {
+      res.status(503).json({
+        error: {
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'WeighVision readmodel unavailable',
           traceId: res.locals.traceId || 'unknown',
         },
       })
@@ -206,24 +252,30 @@ export async function getAnalyticsHandler(req: Request, res: Response) {
       traceId: res.locals.traceId,
     })
 
-    // Map downstream errors to standard error envelope
+    const status =
+      error.response?.status || parseStatusFromErrorMessage(error.message) || 500
+
+    if (isRetryableDownstreamStatus(status)) {
+      return res.json(emptyAnalyticsPayload())
+    }
+
     if (error.response?.status) {
-      res.status(error.response.status).json(error.response.data || {
+      return res.status(error.response.status).json(error.response.data || {
         error: {
           code: 'DOWNSTREAM_ERROR',
           message: error.message || 'Failed to fetch weighvision analytics',
           traceId: res.locals.traceId || 'unknown',
         },
       })
-    } else {
-      res.status(500).json({
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: 'Failed to fetch weighvision analytics',
-          traceId: res.locals.traceId || 'unknown',
-        },
-      })
     }
+
+    return res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to fetch weighvision analytics',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
   }
 }
 
@@ -271,7 +323,12 @@ export async function getWeightAggregatesHandler(req: Request, res: Response) {
     res.json(result)
   } catch (error: any) {
     logger.error('Error fetching weighvision weight aggregates:', error)
-    res.status(500).json({
+    const status =
+      error.response?.status || parseStatusFromErrorMessage(error.message) || 500
+    if (isRetryableDownstreamStatus(status)) {
+      return res.json({ data: [], meta: { downstream_available: false } })
+    }
+    return res.status(500).json({
       error: {
         code: 'INTERNAL_ERROR',
         message: error.message || 'Failed to fetch weighvision weight aggregates',

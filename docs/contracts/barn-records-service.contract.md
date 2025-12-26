@@ -34,6 +34,7 @@ Define the HTTP contract for barn health, welfare, housing, and genetic records.
 | POST | /api/v1/barn-records/welfare-checks | tenant_admin, farm_manager, house_operator | required | welfare payload | welfare record | 400,401,403,409,422 |
 | POST | /api/v1/barn-records/housing-conditions | tenant_admin, farm_manager, house_operator | required | housing payload | housing record | 400,401,403,409,422 |
 | POST | /api/v1/barn-records/genetics | tenant_admin, farm_manager | required | genetic payload | genetic record | 400,401,403,409,422 |
+| GET | /api/v1/barn-records/genetics | tenant_admin, farm_manager, viewer | n/a | filters (tenantId,batchId) | list of genetic profiles | 400,401,403 |
 
 ## OpenAPI Snippets
 
@@ -261,14 +262,18 @@ Content-Type: application/json
 {
   "tenantId": "t-001",
   "batchId": "batch-001",
+  "speciesCode": "chicken",
+  "geneticLineCode": "COBB500",
   "strain": "Cobb 500",
   "breedLine": "Line A",
-  "supplier": "Hatchery X"
+  "supplier": "Hatchery X",
+  "hatchDate": "2025-01-01",
+  "growthTargetSetId": "00000000-0000-4000-8000-00000000abcd"
 }
 ```
 **Response**
 ```json
-{ "id": "0190a1d1-8888-7d3f-b2e4-9e8b5f8e0018", "strain": "Cobb 500" }
+{ "id": "0190a1d1-8888-7d3f-b2e4-9e8b5f8e0018", "speciesCode": "chicken", "geneticLineCode": "COBB500", "strain": "Cobb 500" }
 ```
 
 ### Example 9 (Error): Forbidden

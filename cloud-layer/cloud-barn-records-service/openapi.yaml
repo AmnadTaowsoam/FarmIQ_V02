@@ -503,6 +503,7 @@ paths:
               required:
                 - tenantId
                 - batchId
+                - speciesCode
               properties:
                 tenantId:
                   type: string
@@ -510,6 +511,33 @@ paths:
                 batchId:
                   type: string
                   format: uuid
+                speciesCode:
+                  type: string
+                  description: Species code (catalog-driven via cloud-standards-service)
+                  example: chicken
+                geneticLineCode:
+                  type: string
+                  nullable: true
+                  description: Genetic line code (optional)
+                  example: COBB500
+                growthTargetSetId:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: Optional override to a TARGET set in cloud-standards-service (schema=GROWTH)
+                envTargetSetId:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: Optional override to a TARGET set in cloud-standards-service (schema=ENV_LIMITS)
+                lightingTargetSetId:
+                  type: string
+                  format: uuid
+                  nullable: true
+                ventilationTargetSetId:
+                  type: string
+                  format: uuid
+                  nullable: true
                 strain:
                   type: string
                 breedLine:

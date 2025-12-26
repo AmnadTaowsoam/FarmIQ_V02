@@ -66,17 +66,14 @@ COPY --from=build /usr/src/app/src ./src
 COPY --from=build /usr/src/app/tsconfig.json ./tsconfig.json
 COPY --from=build /usr/src/app/openapi.yaml ./openapi.yaml
 
-# Install nodemon globally for hot-reload
-RUN npm install -g nodemon ts-node
-
-# Install curl for healthcheck
-RUN apk add --no-cache curl
+# Note: nodemon/ts-node are already installed via `npm ci` (devDependencies).
+# Avoid `npm install -g ...` here to prevent builds failing in restricted/offline environments.
 
 EXPOSE 3000
 
 # Healthcheck
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-CMD curl --fail http://localhost:3000/api/health || exit 1
+CMD node -e "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 # Start the application in development mode
 CMD ["npm", "run", "dev"]
@@ -113,9 +110,6 @@ COPY --from=build /usr/src/app/node_modules/@prisma ./node_modules/@prisma
 # Copy the openapi.yaml file
 COPY --from=build /usr/src/app/openapi.yaml ./openapi.yaml
 
-# Install curl for healthcheck
-RUN apk add --no-cache curl
-
 # Create a non-root user
 RUN adduser -D -u 1001 nodeuser
 
@@ -127,7 +121,7 @@ EXPOSE 3000
 
 # Healthcheck to ensure the app is running
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-CMD curl --fail http://localhost:3000/api/health || exit 1
+CMD node -e "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 # Run database migrations before starting the application
 # Note: DATABASE_URL must be provided as environment variable

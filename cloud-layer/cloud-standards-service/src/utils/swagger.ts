@@ -1,0 +1,16 @@
+import swaggerUi from 'swagger-ui-express'
+import { Express } from 'express'
+import fs from 'fs'
+import yaml from 'js-yaml'
+import path from 'path'
+
+const openApiPath = path.join(__dirname, '..', '..', 'openapi.yaml')
+const openApiSpec = yaml.load(fs.readFileSync(openApiPath, 'utf8')) as Record<
+  string,
+  unknown
+>
+
+export function setupSwagger(app: Express): void {
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openApiSpec))
+}
+

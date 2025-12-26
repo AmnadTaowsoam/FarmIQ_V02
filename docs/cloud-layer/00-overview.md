@@ -30,6 +30,7 @@ Business services:
 - `cloud-api-gateway-bff` (Node)
 - `cloud-identity-access` (Node)
 - `cloud-tenant-registry` (Node)
+- `cloud-standards-service` (Node)
 - `cloud-ingestion` (Node)
 - `cloud-telemetry-service` (Node)
 - `cloud-analytics-service` (Python)

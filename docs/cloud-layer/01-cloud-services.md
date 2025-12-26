@@ -14,6 +14,7 @@ Services:
 - `cloud-api-gateway-bff` (Node; gateway + BFF)
 - `cloud-identity-access` (Node; JWT/OIDC, RBAC)
 - `cloud-tenant-registry` (Node; master data)
+- `cloud-standards-service` (Node; reference/standard/target master data)
 - `cloud-ingestion` (Node; single entry from edge, validate + dedupe)
 - `cloud-telemetry-service` (Node; consumes RabbitMQ, telemetry storage + query)
 - `cloud-analytics-service` (Python; consumes RabbitMQ, anomaly/forecast/KPI)
@@ -89,6 +90,23 @@ Ownership guards (non-negotiable):
 - **DB tables owned**:
   - `tenant`, `farm`, `barn`, `batch`, `device`
 - **RabbitMQ**: Optional to publish master data change events; not required for MVP.
+- **Boilerplate**: `boilerplates/Backend-node`
+
+### `cloud-standards-service` (Node) — Standards owner
+
+- **Purpose**: Store and serve reference/standard/target master data (growth, ventilation, lighting, environmental limits) with scope precedence resolution.
+- **APIs**:
+  - `GET /api/health`
+  - `GET /api/ready` (recommended)
+  - `GET /api-docs`
+  - `GET /api/v1/standards/sets`
+  - `GET /api/v1/standards/sets/{setId}`
+  - `GET /api/v1/standards/sets/{setId}/rows`
+  - `GET /api/v1/standards/resolve`
+  - Write (admin): `POST /sets`, `PATCH /sets/{setId}`, `PUT /sets/{setId}/rows`, `POST /imports/csv`, `POST /sets/{setId}/clone`, `POST /sets/{setId}/adjust`
+- **DB tables owned** (typical):
+  - `standard_sets`, `standard_rows`, `source_documents`, `import_jobs`
+- **RabbitMQ**: None (read-heavy config/master data).
 - **Boilerplate**: `boilerplates/Backend-node`
 
 ### `cloud-ingestion` (Node) — Cloud ingress owner

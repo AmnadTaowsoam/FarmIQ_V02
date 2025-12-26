@@ -837,6 +837,69 @@ export async function getAnalytics(params: {
 }
 
 /**
+ * Get weighvision weight aggregates (precomputed daily rollups)
+ */
+export async function listWeightAggregates(params: {
+  tenantId: string
+  farmId?: string
+  barnId?: string
+  batchId?: string
+  startDate: Date
+  endDate: Date
+}) {
+  const { tenantId, farmId, barnId, batchId, startDate, endDate } = params
+
+  let query = `
+    SELECT
+      a.*
+    FROM weighvision_weight_aggregate a
+    WHERE a."tenantId" = $1
+      AND a."recordDate" >= $2
+      AND a."recordDate" <= $3
+  `
+
+  const queryParams: any[] = [tenantId, startDate, endDate]
+  let paramIndex = 4
+
+  if (farmId) {
+    query += ` AND a."farmId" = $${paramIndex}`
+    queryParams.push(farmId)
+    paramIndex++
+  }
+  if (barnId) {
+    query += ` AND a."barnId" = $${paramIndex}`
+    queryParams.push(barnId)
+    paramIndex++
+  }
+  if (batchId) {
+    query += ` AND a."batchId" = $${paramIndex}`
+    queryParams.push(batchId)
+    paramIndex++
+  }
+
+  query += ` ORDER BY a."recordDate" ASC`
+
+  const rows = (await prisma.$queryRawUnsafe(query, ...queryParams)) as any[]
+
+  return rows.map((row: any) => ({
+    id: row.id,
+    tenantId: row.tenantId,
+    farmId: row.farmId,
+    barnId: row.barnId,
+    batchId: row.batchId,
+    recordDate: row.recordDate,
+    avgWeightKg: row.avgWeightKg,
+    p10WeightKg: row.p10WeightKg,
+    p50WeightKg: row.p50WeightKg,
+    p90WeightKg: row.p90WeightKg,
+    sampleCount: row.sampleCount,
+    qualityPassRate: row.qualityPassRate,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  }))
+}
+
+/**
  * Handle inference.completed event (optional)
  */
 export async function handleInferenceCompleted(event: WeighVisionEvent) {
@@ -938,4 +1001,3 @@ export async function handleInferenceCompleted(event: WeighVisionEvent) {
     throw error
   }
 }
-

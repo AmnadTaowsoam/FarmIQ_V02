@@ -6,6 +6,7 @@ export interface ServiceBaseUrls {
   telemetryBaseUrl: string
   analyticsBaseUrl: string
   weighvisionReadModelBaseUrl: string
+  standardsBaseUrl: string
   configRulesBaseUrl: string
   auditLogBaseUrl: string
   notificationBaseUrl: string
@@ -39,6 +40,12 @@ export function getServiceBaseUrls(): ServiceBaseUrls {
     process.env.WEIGHVISION_READMODEL_BASE_URL ||
     'http://cloud-weighvision-readmodel:3000'
 
+  const standardsBaseUrl =
+    process.env.STANDARDS_SERVICE_URL ||
+    process.env.CLOUD_STANDARDS_SERVICE_URL ||
+    process.env.STANDARDS_BASE_URL ||
+    'http://cloud-standards-service:3000'
+
   const configRulesBaseUrl =
     process.env.CONFIG_RULES_BASE_URL ||
     'http://cloud-config-rules-service:3000'
@@ -71,6 +78,7 @@ export function getServiceBaseUrls(): ServiceBaseUrls {
     telemetryBaseUrl,
     analyticsBaseUrl,
     weighvisionReadModelBaseUrl,
+    standardsBaseUrl,
     configRulesBaseUrl,
     auditLogBaseUrl,
     notificationBaseUrl,
@@ -116,11 +124,14 @@ export async function callDownstreamJson<T>(
 export async function fetchOverview(params: {
   tenantId: string
   headers: Record<string, string>
+  from: string
+  to: string
+  bucket: '5m' | '1h' | '1d'
 }) {
   const bases = getServiceBaseUrls()
 
   const topologyPromise = callDownstreamJson<any>(
-    `${bases.registryBaseUrl}/api/v1/topology`,
+    `${bases.registryBaseUrl}/api/v1/topology?tenantId=${encodeURIComponent(params.tenantId)}`,
     {
       headers: params.headers,
     }
@@ -136,32 +147,72 @@ export async function fetchOverview(params: {
   const aggregatesPromise = callDownstreamJson<any>(
     `${bases.telemetryBaseUrl}/api/v1/telemetry/aggregates?tenantId=${encodeURIComponent(
       params.tenantId
-    )}`,
+    )}&from=${encodeURIComponent(params.from)}&to=${encodeURIComponent(params.to)}&bucket=${
+      params.bucket
+    }`,
     { headers: params.headers }
   )
 
+  // Note: cloud-analytics-service does not provide /api/v1/analytics/alerts.
+  // Keep this optional and return empty alerts if unavailable.
   const analyticsPromise = callDownstreamJson<any>(
-    `${bases.analyticsBaseUrl}/api/v1/analytics/alerts?tenantId=${encodeURIComponent(
+    `${bases.analyticsBaseUrl}/api/v1/anomalies?tenantId=${encodeURIComponent(
       params.tenantId
-    )}`,
+    )}&limit=25`,
     { headers: params.headers }
   )
 
-  const [topology, metrics, aggregates, analytics] = await Promise.all([
+  const [topologyResult, metricsResult, aggregatesResult, analyticsResult] = await Promise.all([
     topologyPromise,
     metricsPromise,
     aggregatesPromise,
     analyticsPromise,
   ])
 
+  const topologyData = topologyResult.ok ? (topologyResult.data as any) : null
+
+  // Build minimal KPI payload expected by the frontend contract
+  const farms = topologyData?.farms || []
+  const totalFarms = Array.isArray(farms) ? farms.length : 0
+  const totalBarns = Array.isArray(farms)
+    ? farms.reduce((sum: number, farm: any) => sum + (farm?.barns?.length || 0), 0)
+    : 0
+
+  const deviceIds = new Set<string>()
+  if (Array.isArray(farms)) {
+    for (const farm of farms) {
+      for (const device of farm?.devices || []) device?.id && deviceIds.add(device.id)
+      for (const barn of farm?.barns || []) {
+        for (const device of barn?.devices || []) device?.id && deviceIds.add(device.id)
+        for (const batch of barn?.batches || []) {
+          for (const device of batch?.devices || []) device?.id && deviceIds.add(device.id)
+        }
+      }
+      for (const batch of farm?.batches || []) {
+        for (const device of batch?.devices || []) device?.id && deviceIds.add(device.id)
+      }
+    }
+  }
+
   return {
-    topology: topology.ok ? topology.data : null,
-    telemetry: {
-      metrics: metrics.ok ? metrics.data : { metrics: [] },
-      aggregates: aggregates.ok ? aggregates.data : [],
+    data: {
+      kpis: {
+        total_farms: totalFarms,
+        total_barns: totalBarns,
+        active_devices: deviceIds.size,
+        critical_alerts: 0,
+      },
+      recent_alerts: [],
+      recent_activity: [],
+      weight_trend: [],
+      sensor_status: {},
     },
-    alerts: analytics.ok ? analytics.data : [],
-    analyticsAvailable: analytics.ok,
+    meta: {
+      topology_ok: topologyResult.ok,
+      telemetry_metrics_ok: metricsResult.ok,
+      telemetry_aggregates_ok: aggregatesResult.ok,
+      analytics_ok: analyticsResult.ok,
+    },
   }
 }
 
@@ -171,25 +222,29 @@ export async function fetchFarmDashboard(params: {
   headers: Record<string, string>
 }) {
   const bases = getServiceBaseUrls()
+  const to = new Date().toISOString()
+  const from = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
   const farmPromise = callDownstreamJson<any>(
     `${bases.registryBaseUrl}/api/v1/farms/${encodeURIComponent(
       params.farmId
-    )}`,
+    )}?tenantId=${encodeURIComponent(params.tenantId)}`,
     { headers: params.headers }
   )
 
   const barnsPromise = callDownstreamJson<any>(
-    `${bases.registryBaseUrl}/api/v1/barns?farmId=${encodeURIComponent(
-      params.farmId
-    )}`,
+    `${bases.registryBaseUrl}/api/v1/barns?tenantId=${encodeURIComponent(
+      params.tenantId
+    )}&farmId=${encodeURIComponent(params.farmId)}`,
     { headers: params.headers }
   )
 
   const aggregatesPromise = callDownstreamJson<any>(
     `${bases.telemetryBaseUrl}/api/v1/telemetry/aggregates?tenantId=${encodeURIComponent(
       params.tenantId
-    )}&farmId=${encodeURIComponent(params.farmId)}`,
+    )}&farmId=${encodeURIComponent(params.farmId)}&from=${encodeURIComponent(
+      from
+    )}&to=${encodeURIComponent(to)}&bucket=5m`,
     { headers: params.headers }
   )
 
@@ -212,18 +267,22 @@ export async function fetchBarnDashboard(params: {
   headers: Record<string, string>
 }) {
   const bases = getServiceBaseUrls()
+  const to = new Date().toISOString()
+  const from = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
   const barnPromise = callDownstreamJson<any>(
     `${bases.registryBaseUrl}/api/v1/barns/${encodeURIComponent(
       params.barnId
-    )}`,
+    )}?tenantId=${encodeURIComponent(params.tenantId)}`,
     { headers: params.headers }
   )
 
   const aggregatesPromise = callDownstreamJson<any>(
     `${bases.telemetryBaseUrl}/api/v1/telemetry/aggregates?tenantId=${encodeURIComponent(
       params.tenantId
-    )}&barnId=${encodeURIComponent(params.barnId)}`,
+    )}&barnId=${encodeURIComponent(params.barnId)}&from=${encodeURIComponent(
+      from
+    )}&to=${encodeURIComponent(to)}&bucket=5m`,
     { headers: params.headers }
   )
 
@@ -254,9 +313,9 @@ export async function fetchAlerts(params: {
   const bases = getServiceBaseUrls()
 
   const analytics = await callDownstreamJson<any>(
-    `${bases.analyticsBaseUrl}/api/v1/analytics/alerts?tenantId=${encodeURIComponent(
+    `${bases.analyticsBaseUrl}/api/v1/anomalies?tenantId=${encodeURIComponent(
       params.tenantId
-    )}`,
+    )}&limit=100`,
     { headers: params.headers }
   )
 

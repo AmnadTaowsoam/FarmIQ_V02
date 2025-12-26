@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     feed_service_url: str = os.getenv("FEED_SERVICE_URL", "http://cloud-feed-service:5130")
     barn_records_service_url: str = os.getenv("BARN_RECORDS_SERVICE_URL", "http://cloud-barn-records-service:3000")
     weighvision_readmodel_url: str = os.getenv("WEIGHVISION_READMODEL_URL", "http://cloud-weighvision-readmodel:3000")
+    standards_service_url: str = os.getenv("STANDARDS_SERVICE_URL", "http://cloud-standards-service:3000")
 
     def new_id(self) -> str:
         return os.getenv("ID_PREFIX", "") + uuid4().hex
-

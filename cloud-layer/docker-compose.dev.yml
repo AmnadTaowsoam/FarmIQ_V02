@@ -131,6 +131,34 @@ services:
       postgres:
         condition: service_healthy
 
+  cloud-standards-service:
+    build:
+      context: ./cloud-standards-service
+      dockerfile: Dockerfile
+      target: development
+    ports:
+      - "5133:3000"
+    volumes:
+      - ./cloud-standards-service/src:/usr/src/app/src:ro
+      - ./cloud-standards-service/package.json:/usr/src/app/package.json:ro
+      - ./cloud-standards-service/prisma:/usr/src/app/prisma:ro
+      - ./cloud-standards-service/openapi.yaml:/usr/src/app/openapi.yaml:ro
+    environment:
+      - NODE_ENV=development
+      - APP_PORT=3000
+      - LOG_LEVEL=debug
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_standards_service
+      - DD_ENV=${DD_ENV:-dev}
+      - DD_SERVICE=cloud-standards-service
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+    networks:
+      - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   cloud-ingestion:
     build:
       context: ./cloud-ingestion
@@ -204,6 +232,8 @@ services:
       - PORT=8000
       - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_analytics
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
+      - BARN_RECORDS_SERVICE_URL=http://cloud-barn-records-service:3000
+      - STANDARDS_SERVICE_URL=http://cloud-standards-service:3000
       - DD_ENV=${DD_ENV:-dev}
       - DD_SERVICE=cloud-analytics-service
       - DD_VERSION=${DD_VERSION:-local}
@@ -238,6 +268,8 @@ services:
       - TELEMETRY_BASE_URL=http://cloud-telemetry-service:3000
       - ANALYTICS_BASE_URL=http://cloud-analytics-service:8000
       - WEIGHVISION_READMODEL_BASE_URL=http://cloud-weighvision-readmodel:3000
+      - STANDARDS_SERVICE_URL=http://cloud-standards-service:3000
+      - CLOUD_STANDARDS_SERVICE_URL=http://cloud-standards-service:3000
       - CONFIG_RULES_BASE_URL=http://cloud-config-rules-service:3000
       - AUDIT_LOG_BASE_URL=http://cloud-audit-log-service:3000
       - NOTIFICATION_BASE_URL=http://cloud-notification-service:3000

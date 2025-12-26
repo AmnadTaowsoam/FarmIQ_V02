@@ -166,6 +166,12 @@ export interface CreateHousingConditionInput {
 export interface CreateGeneticProfileInput {
   tenantId: string
   batchId: string
+  speciesCode: string
+  geneticLineCode?: string | null
+  growthTargetSetId?: string | null
+  envTargetSetId?: string | null
+  lightingTargetSetId?: string | null
+  ventilationTargetSetId?: string | null
   strain?: string | null
   breedLine?: string | null
   supplier?: string | null
@@ -705,7 +711,36 @@ export async function listHousingConditions(tenantId: string, filters?: ListFilt
 }
 
 export async function listGeneticProfiles(tenantId: string, filters?: ListFilters) {
-  return listByModel('barnGeneticProfile', tenantId, 'hatchDate', filters)
+  const limit = Math.min(filters?.limit || 25, 100)
+  const where: Prisma.BarnGeneticProfileWhereInput = {
+    tenantId,
+    ...(filters?.batchId ? { batchId: filters.batchId } : {}),
+    ...(filters?.start || filters?.end
+      ? {
+          hatchDate: {
+            ...(filters.start ? { gte: filters.start } : {}),
+            ...(filters.end ? { lte: filters.end } : {}),
+          },
+        }
+      : {}),
+  }
+
+  const items = await prisma.barnGeneticProfile.findMany({
+    where,
+    take: limit + 1,
+    ...(filters?.cursor ? { skip: 1, cursor: { id: filters.cursor } } : {}),
+    orderBy: { hatchDate: 'desc' },
+  })
+
+  const hasNext = items.length > limit
+  if (hasNext) {
+    items.pop()
+  }
+
+  return {
+    items,
+    nextCursor: hasNext ? items[items.length - 1].id : null,
+  }
 }
 
 /**
@@ -896,6 +931,12 @@ export async function createGeneticProfile(
         id: newUuidV7(),
         tenantId,
         batchId: input.batchId,
+        speciesCode: input.speciesCode,
+        geneticLineCode: input.geneticLineCode ?? null,
+        growthTargetSetId: input.growthTargetSetId ?? null,
+        envTargetSetId: input.envTargetSetId ?? null,
+        lightingTargetSetId: input.lightingTargetSetId ?? null,
+        ventilationTargetSetId: input.ventilationTargetSetId ?? null,
         strain: input.strain,
         breedLine: input.breedLine,
         supplier: input.supplier,

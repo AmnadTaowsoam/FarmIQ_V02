@@ -6,6 +6,7 @@ import {
   getBarnDashboard,
   getAlerts,
 } from '../controllers/dashboardController'
+import { acknowledgeAlert } from '../controllers/opsController'
 
 const router = express.Router()
 
@@ -31,6 +32,9 @@ router.get('/barns/:barnId', getBarnDashboard)
  * GET /api/v1/dashboard/alerts
  */
 router.get('/alerts', getAlerts)
+
+// Optional dev-only alert acknowledge (no-op)
+router.post('/alerts/:alertId/acknowledge', acknowledgeAlert)
 
 export default router
 

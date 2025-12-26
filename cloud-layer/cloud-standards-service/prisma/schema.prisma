@@ -1,0 +1,246 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SetType {
+  REFERENCE
+  STANDARD
+  TARGET
+}
+
+enum UnitSystem {
+  METRIC
+  IMPERIAL
+}
+
+enum Sex {
+  AS_HATCHED
+  MALE
+  FEMALE
+  MIXED
+}
+
+enum Scope {
+  GLOBAL
+  TENANT
+  FARM
+  HOUSE
+  FLOCK
+}
+
+enum DimType {
+  AGE_DAY
+  AGE_WEEK
+  BODY_WEIGHT_G
+  PHASE
+  CUSTOM
+}
+
+enum ImportJobStatus {
+  DRAFT
+  VALIDATED
+  COMMITTED
+  FAILED
+}
+
+model SpeciesCatalog {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  name      String
+  scientificName String? @map("scientific_name")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  geneticLines GeneticLineCatalog[]
+
+  @@map("species_catalog")
+}
+
+model BreederCompany {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  country   String?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  geneticLines GeneticLineCatalog[]
+
+  @@map("breeder_company")
+}
+
+model GeneticLineCatalog {
+  id               String          @id @default(uuid())
+  breederCompanyId String          @map("breeder_company_id")
+  speciesId        String          @map("species_id")
+  code             String?         @unique
+  name             String
+  isActive         Boolean         @default(true) @map("is_active")
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  breederCompany   BreederCompany  @relation(fields: [breederCompanyId], references: [id], onDelete: Restrict)
+  species          SpeciesCatalog  @relation(fields: [speciesId], references: [id], onDelete: Restrict)
+
+  @@unique([breederCompanyId, name])
+  @@index([speciesId])
+  @@map("genetic_line_catalog")
+}
+
+model StandardSchema {
+  id               String   @id @default(uuid())
+  code             String   @unique
+  displayName      String   @map("display_name")
+  dimTypeDefault   DimType  @map("dim_type_default")
+  csvColumnsJson   Json     @map("csv_columns_json")
+  payloadSchemaJson Json    @map("payload_schema_json")
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  sets             StandardSet[]
+
+  @@map("standard_schema")
+}
+
+model SourceDocument {
+  id        String   @id @default(uuid())
+  title     String?
+  doi       String?
+  url       String?
+  fileHash  String?
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("source_documents")
+}
+
+model StandardSet {
+  id               String       @id @default(uuid())
+  name             String
+
+  setType          SetType
+  unitSystem       UnitSystem
+  sex              Sex
+
+  scope            Scope
+  tenantId         String?      @map("tenant_id")
+  farmId           String?      @map("farm_id")
+  houseId          String?      @map("house_id")
+  flockId          String?      @map("flock_id")
+
+  speciesId        String       @map("species_id")
+  geneticLineId    String?      @map("genetic_line_id")
+  standardSchemaId String       @map("standard_schema_id")
+
+  versionTag       String
+  isActive         Boolean      @default(false)
+
+  derivedFromSetId String?
+  adjustmentJson   Json?
+
+  sourceDocumentId String?
+
+  dayStart         Int?
+  dayEnd           Int?
+  isDaily          Boolean      @default(true)
+
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  species          SpeciesCatalog @relation(fields: [speciesId], references: [id], onDelete: Restrict)
+  geneticLine      GeneticLineCatalog? @relation(fields: [geneticLineId], references: [id], onDelete: SetNull)
+  standardSchema   StandardSchema @relation(fields: [standardSchemaId], references: [id], onDelete: Restrict)
+  sourceDocument   SourceDocument? @relation(fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+
+  derivedFrom      StandardSet? @relation("DerivedFrom", fields: [derivedFromSetId], references: [id], onDelete: SetNull)
+  derivedTo        StandardSet[] @relation("DerivedFrom")
+
+  rows             StandardRow[]
+  importJobs       ImportJob[]
+
+  @@index([speciesId, geneticLineId, standardSchemaId, isActive, scope, tenantId, farmId, houseId, flockId])
+  @@index([tenantId, farmId, houseId, flockId])
+  @@index([standardSchemaId])
+  @@map("standard_sets")
+}
+
+model StandardRow {
+  id            String      @id @default(uuid())
+  setId         String
+  rowKey        String
+  dimType       DimType
+  dimFrom       Float
+  dimTo         Float?
+  phase         String?
+  payloadJson   Json
+  isInterpolated Boolean    @default(false)
+  note          String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  set           StandardSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+  metrics       StandardRowMetric[]
+
+  @@unique([setId, rowKey])
+  @@index([setId, dimType, dimFrom])
+  @@map("standard_rows")
+}
+
+model StandardRowMetric {
+  id        String      @id @default(uuid())
+  rowId     String
+  metricKey String
+  valueJson Json
+  createdAt DateTime    @default(now())
+
+  row       StandardRow @relation(fields: [rowId], references: [id], onDelete: Cascade)
+
+  @@unique([rowId, metricKey])
+  @@index([metricKey])
+  @@map("standard_row_metrics")
+}
+
+model ImportJob {
+  id          String        @id @default(uuid())
+  setId       String?
+  status      ImportJobStatus @default(DRAFT)
+  filename    String
+  fileHash    String?
+  uploadedBy  String?
+  uploadedAt  DateTime      @default(now())
+  dryRun      Boolean       @default(true)
+  summaryJson Json?
+  errorJson   Json?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  set         StandardSet?  @relation(fields: [setId], references: [id], onDelete: SetNull)
+  errors      ImportJobError[]
+
+  @@index([status, uploadedAt(sort: Desc)])
+  @@index([setId])
+  @@map("import_jobs")
+}
+
+model ImportJobError {
+  id        String   @id @default(uuid())
+  jobId     String
+  line      Int?
+  column    String?
+  message   String
+  createdAt DateTime @default(now())
+
+  job       ImportJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@map("import_job_errors")
+}

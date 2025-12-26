@@ -106,55 +106,6 @@ class AnalyticsDb:
             await conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS feeding_kpi_daily (
-                  tenant_id TEXT NOT NULL,
-                  farm_id TEXT,
-                  barn_id TEXT NOT NULL,
-                  batch_id TEXT,
-                  date DATE NOT NULL,
-                  animal_count INTEGER,
-                  avg_weight_kg DOUBLE PRECISION,
-                  biomass_kg DOUBLE PRECISION,
-                  weight_gain_kg DOUBLE PRECISION,
-                  total_feed_kg DOUBLE PRECISION,
-                  fcr DOUBLE PRECISION,
-                  adg_kg DOUBLE PRECISION,
-                  sgr_pct DOUBLE PRECISION,
-                  intake_missing_flag BOOLEAN DEFAULT FALSE,
-                  weight_missing_flag BOOLEAN DEFAULT FALSE,
-                  quality_flag BOOLEAN DEFAULT TRUE,
-                  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-                  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-                  PRIMARY KEY (tenant_id, barn_id, batch_id, date)
-                );
-                """
-            )
-
-            await conn.execute(
-                """
-                CREATE INDEX IF NOT EXISTS feeding_kpi_daily_tenant_barn_date_idx
-                  ON feeding_kpi_daily(tenant_id, barn_id, date DESC);
-                """
-            )
-
-            await conn.execute(
-                """
-                CREATE INDEX IF NOT EXISTS feeding_kpi_daily_tenant_farm_barn_date_idx
-                  ON feeding_kpi_daily(tenant_id, farm_id, barn_id, date DESC);
-                """
-            )
-
-            await conn.execute(
-                """
-                CREATE INDEX IF NOT EXISTS feeding_kpi_daily_tenant_barn_batch_date_idx
-                  ON feeding_kpi_daily(tenant_id, barn_id, batch_id, date DESC);
-                """
-            )
-
-            # unique constraint above covers idempotency per source event
-
-            await conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS feeding_kpi_daily (
                   id TEXT PRIMARY KEY,
                   tenant_id TEXT NOT NULL,
                   farm_id TEXT NOT NULL DEFAULT '',

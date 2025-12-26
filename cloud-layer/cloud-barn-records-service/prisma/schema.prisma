@@ -233,6 +233,12 @@ model BarnGeneticProfile {
   id                String    @id @default(uuid())
   tenantId          String    @map("tenant_id")
   batchId           String    @map("batch_id")
+  speciesCode       String    @default("chicken") @map("species_code") @db.Text
+  geneticLineCode   String?   @map("genetic_line_code") @db.Text
+  growthTargetSetId String?   @map("growth_target_set_id") @db.Uuid
+  envTargetSetId    String?   @map("env_target_set_id") @db.Uuid
+  lightingTargetSetId String? @map("lighting_target_set_id") @db.Uuid
+  ventilationTargetSetId String? @map("ventilation_target_set_id") @db.Uuid
   strain            String?   @db.Text
   breedLine         String?   @map("breed_line") @db.Text
   supplier          String?   @db.Text
