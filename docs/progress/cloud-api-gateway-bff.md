@@ -198,6 +198,39 @@ curl "http://localhost:5125/api/v1/dashboard/barns/$barnId" `
   -H "x-request-id: $(New-Guid)"
 ```
 
+### Notifications (in-app)
+
+```powershell
+$tenantId = "test-tenant-001"
+
+# Inbox (current user/roles)
+curl "http://localhost:5125/api/v1/notifications/inbox?tenantId=$tenantId&limit=25" `
+  -H "Authorization: Bearer $token" `
+  -H "x-request-id: $(New-Guid)"
+
+# History (audit / all channels)
+curl "http://localhost:5125/api/v1/notifications/history?tenantId=$tenantId&limit=25" `
+  -H "Authorization: Bearer $token" `
+  -H "x-request-id: $(New-Guid)"
+
+# Send (RBAC: tenant_admin, farm_manager)
+curl "http://localhost:5125/api/v1/notifications/send?tenantId=$tenantId" `
+  -Method POST `
+  -H "Authorization: Bearer $token" `
+  -H "x-request-id: $(New-Guid)" `
+  -H "idempotency-key: TEST:$tenantId:1" `
+  -ContentType "application/json" `
+  -Body (@{
+    tenantId = $tenantId
+    severity = "info"
+    channel  = "in_app"
+    title    = "Test"
+    message  = "Hello"
+    externalRef = "TEST:1"
+    targets = @(@{ type = "role"; value = "tenant_admin" })
+  } | ConvertTo-Json -Depth 5)
+```
+
 ### Alerts
 
 ```powershell

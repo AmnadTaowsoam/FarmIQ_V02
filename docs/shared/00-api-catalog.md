@@ -1,7 +1,7 @@
 Purpose: Provide a single catalog of all FarmIQ APIs across services (single source of truth).  
 Scope: Service purpose, base path (`/api`), auth expectations, core endpoints, and `/api-docs` location.  
 Owner: FarmIQ Platform Team  
-Last updated: 2025-12-17  
+Last updated: 2025-12-27  
 
 ---
 
@@ -252,6 +252,18 @@ All FarmIQ services must follow `shared/01-api-standards.md`:
   - `GET /api/v1/dashboard/farms/{farmId}`
   - `GET /api/v1/dashboard/barns/{barnId}`
   - `GET /api/v1/dashboard/alerts`
+  - Notifications (dashboard; proxy to `cloud-notification-service`)
+    - `GET /api/v1/dashboard/notifications/inbox`
+    - `GET /api/v1/dashboard/notifications/history`
+    - `POST /api/v1/dashboard/notifications/send` (optional; strict RBAC)
+  - Notifications (generic; normalized list shape)
+    - `GET /api/v1/notifications/inbox`
+    - `GET /api/v1/notifications/history`
+    - `POST /api/v1/notifications/send`
+  - Insights (planned; proxy to analytics orchestrator)
+    - `POST /api/v1/dashboard/insights/generate`
+    - `GET /api/v1/dashboard/insights`
+    - `GET /api/v1/dashboard/insights/{insightId}`
 - **Feeding surfaces**: Canonical proxy/aggregation is `GET /api/v1/kpi/feeding` for FE dashboards.
 - **Data ownership**: None (aggregation layer)
 - **Implementation notes**: `boilerplates/Backend-node`
@@ -428,7 +440,7 @@ All FarmIQ services must follow `shared/01-api-standards.md`:
 
 ### `cloud-analytics-service`
 
-- **Purpose**: Consume events and compute anomalies/forecasts/KPIs.
+- **Purpose**: Consume events and compute anomalies/forecasts/KPIs; also orchestrate synchronous insights generation for dashboard use cases.
 - **Base path**: `/api`
 - **Auth**: Internal-only or JWT + RBAC (depending on exposure).
 - **/api-docs**: `GET /api-docs`
@@ -441,7 +453,50 @@ All FarmIQ services must follow `shared/01-api-standards.md`:
   - `/api/v1/analytics/anomalies`
   - `/api/v1/analytics/forecasts`
   - `/api/v1/analytics/kpi/growth-deviation` (resolves standards via `cloud-standards-service` + batch genetics via `cloud-barn-records-service`)
+  - Orchestrator (MVP)
+    - `POST /api/v1/analytics/insights/generate`
+    - `GET /api/v1/analytics/insights`
+    - `GET /api/v1/analytics/insights/{insightId}`
 - **Data ownership**: analytics tables
+- **Contract doc**: `docs/contracts/cloud-analytics-service.contract.md`
+- **Implementation notes**: `boilerplates/Backend-python`
+
+### `cloud-llm-insights-service`
+
+- **Purpose**: Generate structured "insights" from analytics feature summaries (no raw telemetry).
+- **Base path**: `/api`
+- **Auth**: Internal-only or JWT + RBAC (recommended to forward user JWT via analytics orchestrator).
+- **/api-docs**: `GET /api-docs`
+- **Core endpoints (MVP)**
+  - `GET /api/health`
+  - `GET /api/ready` (recommended)
+  - `GET /api-docs`
+  - `GET /api-docs/openapi.json` (or `openapi.yaml`)
+  - `POST /api/v1/llm-insights/analyze`
+  - `GET /api/v1/llm-insights/history`
+  - `GET /api/v1/llm-insights/{insightId}`
+  - `GET /api/v1/llm-insights/templates` (optional)
+- **Data ownership**: `llm_insight`, `llm_insight_run` (+ `llm_prompt_template` optional)
+- **Contract doc**: `docs/contracts/cloud-llm-insights-service.contract.md`
+- **Implementation notes**: `boilerplates/Backend-python`
+
+### `cloud-ml-model-service` (optional)
+
+- **Purpose**: Host/version ML models and serve predictions/forecasts (regression, time-series, forecasting).
+- **Base path**: `/api`
+- **Auth**: Internal-only or JWT + RBAC.
+- **/api-docs**: `GET /api-docs`
+- **Core endpoints (MVP)**
+  - `GET /api/health`
+  - `GET /api/ready` (recommended)
+  - `GET /api-docs`
+  - `GET /api-docs/openapi.json` (or `openapi.yaml`)
+  - `POST /api/v1/ml/predict`
+  - `POST /api/v1/ml/forecast`
+  - `GET /api/v1/ml/models`
+  - `GET /api/v1/ml/models/{modelKey}`
+- **Data ownership**: optional `ml_model_registry`, `ml_prediction_log`
+- **Contract doc**: `docs/contracts/cloud-ml-model-service.contract.md`
 - **Implementation notes**: `boilerplates/Backend-python`
 
 ### `cloud-config-rules-service`
@@ -482,18 +537,39 @@ All FarmIQ services must follow `shared/01-api-standards.md`:
 
 ### `cloud-notification-service`
 
-- **Purpose**: Deliver notifications from anomalies/rules (MVP: webhook).
+- **Purpose**: In-app notifications and delivery jobs (queue-backed for non in-app channels).
 - **Base path**: `/api`
-- **Auth**: JWT + RBAC (for history); internal service auth (for send).
+- **Auth**: `Authorization: Bearer <jwt>` + RBAC; tenant scope primarily from JWT claim `tenant_id` (fallback `x-tenant-id` / `tenantId` in dev).
 - **/api-docs**: `GET /api-docs`
 - **Core endpoints**
   - `GET /api/health`
   - `GET /api/ready` (recommended)
   - `GET /api-docs`
-  - `POST /api/v1/notifications/send` - Direct send (MVP: webhook)
-  - `GET /api/v1/notifications/history` - Notification history
-- **Data ownership**: `notifications`
-- **Async**: Consumes `notification.jobs` queue from RabbitMQ
+  - `GET /api-docs/openapi.json` (or `openapi.yaml`)
+  - `POST /api/v1/notifications/send` - Create notification (idempotent via `Idempotency-Key` header; supports `externalRef`)
+  - `GET /api/v1/notifications/history` - List notification history (cursor pagination: `{items,nextCursor}`)
+  - `GET /api/v1/notifications/inbox` - List in-app notifications for current user/roles/topics (cursor pagination: `{items,nextCursor}`)
+- **Not supported (yet)**: `GET /api/v1/notifications/{id}` (no HTTP endpoint in current contract)
+- **RBAC (as implemented)**:
+  - Send: `tenant_admin`, `farm_manager`
+  - History/Inbox: `tenant_admin`, `farm_manager`, `house_operator`, `viewer`
+- **Targets (as implemented)**: `user | role | topic` targets are evaluated against JWT-derived `userId` + `roles` and optional `topic` query filter.
+- **Data ownership**: `notifications`, `notification_targets`, `notification_delivery_attempts`
+- **Async**: Non-`in_app` notifications are enqueued to RabbitMQ jobs; `in_app` is stored as `sent` immediately.
+- **Contract notes**:
+  - OpenAPI: `cloud-layer/cloud-notification-service/openapi.yaml`
+  - Canonical payload mapping: `docs/contracts/notifications.payload.md`
+- **Examples**
+  - Create (in-app):
+    - `POST /api/v1/notifications/send` with header `Idempotency-Key: <key>`
+    - Body:
+      - `{ "tenantId":"uuid", "severity":"info|warning|critical", "channel":"in_app", "title":"...", "message":"...", "externalRef":"...", "targets":[{"type":"role","value":"tenant_admin"}] }`
+    - Response:
+      - `{ "notificationId":"uuid", "status":"sent|created|queued|failed", "createdAt":"ISO8601" }`
+  - Inbox list:
+    - `GET /api/v1/notifications/inbox?topic=&cursor=&limit=`
+    - Response:
+      - `{ "items":[...], "nextCursor":"string|null" }`
 - **Implementation notes**: `boilerplates/Backend-node`
 
 ### `cloud-reporting-export-service`
@@ -537,5 +613,20 @@ All FarmIQ services must follow `shared/01-api-standards.md`:
 
 - This catalog must be updated whenever APIs are added/changed.
 - Prefer routing dashboard calls through `cloud-api-gateway-bff` to minimize frontend coupling.
+
+---
+
+## Doc Change Summary (2025-12-27)
+
+- Added catalog entries for `cloud-llm-insights-service` and optional `cloud-ml-model-service`.
+- Added analytics orchestrator endpoints and planned BFF dashboard insights endpoints (proxying to analytics).
+- Updated `cloud-notification-service` endpoints/semantics (send/history/inbox, targets, cursor pagination) from the real service OpenAPI and schema.
+
+## Next Implementation Steps
+
+1) Implement `cloud-llm-insights-service`.  
+2) Add orchestrator endpoints to `cloud-analytics-service`.  
+3) Add BFF proxy endpoints (`/api/v1/dashboard/insights/*`).  
+4) Implement `cloud-ml-model-service` (optional).  
 
 

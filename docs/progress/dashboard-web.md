@@ -68,7 +68,7 @@ pnpm -C apps/dashboard-web add @mui/x-data-grid
 
 # Start dev server
 pnpm -C apps/dashboard-web dev
-# Result: Server running at http://localhost:5130
+# Result: Server running at http://localhost:5142
 ```
 
 **Outcome**: ✅ Install works reliably, dev server starts successfully

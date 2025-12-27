@@ -86,4 +86,28 @@ export function jwtAuthMiddleware(
   }
 }
 
+/**
+ * RBAC middleware - checks if user has required role(s).
+ * Note: In dev mode, missing roles are allowed (consistent with jwtAuthMiddleware behavior).
+ */
+export function requireRole(...allowedRoles: string[]) {
+  return (_req: Request, res: Response, next: NextFunction): void => {
+    const roles = res.locals.roles || []
+    const hasRole = allowedRoles.some((role) => roles.includes(role))
+
+    if (!hasRole && process.env.NODE_ENV === 'production') {
+      res.status(403).json({
+        error: {
+          code: 'FORBIDDEN',
+          message: `Required role: ${allowedRoles.join(' or ')}`,
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+      return
+    }
+
+    next()
+  }
+}
+
 

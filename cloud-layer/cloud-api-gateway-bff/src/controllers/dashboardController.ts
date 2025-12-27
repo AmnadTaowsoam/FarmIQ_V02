@@ -89,7 +89,11 @@ export async function getOverview(req: Request, res: Response) {
 
     const headers = buildDownstreamHeaders(req, tenantId)
     const window = resolveTimeWindow(req)
-    const data = await fetchOverview({ tenantId, headers, ...window })
+    const farmId = (req.query.farmId as string | undefined) || (req.query.farm_id as string | undefined)
+    const barnId = (req.query.barnId as string | undefined) || (req.query.barn_id as string | undefined)
+    const batchId = (req.query.batchId as string | undefined) || (req.query.batch_id as string | undefined)
+
+    const data = await fetchOverview({ tenantId, farmId, barnId, batchId, headers, ...window })
     return res.json(data)
   } catch (error) {
     logger.error('Error in getOverview', { error })

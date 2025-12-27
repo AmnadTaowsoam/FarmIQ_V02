@@ -1,7 +1,7 @@
 Purpose: High-level entry point for FarmIQ platform documentation.  
 Scope: Overview of layers, services, and links to detailed design docs.  
 Owner: FarmIQ Architecture Team  
-Last updated: 2025-12-17  
+Last updated: 2025-12-27  
 
 ---
 
@@ -19,11 +19,18 @@ FarmIQ is organized into **three layers**:
 
 ## Table of contents
 
+- [Start here](00-START-HERE.md)
 - [Architecture](01-architecture.md)
 - [Domain and multi-tenant model](02-domain-multi-tenant-data-model.md)
 - [Messaging (RabbitMQ)](03-messaging-rabbitmq.md)
 - [Database design](04-database-design.md)
 - [Topic normalization and routing](topic-bridge.md)
+- [Roadmap](ROADMAP.md)
+- [Decisions](DECISIONS.md)
+- Evidence
+  - [Evidence index](evidence/README.md)
+  - [Notifications evidence](evidence/NOTIFICATIONS_EVIDENCE.md)
+  - [Insights evidence](evidence/INSIGHTS_EVIDENCE.md)
 - Shared
   - [API catalog](shared/00-api-catalog.md)
   - [Contacts and escalation](shared/00-contacts-escalation.md)
@@ -47,6 +54,12 @@ FarmIQ is organized into **three layers**:
   - [Cloud services](cloud-layer/01-cloud-services.md)
   - [Dashboard](cloud-layer/02-dashboard.md)
   - [Dashboard Pages Design](cloud-layer/03-dashboard-pages-design.md)
+  - Runbooks: `docs/cloud-layer/RUNBOOKS.md`
+  - Service pages (selected):
+    - `docs/cloud-layer/cloud-api-gateway-bff.md`
+    - `docs/cloud-layer/cloud-notification-service.md`
+    - `docs/cloud-layer/cloud-analytics-service.md`
+    - `docs/cloud-layer/cloud-llm-insights-service.md`
   - Dashboard Documentation Pack
     - [📋 Docs Freeze Summary](cloud-layer/dashboard/00-DOCS-FREEZE-SUMMARY.md) ⭐ START HERE
     - [📚 README](cloud-layer/dashboard/README.md)
@@ -141,11 +154,14 @@ Each service-level document below explicitly maps to one of these boilerplates.
 ## Document map
 
 - **Root**
+  - [00-START-HERE](00-START-HERE.md): fast entrypoint + “how to run” links.
   - [00-index](00-index.md)
   - [01-architecture](01-architecture.md): Overall architecture, responsibilities, and NFRs.
   - [02-domain-multi-tenant-data-model](02-domain-multi-tenant-data-model.md): Tenant model and data strategy.
   - [03-messaging-rabbitmq](03-messaging-rabbitmq.md): RabbitMQ design and message envelope.
   - [04-database-design](04-database-design.md): Database design checklist and ownership map.
+  - [ROADMAP](ROADMAP.md): phased plan (current vs next vs later) with measurable exit criteria.
+  - [DECISIONS](DECISIONS.md): short decision log (ADR-style).
 
 - **Shared (cross-layer)**
   - [shared/00-api-catalog](shared/00-api-catalog.md): Single source of truth for endpoints.
@@ -173,6 +189,7 @@ Each service-level document below explicitly maps to one of these boilerplates.
   - [cloud-layer/02-dashboard](cloud-layer/02-dashboard.md)
   - [cloud-layer/03-dashboard-pages-design](cloud-layer/03-dashboard-pages-design.md)
   - [cloud-layer/04-dashboard-design-system](cloud-layer/04-dashboard-design-system.md)
+  - [cloud-layer/RUNBOOKS](cloud-layer/RUNBOOKS.md)
   - **cloud-layer/dashboard/** (Dashboard Documentation Pack)
     - [dashboard/00-dashboard-expanded-scope](cloud-layer/dashboard/00-dashboard-expanded-scope.md)
     - [dashboard/01-information-architecture](cloud-layer/dashboard/01-information-architecture.md)

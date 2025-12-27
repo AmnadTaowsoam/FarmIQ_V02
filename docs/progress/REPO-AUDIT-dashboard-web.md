@@ -339,7 +339,7 @@ curl -H "Authorization: Bearer $token" http://localhost:5120/api/v1/registry/far
 cd apps/dashboard-web
 npm install
 npm run dev
-# Should start on http://localhost:5130 (check vite.config.ts:13)
+# Should start on http://localhost:5142 (check vite.config.ts)
 ```
 
 ### Check Environment Variables

@@ -11,12 +11,18 @@ import weighvisionRoutes from './weighvisionRoutes'
 import reportingRoutes from './reportingRoutes'
 import opsRoutes from './opsRoutes'
 import standardsRoutes from './standardsRoutes'
+import telemetryRoutes from './telemetryRoutes'
+import notificationRoutes from './notificationRoutes'
+import dashboardNotificationRoutes from './dashboardNotificationRoutes'
 
 /**
  *
  * @param {Express} app - The Express app instance to configure.
  */
 export function setupRoutes(app: Express): void {
+  // Dashboard notification routes (must be registered before /api/v1/dashboard)
+  app.use('/api/v1/dashboard/notifications', dashboardNotificationRoutes)
+
   // BFF dashboard routes
   app.use('/api/v1/dashboard', dashboardRoutes)
 
@@ -38,6 +44,9 @@ export function setupRoutes(app: Express): void {
   // Sensor module proxy routes (part of tenant-registry)
   app.use('/api/v1', sensorsRoutes)
 
+  // Telemetry service proxy routes
+  app.use('/api/v1/telemetry', telemetryRoutes)
+
   // WeighVision read model proxy routes
   app.use('/api/v1/weighvision', weighvisionRoutes)
 
@@ -49,6 +58,9 @@ export function setupRoutes(app: Express): void {
 
   // Standards service proxy routes
   app.use('/api/v1/standards', standardsRoutes)
+
+  // Notification service proxy routes
+  app.use('/api/v1/notifications', notificationRoutes)
 
   // Keep existing public variable route for frontend config
   app.use('/api/public-variable-frontend', publicVariableRoutes)

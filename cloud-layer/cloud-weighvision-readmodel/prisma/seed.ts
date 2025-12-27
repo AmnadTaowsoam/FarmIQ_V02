@@ -33,6 +33,10 @@ function getAllSessionIds(): string[] {
   })
 }
 
+function pick<T>(items: T[], index: number): T {
+  return items[index % items.length]
+}
+
 // Guard: prevent seed in production
 if (process.env.NODE_ENV === 'production' && !process.env.ALLOW_SEED_IN_PROD) {
   console.error('ERROR: Seed is not allowed in production!')
@@ -66,21 +70,62 @@ async function main() {
 
   const sessionCount = Math.max(SEED_COUNT, 30)
   const sessionIds = getAllSessionIds()
-  const farmIds = [SEED_IDS.FARM_1A, SEED_IDS.FARM_1B, SEED_IDS.FARM_2A, SEED_IDS.FARM_2B]
-  const barnIds = [SEED_IDS.BARN_1A_1, SEED_IDS.BARN_1A_2, SEED_IDS.BARN_1B_1, SEED_IDS.BARN_1B_2, SEED_IDS.BARN_2A_1, SEED_IDS.BARN_2A_2]
-  const batchIds = [SEED_IDS.BATCH_1A_1, SEED_IDS.BATCH_1A_2, SEED_IDS.BATCH_1B_1, SEED_IDS.BATCH_1B_2]
-  const stationIds = [SEED_IDS.STATION_1A_1, SEED_IDS.STATION_1A_2, SEED_IDS.STATION_1B_1, SEED_IDS.STATION_1B_2]
+
+  // Keep IDs consistent with tenant-registry seeds:
+  // - tenant1 owns farms 101/102 and barns 1101/1102/1201/1202
+  // - tenant2 owns farms 201/202 and barns 2101/2102 (only 2 barns in constants)
+  const tenantFarmIds: Record<string, string[]> = {
+    [SEED_IDS.TENANT_1]: [SEED_IDS.FARM_1A, SEED_IDS.FARM_1B],
+    [SEED_IDS.TENANT_2]: [SEED_IDS.FARM_2A, SEED_IDS.FARM_2B],
+  }
+
+  const tenantBarnIds: Record<string, string[]> = {
+    [SEED_IDS.TENANT_1]: [
+      SEED_IDS.BARN_1A_1,
+      SEED_IDS.BARN_1A_2,
+      SEED_IDS.BARN_1B_1,
+      SEED_IDS.BARN_1B_2,
+    ],
+    [SEED_IDS.TENANT_2]: [SEED_IDS.BARN_2A_1, SEED_IDS.BARN_2A_2],
+  }
+
+  const tenantBatchIds: Record<string, string[]> = {
+    [SEED_IDS.TENANT_1]: [
+      SEED_IDS.BATCH_1A_1,
+      SEED_IDS.BATCH_1A_2,
+      SEED_IDS.BATCH_1B_1,
+      SEED_IDS.BATCH_1B_2,
+    ],
+    // Tenant2 batch IDs are not modeled in shared constants; use the same IDs for demo purposes.
+    [SEED_IDS.TENANT_2]: [
+      SEED_IDS.BATCH_1A_1,
+      SEED_IDS.BATCH_1A_2,
+      SEED_IDS.BATCH_1B_1,
+      SEED_IDS.BATCH_1B_2,
+    ],
+  }
+
+  const tenantStationIds: Record<string, string[]> = {
+    [SEED_IDS.TENANT_1]: [SEED_IDS.STATION_1A_1, SEED_IDS.STATION_1A_2, SEED_IDS.STATION_1B_1, SEED_IDS.STATION_1B_2],
+    [SEED_IDS.TENANT_2]: [SEED_IDS.STATION_1A_1, SEED_IDS.STATION_1A_2, SEED_IDS.STATION_1B_1, SEED_IDS.STATION_1B_2],
+  }
+
   const statuses = ['RUNNING', 'FINALIZED', 'CANCELLED']
   const now = new Date()
+  const perTenantIndex: Record<string, number> = {
+    [SEED_IDS.TENANT_1]: 0,
+    [SEED_IDS.TENANT_2]: 0,
+  }
 
   // Create WeighVisionSessions with related data
   for (let i = 0; i < sessionCount; i++) {
     const tenantId = i % 2 === 0 ? SEED_IDS.TENANT_1 : SEED_IDS.TENANT_2
-    const farmId = farmIds[i % farmIds.length]
-    const barnId = barnIds[i % barnIds.length]
-    const batchId = batchIds[i % batchIds.length]
-    const stationId = stationIds[i % stationIds.length]
-    const sessionId = sessionIds[i % sessionIds.length]
+    const idx = perTenantIndex[tenantId]++
+    const farmId = pick(tenantFarmIds[tenantId], idx)
+    const barnId = pick(tenantBarnIds[tenantId], idx)
+    const batchId = pick(tenantBatchIds[tenantId], idx)
+    const stationId = pick(tenantStationIds[tenantId], idx)
+    const sessionId = pick(sessionIds, idx)
     const status = statuses[i % statuses.length]
     const startedAt = new Date(now.getTime() - (i * 2 * 60 * 60 * 1000))
     const endedAt = status === 'FINALIZED' ? new Date(startedAt.getTime() + (30 + (i % 30)) * 60 * 1000) : null
@@ -147,12 +192,18 @@ async function main() {
 
   console.log(`Created ${sessionCount} weighvision sessions with related data`)
 
+  // Reset counters so aggregates cover every tenant's farms/barns consistently.
+  perTenantIndex[SEED_IDS.TENANT_1] = 0
+  perTenantIndex[SEED_IDS.TENANT_2] = 0
+
   for (let i = 0; i < sessionCount; i++) {
     const tenantId = i % 2 === 0 ? SEED_IDS.TENANT_1 : SEED_IDS.TENANT_2
-    const farmId = farmIds[i % farmIds.length]
-    const barnId = barnIds[i % barnIds.length]
-    const batchId = batchIds[i % batchIds.length]
-    const recordDate = new Date(now.getTime() - (i * 24 * 60 * 60 * 1000))
+    const idx = perTenantIndex[tenantId]++
+    const farmId = pick(tenantFarmIds[tenantId], idx)
+    const barnId = pick(tenantBarnIds[tenantId], idx)
+    const batchId = pick(tenantBatchIds[tenantId], idx)
+    // Use per-tenant index so each tenant has a contiguous daily series in the recent window.
+    const recordDate = new Date(now.getTime() - (idx * 24 * 60 * 60 * 1000))
     recordDate.setHours(0, 0, 0, 0)
 
     await prisma.weighVisionWeightAggregate.create({
@@ -162,12 +213,12 @@ async function main() {
         barnId,
         batchId,
         recordDate,
-        avgWeightKg: new Prisma.Decimal(1.0 + (i % 20) * 0.1),
-        p10WeightKg: new Prisma.Decimal(0.9 + (i % 20) * 0.1),
-        p50WeightKg: new Prisma.Decimal(1.0 + (i % 20) * 0.1),
-        p90WeightKg: new Prisma.Decimal(1.1 + (i % 20) * 0.1),
-        sampleCount: 50 + (i % 100),
-        qualityPassRate: new Prisma.Decimal(75 + (i % 20)),
+        avgWeightKg: new Prisma.Decimal(1.0 + (idx % 20) * 0.1),
+        p10WeightKg: new Prisma.Decimal(0.9 + (idx % 20) * 0.1),
+        p50WeightKg: new Prisma.Decimal(1.0 + (idx % 20) * 0.1),
+        p90WeightKg: new Prisma.Decimal(1.1 + (idx % 20) * 0.1),
+        sampleCount: 50 + (idx % 100),
+        qualityPassRate: new Prisma.Decimal(75 + (idx % 20)),
       },
     })
   }

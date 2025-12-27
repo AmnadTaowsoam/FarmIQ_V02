@@ -3,7 +3,7 @@
 **Purpose**: Define the implementation strategy, security model, and API contracts for the FarmIQ React Dashboard.  
 **Scope**: Integration rules between `dashboard-web` and `cloud-layer` services.  
 **Owner**: FarmIQ Frontend Team  
-**Last updated**: 2025-01-20  
+**Last updated**: 2025-12-27  
 
 ---
 
@@ -113,6 +113,56 @@ The frontend expects this exact shape for all paginated lists:
 *   **Permitted**: Network Failure, 502, 503, 504. (Max 3 retries, exponential backoff).
 *   **Forbidden**: 400, 401, 403, 404. (Do not retry logic errors).
 
+### 4.5 Insights (planned) — dashboard-web → BFF only
+
+**Rule**: `dashboard-web` MUST call **only** `cloud-api-gateway-bff` for insights generation (no direct calls to analytics/LLM/ML services).
+
+Planned BFF endpoints:
+- `POST /api/v1/dashboard/insights/generate`
+- `GET /api/v1/dashboard/insights?tenant_id=...&farm_id=...&barn_id=...&start_time=...&end_time=...&page=...&limit=...`
+- `GET /api/v1/dashboard/insights/:insightId?tenant_id=...`
+
+BFF → analytics mapping:
+- BFF `POST /api/v1/dashboard/insights/generate` proxies to `cloud-analytics-service`:
+  - `POST /api/v1/analytics/insights/generate` (see `docs/contracts/cloud-analytics-service.contract.md`)
+- `cloud-analytics-service` orchestrates downstream calls:
+  - `cloud-llm-insights-service` (required; see `docs/contracts/cloud-llm-insights-service.contract.md`)
+  - `cloud-ml-model-service` (optional; see `docs/contracts/cloud-ml-model-service.contract.md`)
+
+### 4.6 Notifications (MVP) — dashboard-web → BFF only
+
+**Rule**: `dashboard-web` MUST call **only** `cloud-api-gateway-bff` for in-app notifications.
+
+Implemented BFF endpoints (recommended for `dashboard-web`):
+- `GET /api/v1/notifications/inbox?tenantId=...&topic=&cursor=&limit=`
+- `GET /api/v1/notifications/history?tenantId=...&farmId=&barnId=&batchId=&severity=&channel=&status=&startDate=&endDate=&cursor=&limit=`
+- `POST /api/v1/notifications/send` (optional; admin only)
+
+Optional aliases (dashboard namespace):
+- `GET /api/v1/dashboard/notifications/inbox`
+- `GET /api/v1/dashboard/notifications/history`
+- `POST /api/v1/dashboard/notifications/send`
+- `POST /api/v1/dashboard/notifications/{id}/ack` (optional; requires read/ack support)
+
+BFF → notification service mapping (as implemented in `cloud-notification-service/openapi.yaml`):
+- Primary inbox listing:
+  - BFF `GET /api/v1/notifications/inbox` proxies to `GET /api/v1/notifications/inbox`.
+- Optional history listing (admin views):
+  - BFF `GET /api/v1/notifications/history` proxies to `GET /api/v1/notifications/history`.
+- Optional create (admin/system):
+  - BFF `POST /api/v1/notifications/send` proxies to `POST /api/v1/notifications/send`.
+
+Notes:
+- `cloud-notification-service` currently uses cursor pagination (`{items,nextCursor}`).
+- BFF normalizes notification list responses to `{data,meta}` for dashboard use.
+- `cloud-notification-service` does not implement unread/read tracking; `unreadOnly` and `ack` are TODO until the service supports it.
+
+Notifications UX Contract (dashboard-web):
+- Required headers: `Authorization: Bearer <jwt>`, `x-request-id: <uuid>`
+- Tenant scope: pass `tenantId` query param; BFF validates and forwards `x-tenant-id`.
+- Retry policy: retry only on network/502/503/504 (max 3); never retry 400/401/403/404.
+- Polling: refresh inbox every 60s; pause when `document.visibilityState === 'hidden'`.
+
 ---
 
 ## 5. Realtime & Refresh Strategy
@@ -171,3 +221,17 @@ For comprehensive Dashboard documentation, see the [Dashboard Documentation Pack
 - **[Ops Observability UX](dashboard/07-ops-observability-ux.md)**: Data freshness indicators, sync monitoring, and troubleshooting
 - **[ML Analytics Roadmap](dashboard/08-ml-analytics-roadmap.md)**: Data collection, export formats, drift monitoring, and implementation phases
 - **[Acceptance Checklist](dashboard/09-acceptance-checklist.md)**: Comprehensive testing checklist for release readiness
+
+---
+
+## Doc Change Summary (2025-12-27)
+
+- Added planned BFF endpoints for insights generation and explicitly mapped BFF → analytics orchestrator → LLM/ML services.
+- Added planned BFF endpoints for dashboard notifications and mapped them to `cloud-notification-service` inbox/history (unread/ack is TODO until supported).
+
+## Next Implementation Steps
+
+1) Implement `cloud-llm-insights-service`.  
+2) Add orchestrator endpoints to `cloud-analytics-service`.  
+3) Add BFF proxy endpoints and update the shared BFF OpenAPI if/when enabled.  
+4) Implement `cloud-ml-model-service` (optional).  

@@ -1,5 +1,5 @@
 # Verification script for BFF /api/v1/tenants route
-# Usage: .\verify-bff-tenants-route.ps1
+# Usage: .\scripts\verify-bff-tenants-route.ps1
 
 $BFF_URL = "http://localhost:5125"
 $TENANT_REGISTRY_URL = "http://localhost:5121"

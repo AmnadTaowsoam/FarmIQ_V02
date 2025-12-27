@@ -12,6 +12,86 @@ from app.models import AnalyticsResult
 
 logger = logging.getLogger(__name__)
 
+class InMemoryAnalyticsDb:
+    def __init__(self):
+        self._results: list[AnalyticsResult] = []
+        self._insight_refs: dict[str, dict[str, Any]] = {}
+
+    async def connect(self) -> None:
+        return None
+
+    async def close(self) -> None:
+        return None
+
+    async def ping(self) -> bool:
+        return True
+
+    async def ensure_schema(self) -> None:
+        return None
+
+    def add_result(self, result: AnalyticsResult) -> None:
+        self._results.append(result)
+
+    async def query_results_range(
+        self,
+        *,
+        tenant_id: str,
+        type_: str,
+        farm_id: Optional[str],
+        barn_id: Optional[str],
+        metric: Optional[str],
+        start_time: datetime,
+        end_time: datetime,
+        limit: int,
+    ) -> list[AnalyticsResult]:
+        limit = max(1, min(limit, 500))
+        items = [
+            r
+            for r in self._results
+            if r.tenant_id == tenant_id
+            and r.type == type_
+            and (farm_id is None or r.farm_id == farm_id)
+            and (barn_id is None or r.barn_id == barn_id)
+            and (metric is None or r.metric == metric)
+            and r.occurred_at >= start_time
+            and r.occurred_at <= end_time
+        ]
+        items.sort(key=lambda x: x.occurred_at, reverse=True)
+        return items[:limit]
+
+    async def insert_insight_ref(self, *, row: dict[str, Any]) -> None:
+        self._insight_refs[row["insight_id"]] = row
+
+    async def get_insight_ref(self, *, insight_id: str) -> Optional[dict[str, Any]]:
+        return self._insight_refs.get(insight_id)
+
+    async def list_insight_refs(
+        self,
+        *,
+        tenant_id: str,
+        farm_id: str,
+        barn_id: str,
+        start_time: datetime,
+        end_time: datetime,
+        page: int,
+        limit: int,
+    ) -> tuple[list[dict[str, Any]], int]:
+        page = max(1, page)
+        limit = max(1, min(limit, 100))
+        items = [
+            r
+            for r in self._insight_refs.values()
+            if r["tenant_id"] == tenant_id
+            and r["farm_id"] == farm_id
+            and r["barn_id"] == barn_id
+            and r["generated_at"] >= start_time
+            and r["generated_at"] <= end_time
+        ]
+        items.sort(key=lambda x: x["generated_at"], reverse=True)
+        total = len(items)
+        offset = (page - 1) * limit
+        return items[offset : offset + limit], total
+
 
 class AnalyticsDb:
     def __init__(self, database_url: str):
@@ -150,6 +230,32 @@ class AnalyticsDb:
                 """
             )
 
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS analytics_insight_ref (
+                  insight_id TEXT PRIMARY KEY,
+                  tenant_id TEXT NOT NULL,
+                  farm_id TEXT NOT NULL,
+                  barn_id TEXT NOT NULL,
+                  batch_id TEXT NULL,
+                  start_time TIMESTAMPTZ NOT NULL,
+                  end_time TIMESTAMPTZ NOT NULL,
+                  mode TEXT NOT NULL,
+                  generated_at TIMESTAMPTZ NOT NULL,
+                  summary TEXT NOT NULL,
+                  confidence DOUBLE PRECISION NOT NULL,
+                  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                );
+                """
+            )
+
+            await conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS analytics_insight_ref_tenant_scope_time_idx
+                  ON analytics_insight_ref(tenant_id, farm_id, barn_id, generated_at DESC);
+                """
+            )
+
     async def try_mark_event_seen(self, tenant_id: str, event_id: str) -> bool:
         assert self._pool is not None
         async with self._pool.acquire() as conn:
@@ -279,7 +385,168 @@ class AnalyticsDb:
 
         async with self._pool.acquire() as conn:
             rows = await conn.fetch(sql, *args)
-        return [AnalyticsResult(**dict(r)) for r in rows]
+        results: list[AnalyticsResult] = []
+        for r in rows:
+            item = dict(r)
+            payload = item.get("payload")
+            # asyncpg returns JSON/JSONB as str unless a codec is registered.
+            if isinstance(payload, str):
+                try:
+                    payload = json.loads(payload)
+                except json.JSONDecodeError:
+                    payload = {}
+            item["payload"] = payload if isinstance(payload, dict) else {}
+            results.append(AnalyticsResult(**item))
+        return results
+
+    async def query_results_range(
+        self,
+        *,
+        tenant_id: str,
+        type_: str,
+        farm_id: Optional[str],
+        barn_id: Optional[str],
+        metric: Optional[str],
+        start_time: datetime,
+        end_time: datetime,
+        limit: int,
+    ) -> list[AnalyticsResult]:
+        assert self._pool is not None
+        limit = max(1, min(limit, 500))
+        where = ["tenant_id = $1", "type = $2", "occurred_at >= $3", "occurred_at <= $4"]
+        args: list[Any] = [tenant_id, type_, start_time, end_time]
+        idx = 5
+
+        if farm_id:
+            where.append(f"farm_id = ${idx}")
+            args.append(farm_id)
+            idx += 1
+        if barn_id:
+            where.append(f"barn_id = ${idx}")
+            args.append(barn_id)
+            idx += 1
+        if metric:
+            where.append(f"metric = ${idx}")
+            args.append(metric)
+            idx += 1
+
+        sql = f"""
+          SELECT id, type, tenant_id, farm_id, barn_id, device_id, session_id,
+                 metric, value, unit, "window", occurred_at, created_at, source_event_id, trace_id, payload
+          FROM analytics_results
+          WHERE {" AND ".join(where)}
+          ORDER BY occurred_at DESC
+          LIMIT {limit}
+        """
+
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(sql, *args)
+        results: list[AnalyticsResult] = []
+        for r in rows:
+            item = dict(r)
+            payload = item.get("payload")
+            if isinstance(payload, str):
+                try:
+                    payload = json.loads(payload)
+                except json.JSONDecodeError:
+                    payload = {}
+            item["payload"] = payload if isinstance(payload, dict) else {}
+            results.append(AnalyticsResult(**item))
+        return results
+
+    async def insert_insight_ref(self, *, row: dict[str, Any]) -> None:
+        assert self._pool is not None
+        async with self._pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO analytics_insight_ref
+                  (insight_id, tenant_id, farm_id, barn_id, batch_id,
+                   start_time, end_time, mode, generated_at, summary, confidence)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+                ON CONFLICT (insight_id) DO NOTHING
+                """,
+                row["insight_id"],
+                row["tenant_id"],
+                row["farm_id"],
+                row["barn_id"],
+                row.get("batch_id"),
+                row["start_time"],
+                row["end_time"],
+                row["mode"],
+                row["generated_at"],
+                row["summary"],
+                row["confidence"],
+            )
+
+    async def get_insight_ref(self, *, insight_id: str) -> Optional[dict[str, Any]]:
+        assert self._pool is not None
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT insight_id, tenant_id, farm_id, barn_id, batch_id,
+                       start_time, end_time, mode, generated_at, summary, confidence, created_at
+                FROM analytics_insight_ref
+                WHERE insight_id = $1
+                """,
+                insight_id,
+            )
+            return dict(row) if row else None
+
+    async def list_insight_refs(
+        self,
+        *,
+        tenant_id: str,
+        farm_id: str,
+        barn_id: str,
+        start_time: datetime,
+        end_time: datetime,
+        page: int,
+        limit: int,
+    ) -> tuple[list[dict[str, Any]], int]:
+        assert self._pool is not None
+        page = max(1, page)
+        limit = max(1, min(limit, 100))
+        offset = (page - 1) * limit
+
+        async with self._pool.acquire() as conn:
+            total = await conn.fetchval(
+                """
+                SELECT COUNT(*)
+                FROM analytics_insight_ref
+                WHERE tenant_id = $1
+                  AND farm_id = $2
+                  AND barn_id = $3
+                  AND generated_at >= $4
+                  AND generated_at <= $5
+                """,
+                tenant_id,
+                farm_id,
+                barn_id,
+                start_time,
+                end_time,
+            )
+
+            rows = await conn.fetch(
+                """
+                SELECT insight_id, mode, summary, confidence, generated_at
+                FROM analytics_insight_ref
+                WHERE tenant_id = $1
+                  AND farm_id = $2
+                  AND barn_id = $3
+                  AND generated_at >= $4
+                  AND generated_at <= $5
+                ORDER BY generated_at DESC
+                LIMIT $6 OFFSET $7
+                """,
+                tenant_id,
+                farm_id,
+                barn_id,
+                start_time,
+                end_time,
+                limit,
+                offset,
+            )
+            return [dict(r) for r in rows], int(total or 0)
 
     def _normalize_key(self, farm_id: Optional[str], batch_id: Optional[str]) -> tuple[str, str]:
         return farm_id or "", batch_id or ""

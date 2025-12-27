@@ -90,7 +90,7 @@ cd D:\FarmIQ\FarmIQ_V02
 ```powershell
 cd D:\FarmIQ\FarmIQ_V02\cloud-layer
 $env:SEED_COUNT = "30"
-.\run-seeds.ps1
+.\scripts\run-seeds.ps1
 ```
 
 ## ✅ ตรวจสอบว่า Seed ทำงาน

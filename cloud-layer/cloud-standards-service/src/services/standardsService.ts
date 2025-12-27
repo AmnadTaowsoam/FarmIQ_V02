@@ -451,6 +451,13 @@ export async function upsertRows(
   return prisma.$transaction(operations)
 }
 
+export type ResolveActiveSetResult = {
+  resolvedSetId: string | null
+  scopeUsed: Scope | null
+  versionTag: string | null
+  setType: SetType | null
+}
+
 export async function resolveActiveSet(params: {
   tenantId: string
   farmId?: string
@@ -462,7 +469,7 @@ export async function resolveActiveSet(params: {
   setType?: SetType
   unitSystem?: string
   sex?: string
-}) {
+}): Promise<ResolveActiveSetResult> {
   const commonWhere: Prisma.StandardSetWhereInput = {
     isActive: true,
     standardSchemaId: params.standardSchemaId,
@@ -502,7 +509,7 @@ export async function resolveActiveSet(params: {
 
   // If genetic line is specified but no set found, retry with generic species-level (geneticLineId = null)
   if (params.geneticLineId) {
-    const retry = await resolveActiveSet({ ...params, geneticLineId: undefined })
+    const retry: ResolveActiveSetResult = await resolveActiveSet({ ...params, geneticLineId: undefined })
     if (retry.resolvedSetId) return retry
   }
 
@@ -697,8 +704,8 @@ export async function createImportJob(params: {
       uploadedBy: params.uploadedBy || null,
       dryRun: params.dryRun,
       setId: params.setId || null,
-      summaryJson: params.summaryJson || null,
-      errorJson: params.errorJson || null,
+      summaryJson: params.summaryJson ?? undefined,
+      errorJson: params.errorJson ?? undefined,
     },
     include: { errors: true },
   })

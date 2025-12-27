@@ -18,6 +18,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-farmiq}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
     networks:
       - farmiq-net
     healthcheck:
@@ -117,6 +118,8 @@ services:
       - ./cloud-tenant-registry/prisma:/usr/src/app/prisma:ro
     environment:
       - NODE_ENV=development
+      # Prevent a single ts-node process from consuming all memory and getting OOM-killed under WSL/Docker Desktop.
+      - NODE_OPTIONS=--max-old-space-size=256
       - APP_PORT=3000
       - LOG_LEVEL=debug
       - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_tenant_registry
@@ -234,6 +237,18 @@ services:
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
       - BARN_RECORDS_SERVICE_URL=http://cloud-barn-records-service:3000
       - STANDARDS_SERVICE_URL=http://cloud-standards-service:3000
+      - INSIGHTS_ORCHESTRATOR_ENABLED=true
+      - LLM_INSIGHTS_BASE_URL=http://cloud-llm-insights-service:8000
+      - READY_CHECK_LLM_INSIGHTS=true
+      - LLM_TIMEOUT_S=10
+      - LLM_MAX_RETRIES=1
+      - ML_FALLBACK_ENABLED=false
+      - ML_MODEL_BASE_URL=http://cloud-ml-model-service:8000
+      - ML_TIMEOUT_S=4
+      - ML_MAX_RETRIES=2
+      - NOTIFICATIONS_ENABLED=true
+      - NOTIFICATIONS_TIMEOUT_MS=2000
+      - NOTIFICATION_SERVICE_URL=http://cloud-notification-service:3000
       - DD_ENV=${DD_ENV:-dev}
       - DD_SERVICE=cloud-analytics-service
       - DD_VERSION=${DD_VERSION:-local}
@@ -245,6 +260,37 @@ services:
       postgres:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      cloud-llm-insights-service:
+        condition: service_started
+
+  cloud-llm-insights-service:
+    build:
+      context: ./cloud-llm-insights-service
+      dockerfile: Dockerfile
+    ports:
+      - "5134:8000"
+    volumes:
+      - ./cloud-llm-insights-service/app:/app/app:ro
+    command: ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      - LOG_LEVEL=DEBUG
+      - PORT=8000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_llm_insights
+      - LLM_PROVIDER=${LLM_PROVIDER:-mock}
+      - LLM_TIMEOUT_S=${LLM_TIMEOUT_S:-10}
+      - LLM_MAX_TOKENS=${LLM_MAX_TOKENS:-1024}
+      - LLM_MODEL=${LLM_MODEL:-gpt-4.1-mini}
+      - PROMPT_VERSION=${PROMPT_VERSION:-v1}
+      - DD_ENV=${DD_ENV:-dev}
+      - DD_SERVICE=cloud-llm-insights-service
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+    networks:
+      - farmiq-net
+    depends_on:
+      postgres:
         condition: service_healthy
 
   cloud-api-gateway-bff:
@@ -273,6 +319,7 @@ services:
       - CONFIG_RULES_BASE_URL=http://cloud-config-rules-service:3000
       - AUDIT_LOG_BASE_URL=http://cloud-audit-log-service:3000
       - NOTIFICATION_BASE_URL=http://cloud-notification-service:3000
+      - CLOUD_NOTIFICATION_SERVICE_URL=http://cloud-notification-service:3000
       - REPORTING_EXPORT_BASE_URL=http://cloud-reporting-export-service:3000
       - FEED_SERVICE_URL=http://cloud-feed-service:3000
       - BARN_RECORDS_SERVICE_URL=http://cloud-barn-records-service:3000

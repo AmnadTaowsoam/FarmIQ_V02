@@ -26,7 +26,8 @@ export async function proxyRaw(
     const response = await fetch(url, {
       method: options.method,
       headers: options.headers,
-      body: options.body,
+      // Node's fetch supports Buffer at runtime, but TS lib types don't always accept it.
+      body: options.body as any,
     })
 
     const contentType = response.headers.get('content-type') || ''
@@ -41,4 +42,3 @@ export async function proxyRaw(
     return { ok: false, status: 502 }
   }
 }
-

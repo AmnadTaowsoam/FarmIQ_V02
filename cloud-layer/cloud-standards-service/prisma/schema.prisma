@@ -59,6 +59,7 @@ model SpeciesCatalog {
   updatedAt DateTime @updatedAt
 
   geneticLines GeneticLineCatalog[]
+  standardSets StandardSet[]
 
   @@map("species_catalog")
 }
@@ -88,6 +89,7 @@ model GeneticLineCatalog {
 
   breederCompany   BreederCompany  @relation(fields: [breederCompanyId], references: [id], onDelete: Restrict)
   species          SpeciesCatalog  @relation(fields: [speciesId], references: [id], onDelete: Restrict)
+  standardSets     StandardSet[]
 
   @@unique([breederCompanyId, name])
   @@index([speciesId])
@@ -119,6 +121,7 @@ model SourceDocument {
   note      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  standardSets StandardSet[]
 
   @@map("source_documents")
 }

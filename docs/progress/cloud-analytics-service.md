@@ -26,6 +26,10 @@ Last updated: 2025-12-19
   - `GET /api/v1/analytics/anomalies?tenantId=...`
   - `GET /api/v1/analytics/forecasts?tenantId=...`
 
+- Insights orchestration (sync, MVP):
+  - `POST /api/v1/analytics/insights/generate` (feature summary → LLM insights)
+  - Best-effort notification emission to `cloud-notification-service` after successful insight generation (does not fail the main response)
+
 ## Environment variables
 
 See `cloud-layer/cloud-analytics-service/env.example`.
@@ -55,6 +59,19 @@ curl http://localhost:5124/api-docs
 curl "http://localhost:5124/api/v1/analytics/kpis?tenantId=tenant-123"
 curl "http://localhost:5124/api/v1/analytics/anomalies?tenantId=tenant-123"
 curl "http://localhost:5124/api/v1/analytics/forecasts?tenantId=tenant-123"
+
+# Insight generation (creates a best-effort in-app notification)
+curl -X POST "http://localhost:5124/api/v1/analytics/insights/generate" `
+  -H "Authorization: Bearer $token" `
+  -H "x-request-id: $(New-Guid)" `
+  -H "content-type: application/json" `
+  -d '{
+    "tenantId":"tenant-123",
+    "scope":{"farmId":"farm-1","barnId":"barn-1","batchId":null},
+    "window":{"startTime":"2025-12-20T00:00:00Z","endTime":"2025-12-21T00:00:00Z"},
+    "mode":"daily_report",
+    "include":{"kpis":true,"anomalies":true,"forecasts":true,"insight":true}
+  }'
 ```
 
 ## Tests

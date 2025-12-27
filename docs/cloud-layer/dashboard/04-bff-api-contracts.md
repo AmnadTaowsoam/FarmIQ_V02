@@ -3,7 +3,7 @@
 **Purpose**: Define all BFF endpoints required to power the FarmIQ Dashboard.  
 **Scope**: Complete API contract definitions for `cloud-api-gateway-bff` endpoints consumed by `dashboard-web`.  
 **Owner**: FarmIQ Backend Team  
-**Last updated**: 2025-01-20  
+**Last updated**: 2025-12-27  
 
 ---
 
@@ -1032,6 +1032,186 @@ All endpoints require:
 
 ---
 
+## Insights Endpoints (planned; orchestrated)
+
+### POST /api/v1/dashboard/insights/generate
+**Status**: NEW  
+**Purpose**: Generate a combined analytics + LLM insight response for a scope and time window.
+
+**Query Params**:
+- `tenant_id` (required): Tenant ID
+
+**Request Body**:
+```json
+{
+  "scope": { "farm_id": "uuid", "barn_id": "uuid", "batch_id": "uuid|null" },
+  "window": { "start_time": "ISO8601", "end_time": "ISO8601" },
+  "mode": "daily_report|anomaly_explain|action_recommendation",
+  "include": { "kpis": true, "anomalies": true, "forecasts": true, "insight": true }
+}
+```
+
+**Response**:
+```json
+{
+  "data": {
+    "kpis": [ { "code": "FCR", "value": 1.62, "unit": "ratio", "delta_24h": 0.05 } ],
+    "anomalies": [ { "anomaly_id": "uuid", "code": "TEMP_SPIKE", "severity": "warning", "occurred_at": "ISO8601" } ],
+    "forecasts": [ { "code": "WEIGHT_7D", "horizon_days": 7, "series": [ { "t": "ISO8601", "yhat": 1.23 } ] } ],
+    "insight": {
+      "insight_id": "uuid",
+      "generated_at": "ISO8601",
+      "summary": "string",
+      "key_findings": [],
+      "likely_causes": [],
+      "recommended_actions": [],
+      "confidence": 0.68,
+      "references": [],
+      "model_meta": { "provider": "openai|local|other", "model": "string", "prompt_version": "v1" }
+    },
+    "meta": { "generated_at": "ISO8601", "trace_id": "string" }
+  }
+}
+```
+
+**Notes**:
+- BFF proxies to `cloud-analytics-service` orchestrator `POST /api/v1/analytics/insights/generate`.
+- Analytics calls `cloud-llm-insights-service` with feature summaries only (no raw telemetry).
+
+---
+
+### GET /api/v1/dashboard/insights
+**Status**: NEW  
+**Purpose**: List insight history for a scope/window.
+
+**Query Params**:
+- `tenant_id` (required): Tenant ID
+- `farm_id` (required): Farm ID
+- `barn_id` (required): Barn ID
+- `start_time` (required): ISO 8601 timestamp
+- `end_time` (required): ISO 8601 timestamp
+- `page` (optional, default: 1): Page number
+- `limit` (optional, default: 25): Items per page
+
+**Response**:
+```json
+{
+  "data": [
+    {
+      "insight_id": "uuid",
+      "generated_at": "ISO8601",
+      "summary": "string",
+      "confidence": 0.68
+    }
+  ],
+  "meta": { "page": 1, "limit": 25, "total": 120, "hasNext": true }
+}
+```
+
+---
+
+### GET /api/v1/dashboard/insights/:insightId
+**Status**: NEW  
+**Purpose**: Retrieve a single generated insight (and optional combined analytics payload).
+
+**Query Params**:
+- `tenant_id` (required): Tenant ID
+
+**Response**:
+- `200 OK`: Same shape as `POST /api/v1/dashboard/insights/generate`.
+
+**Contract references**:
+- `docs/contracts/cloud-analytics-service.contract.md`
+- `docs/contracts/cloud-llm-insights-service.contract.md`
+- `docs/contracts/cloud-ml-model-service.contract.md` (optional)
+
+---
+
+## Notifications Endpoints (planned; in-app)
+
+### GET /api/v1/notifications/inbox
+**Status**: EXISTING  
+**Purpose**: List in-app notifications for the current user (dashboard header + notification center).
+
+**Query Params**:
+- `tenantId` (required): Tenant ID (BFF validates; forwarded as `x-tenant-id`)
+- `topic` (optional): Comma-separated topics (`topic=a,b,c`), forwarded to notification service
+- `cursor` / `limit` (optional): cursor pagination (passthrough)
+
+**Response** (BFF normalized list shape):
+```json
+{
+  "data": [],
+  "meta": { "cursor": null, "limit": 25, "hasNext": false }
+}
+```
+
+**Mapping**
+- BFF calls `cloud-notification-service`:
+  - `GET /api/v1/notifications/inbox?cursor=&limit=&topic=` (see `cloud-layer/cloud-notification-service/openapi.yaml`)
+
+**Alias**
+- `GET /api/v1/dashboard/notifications/inbox` (route alias for dashboard namespace; same behavior)
+
+---
+
+### GET /api/v1/notifications/history
+**Status**: EXISTING  
+**Purpose**: List notification history (all channels) for auditing/ops views.
+
+**Query Params**:
+- `tenantId` (required): Tenant ID
+- `farmId` / `barnId` / `batchId` (optional)
+- `severity` (optional): info | warning | critical
+- `channel` (optional): in_app | webhook | email | sms
+- `status` (optional): created | queued | sent | failed | canceled
+- `startDate` / `endDate` (optional): ISO8601 timestamps
+- `cursor` / `limit` (optional): cursor pagination
+
+**Response** (BFF normalized list shape):
+```json
+{
+  "data": [],
+  "meta": { "cursor": null, "limit": 25, "hasNext": false }
+}
+```
+
+**Mapping**
+- BFF calls `cloud-notification-service`:
+  - `GET /api/v1/notifications/history` (see `cloud-layer/cloud-notification-service/openapi.yaml`)
+
+**Alias**
+- `GET /api/v1/dashboard/notifications/history` (route alias for dashboard namespace; same behavior)
+
+---
+
+### POST /api/v1/notifications/send
+**Status**: EXISTING  
+**Purpose**: Create a notification (admin/system only; strict RBAC).
+
+**Headers**:
+- `idempotency-key` (optional but recommended): used by notification service to dedupe sends
+
+**Request Body**: Passthrough to `cloud-notification-service` `POST /api/v1/notifications/send`.
+
+**Mapping**
+- BFF calls `cloud-notification-service`:
+  - `POST /api/v1/notifications/send` (see `cloud-layer/cloud-notification-service/openapi.yaml`)
+
+**Alias**
+- `POST /api/v1/dashboard/notifications/send` (route alias for dashboard namespace; same behavior)
+
+---
+
+### POST /api/v1/dashboard/notifications/:notificationId/ack
+**Status**: NEW  
+**Purpose**: Mark notification as acknowledged/read.
+
+**Notes**:
+- `cloud-notification-service` does not currently expose an ack/read endpoint; this is **TODO** until read tracking is implemented.
+
+---
+
 ## Alerts Endpoints
 
 ### GET /api/v1/alerts
@@ -1483,4 +1663,18 @@ All errors follow this standard format:
 - [API Standards](shared/01-api-standards.md): Base path, headers, error format
 - [API Catalog](shared/00-api-catalog.md): Service-level API documentation
 - [Page Specifications](02-page-specs.md): Pages that consume these endpoints
+
+---
+
+## Doc Change Summary (2025-12-27)
+
+- Added planned BFF endpoints for insights generation and history, aligned to the analytics orchestrator + downstream LLM/ML services.
+- Added planned BFF endpoints for in-app notifications and mapped them to `cloud-notification-service` inbox/history (ack is TODO until the service supports read tracking).
+
+## Next Implementation Steps
+
+1) Implement `cloud-llm-insights-service`.  
+2) Add orchestrator endpoints to `cloud-analytics-service`.  
+3) Implement BFF proxy endpoints (`/api/v1/dashboard/insights/*`) and update the shared BFF OpenAPI if/when enabled.  
+4) Implement `cloud-ml-model-service` (optional).  
 

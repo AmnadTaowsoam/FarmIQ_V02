@@ -8,6 +8,9 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 COPY prisma ./prisma/
 
+# Prisma engine selection depends on OpenSSL availability; install it in the build stage
+RUN apk add --no-cache openssl
+
 # Configure npm for better network reliability
 RUN npm config set fetch-retries 5 && \
     npm config set fetch-retry-mintimeout 20000 && \
@@ -44,6 +47,11 @@ ENV NODE_ENV=development
 # Copy package.json and package-lock.json
 COPY package*.json ./
 
+# Copy OpenSSL libraries from build stage (avoid apk/network here)
+COPY --from=build /usr/bin/openssl /usr/bin/openssl
+COPY --from=build /usr/lib/libssl.so.3 /usr/lib/
+COPY --from=build /usr/lib/libcrypto.so.3 /usr/lib/
+
 # Reuse deps from the build stage to avoid extra network calls
 COPY --from=build /usr/src/app/node_modules ./node_modules
 COPY --from=build /usr/src/app/prisma ./prisma
@@ -73,6 +81,11 @@ ENV NODE_ENV=production
 
 # Copy package.json and package-lock.json
 COPY package*.json ./
+
+# Copy OpenSSL libraries from build stage (avoid apk/network here)
+COPY --from=build /usr/bin/openssl /usr/bin/openssl
+COPY --from=build /usr/lib/libssl.so.3 /usr/lib/
+COPY --from=build /usr/lib/libcrypto.so.3 /usr/lib/
 
 # Reuse deps from build stage and prune dev deps (no network)
 COPY --from=build /usr/src/app/node_modules ./node_modules

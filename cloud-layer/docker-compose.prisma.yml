@@ -1,0 +1,228 @@
+services:
+  prisma-studio-identity-access:
+    image: cloud-layer-cloud-identity-access
+    working_dir: /usr/src/app
+    ports:
+      - "5551:5555"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_identity_access
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    command: [ "sh", "-c", "npm_config_loglevel=error npm_config_fund=false npm_config_audit=false npx prisma@5.22.0 studio --schema prisma/schema.prisma --hostname 0.0.0.0 --port 5555" ]
+    volumes:
+      - ./cloud-identity-access/prisma:/usr/src/app/prisma:ro
+    networks:
+      - farmiq-net
+
+  prisma-studio-tenant-registry:
+    image: cloud-layer-cloud-tenant-registry
+    working_dir: /usr/src/app
+    ports:
+      - "5552:5555"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_tenant_registry
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    command: [ "sh", "-c", "npm_config_loglevel=error npm_config_fund=false npm_config_audit=false npx prisma@5.22.0 studio --schema prisma/schema.prisma --hostname 0.0.0.0 --port 5555" ]
+    volumes:
+      - ./cloud-tenant-registry/prisma:/usr/src/app/prisma:ro
+    networks:
+      - farmiq-net
+
+  prisma-studio-standards:
+    image: cloud-layer-cloud-standards-service
+    working_dir: /usr/src/app
+    ports:
+      - "5553:5555"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_standards_service
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    command: [ "sh", "-c", "npm_config_loglevel=error npm_config_fund=false npm_config_audit=false npx prisma@5.22.0 studio --schema prisma/schema.prisma --hostname 0.0.0.0 --port 5555" ]
+    volumes:
+      - ./cloud-standards-service/prisma:/usr/src/app/prisma:ro
+    networks:
+      - farmiq-net
+
+  prisma-studio-ingestion:
+    image: cloud-layer-cloud-ingestion
+    working_dir: /usr/src/app
+    ports:
+      - "5554:5555"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_ingestion
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    command: [ "sh", "-c", "npm_config_loglevel=error npm_config_fund=false npm_config_audit=false npx prisma@5.22.0 studio --schema prisma/schema.prisma --hostname 0.0.0.0 --port 5555" ]
+    volumes:
+      - ./cloud-ingestion/prisma:/usr/src/app/prisma:ro
+    networks:
+      - farmiq-net
+
+  prisma-studio-telemetry:
+    image: cloud-layer-cloud-telemetry-service
+    working_dir: /usr/src/app
+    ports:
+      - "5555:5555"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_telemetry
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    command: [ "sh", "-c", "npm_config_loglevel=error npm_config_fund=false npm_config_audit=false npx prisma@5.22.0 studio --schema prisma/schema.prisma --hostname 0.0.0.0 --port 5555" ]
+    volumes:
+      - ./cloud-telemetry-service/prisma:/usr/src/app/prisma:ro
+    networks:
+      - farmiq-net
+
+  prisma-studio-api-gateway-bff:
+    image: cloud-layer-cloud-api-gateway-bff
+    working_dir: /usr/src/app
+    ports:
+      - "5556:5555"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_api_gateway_bff
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    command: [ "sh", "-c", "npm_config_loglevel=error npm_config_fund=false npm_config_audit=false npx prisma@5.22.0 studio --schema prisma/schema.prisma --hostname 0.0.0.0 --port 5555" ]
+    volumes:
+      - ./cloud-api-gateway-bff/prisma:/usr/src/app/prisma:ro
+    networks:
+      - farmiq-net
+
+  prisma-studio-config-rules:
+    image: cloud-layer-cloud-config-rules-service
+    working_dir: /usr/src/app
+    ports:
+      - "5557:5555"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_config_rules
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    command: [ "sh", "-c", "npm_config_loglevel=error npm_config_fund=false npm_config_audit=false npx prisma@5.22.0 studio --schema prisma/schema.prisma --hostname 0.0.0.0 --port 5555" ]
+    volumes:
+      - ./cloud-config-rules-service/prisma:/usr/src/app/prisma:ro
+    networks:
+      - farmiq-net
+
+  prisma-studio-audit-log:
+    image: cloud-layer-cloud-audit-log-service
+    working_dir: /usr/src/app
+    ports:
+      - "5558:5555"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_audit_log
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    command: [ "sh", "-c", "npm_config_loglevel=error npm_config_fund=false npm_config_audit=false npx prisma@5.22.0 studio --schema prisma/schema.prisma --hostname 0.0.0.0 --port 5555" ]
+    volumes:
+      - ./cloud-audit-log-service/prisma:/usr/src/app/prisma:ro
+    networks:
+      - farmiq-net
+
+  prisma-studio-notification:
+    image: cloud-layer-cloud-notification-service
+    working_dir: /usr/src/app
+    ports:
+      - "5559:5555"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_notification
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    command: [ "sh", "-c", "npm_config_loglevel=error npm_config_fund=false npm_config_audit=false npx prisma@5.22.0 studio --schema prisma/schema.prisma --hostname 0.0.0.0 --port 5555" ]
+    volumes:
+      - ./cloud-notification-service/prisma:/usr/src/app/prisma:ro
+    networks:
+      - farmiq-net
+
+  prisma-studio-reporting-export:
+    image: cloud-layer-cloud-reporting-export-service
+    working_dir: /usr/src/app
+    ports:
+      - "5560:5555"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_reporting_export
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    command: [ "sh", "-c", "npm_config_loglevel=error npm_config_fund=false npm_config_audit=false npx prisma@5.22.0 studio --schema prisma/schema.prisma --hostname 0.0.0.0 --port 5555" ]
+    volumes:
+      - ./cloud-reporting-export-service/prisma:/usr/src/app/prisma:ro
+    networks:
+      - farmiq-net
+
+  prisma-studio-feed:
+    image: cloud-layer-cloud-feed-service
+    working_dir: /usr/src/app
+    ports:
+      - "5561:5555"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_feed
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    command: [ "sh", "-c", "npm_config_loglevel=error npm_config_fund=false npm_config_audit=false npx prisma@5.22.0 studio --schema prisma/schema.prisma --hostname 0.0.0.0 --port 5555" ]
+    volumes:
+      - ./cloud-feed-service/prisma:/usr/src/app/prisma:ro
+    networks:
+      - farmiq-net
+
+  prisma-studio-barn-records:
+    image: cloud-layer-cloud-barn-records-service
+    working_dir: /usr/src/app
+    ports:
+      - "5562:5555"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_barn_records
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    command: [ "sh", "-c", "npm_config_loglevel=error npm_config_fund=false npm_config_audit=false npx prisma@5.22.0 studio --schema prisma/schema.prisma --hostname 0.0.0.0 --port 5555" ]
+    volumes:
+      - ./cloud-barn-records-service/prisma:/usr/src/app/prisma:ro
+    networks:
+      - farmiq-net
+
+  prisma-studio-weighvision-readmodel:
+    image: cloud-layer-cloud-weighvision-readmodel
+    working_dir: /usr/src/app
+    ports:
+      - "5563:5555"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_weighvision_readmodel
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    command: [ "sh", "-c", "npm_config_loglevel=error npm_config_fund=false npm_config_audit=false npx prisma@5.22.0 studio --schema prisma/schema.prisma --hostname 0.0.0.0 --port 5555" ]
+    volumes:
+      - ./cloud-weighvision-readmodel/prisma:/usr/src/app/prisma:ro
+    networks:
+      - farmiq-net
+
+  prisma-studio-analytics:
+    image: node:20-alpine
+    working_dir: /usr/src/app
+    ports:
+      - "5564:5555"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_analytics
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    command: [ "sh", "-c", "npm_config_loglevel=error npm_config_fund=false npm_config_audit=false npx prisma@5.22.0 studio --schema prisma/schema.prisma --hostname 0.0.0.0 --port 5555" ]
+    volumes:
+      - ./cloud-analytics-service/prisma:/usr/src/app/prisma:ro
+    networks:
+      - farmiq-net
+
+networks:
+  farmiq-net:
+    external: true

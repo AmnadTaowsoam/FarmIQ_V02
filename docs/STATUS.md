@@ -1,7 +1,10 @@
 Purpose: Service status, locks, and implementation progress tracking for FarmIQ.  
 Scope: Service list, locks/reservations, Definition of Done, and detailed TODO checklists.  
 Owner: FarmIQ Platform Team (Doc Captain edits this file)  
-Last updated: 2025-12-21 (Runtime integration verified + seed data enhanced)
+Last updated: 2025-12-27 (Dashboard notifications UI complete: bell, drawer, page, insight deep-linking, UX hardening)
+
+Recent verification notes:
+- Dashboard notifications via BFF: `GET /api/v1/notifications/inbox|history`, `POST /api/v1/notifications/send` (see `docs/progress/cloud-api-gateway-bff.md`).
 
 ---
 
@@ -28,6 +31,8 @@ Last updated: 2025-12-21 (Runtime integration verified + seed data enhanced)
 | cloud-ingestion | cloud | 5122 | OK | OK | done | Antigravity |
 | cloud-telemetry-service | cloud | 5123 | OK | OK | done | CursorAI |
 | cloud-analytics-service | cloud | 5124 | OK | OK | done | Antigravity |
+| cloud-llm-insights-service | cloud | 5134 | - | - | doing | Codex |
+| cloud-ml-model-service | cloud | TBD | - | - | TODO | Codex |
 | cloud-api-gateway-bff | cloud | 5125 | OK | OK | done | CursorAI |
 | cloud-config-rules-service | cloud | 5126 | OK | OK | done | CursorAI |
 | cloud-audit-log-service | cloud | 5127 | OK | OK | done | CursorAI |
@@ -281,6 +286,27 @@ Each service must meet these criteria before marking as "done":
   - [x] GET /api/v1/analytics/anomalies
   - [x] GET /api/v1/analytics/forecasts
 - [x] Tests + Evidence + docs/progress/cloud-analytics-service.md
+- [x] (P1) Insights orchestrator endpoints (sync; called by BFF; no raw telemetry to LLM):
+  - [x] POST /api/v1/analytics/insights/generate
+  - [x] GET /api/v1/analytics/insights
+  - [x] GET /api/v1/analytics/insights/{insightId}
+  - [x] Downstream calls with header propagation (Authorization, x-request-id, x-trace-id):
+    - [x] cloud-llm-insights-service (required)
+    - [ ] cloud-ml-model-service fallback (optional; feature-flagged)
+  - [x] /api/ready includes lightweight downstream check (LLM health)
+  - [x] Contract docs: `docs/contracts/cloud-analytics-service.contract.md`, `docs/contracts/cloud-llm-insights-service.contract.md`
+
+### CLOUD: cloud-llm-insights-service (Python)
+- [x] Scaffold from Python boilerplate (FastAPI)
+- [x] Persistence: `llm_insight`, `llm_insight_run` (owned by service)
+- [x] Endpoints:
+  - [x] GET /api/health
+  - [x] GET /api/ready
+  - [x] POST /api/v1/llm-insights/analyze
+  - [x] GET /api/v1/llm-insights/history
+  - [x] GET /api/v1/llm-insights/{insightId}
+- [x] MVP provider: deterministic mock (`LLM_PROVIDER=mock`)
+- [x] Tests (unit; mocks) added
 
 ### CLOUD: cloud-api-gateway-bff (Node)
 - [x] Aggregate APIs for frontend:
@@ -373,8 +399,38 @@ Each service must meet these criteria before marking as "done":
   - Evidence: `apps/dashboard-web/src/features/reports/pages/ReportJobsPage.tsx`
   - Evidence: `apps/dashboard-web/src/features/reports/pages/CreateReportJobPage.tsx`
   - Evidence: `apps/dashboard-web/src/features/reports/pages/ReportJobDetailPage.tsx`
-- [x] Notification Center page with graceful empty/coming-soon handling
-  - Evidence: `apps/dashboard-web/src/features/notifications/pages/NotificationsPage.tsx`
+- [x] **Notifications Module (Complete - 2025-12-27)**
+  - [x] API Client (`src/api/notifications.ts`)
+    - Endpoints: `/api/v1/notifications/inbox`, `/api/v1/notifications/history`, `/api/v1/notifications/send`
+    - Retry logic with exponential backoff (502/503/504 only, max 3 retries)
+    - Filter parameters: topic, cursor, channel, status, batch_id, severity, farm_id, barn_id, dates
+    - Evidence: `apps/dashboard-web/src/api/notifications.ts`, `apps/dashboard-web/src/utils/retry.ts`
+  - [x] React Query Hooks (`src/hooks/useNotifications.ts`)
+    - Polling: 60s (inbox), 45s (unread count)
+    - Pauses when tab hidden (`refetchIntervalInBackground: false`)
+    - Automatic refetch on window focus
+    - Evidence: `apps/dashboard-web/src/hooks/useNotifications.ts`
+  - [x] UI Components
+    - NotificationBell: Badge with unread count, drawer (420px), top 10 notifications
+    - NotificationListItem: Severity indicators (critical/warning/info), metadata display
+    - NotificationsPage: Inbox/History tabs, filters (severity/channel/status/dates), cursor-based pagination
+    - Evidence: `apps/dashboard-web/src/components/notifications/NotificationBell.tsx`
+    - Evidence: `apps/dashboard-web/src/components/notifications/NotificationListItem.tsx`
+    - Evidence: `apps/dashboard-web/src/features/notifications/pages/NotificationsPage.tsx`
+  - [x] Integration
+    - Topbar integration (bell icon with badge)
+    - Route: `/notifications` (protected by ContextGuard)
+    - Evidence: `apps/dashboard-web/src/layout/Topbar.tsx`, `apps/dashboard-web/src/App.tsx`
+  - [x] UX Hardening
+    - InsightDetailPage created (`/ai/insights/:insightId`)
+    - Deep linking with fallbacks: link → insightId → entityId → notifications
+    - Loading/Empty/Error states implemented
+    - Evidence: `apps/dashboard-web/src/features/ai/pages/InsightDetailPage.tsx`
+    - Evidence: `apps/dashboard-web/evidence/NOTIFICATIONS_EVIDENCE.md` (demo script + screenshots)
+  - [x] Documentation
+    - Implementation summary: `apps/dashboard-web/NOTIFICATIONS_IMPLEMENTATION.md`
+    - Evidence checklist: `apps/dashboard-web/evidence/NOTIFICATIONS_EVIDENCE.md`
+    - Progress doc: `docs/progress/dashboard-web-notifications.md`
 - [x] Debug tools panel (feature-flagged): `VITE_DEBUG_TOOLS=1`
   - Evidence: `apps/dashboard-web/src/layout/AppShell.tsx`, `apps/dashboard-web/src/components/dev/ApiDiagnosticsPanel.tsx`
 - [x] Tenant selection DEV override added (unblocks FE evidence when backend unstable)
@@ -634,7 +690,7 @@ Each service must meet these criteria before marking as "done":
   - Completed: 2025-12-21
 
 #### Manual FE Evidence (Partial Success - 2025-12-21)
-- [x] Start dev server: `pnpm -C apps/dashboard-web dev` ✅ (runs at http://localhost:5130)
+- [x] Start dev server: `pnpm -C apps/dashboard-web dev` ✅ (runs at http://localhost:5142)
 - [x] Install reliability fixed: Applied pnpm timeout configs (network-timeout=600000, fetch-retries=5)
 - [x] Missing dependency fixed: `@mui/x-data-grid` installed successfully
 - [x] Screenshots captured (9 total):
@@ -1079,7 +1135,7 @@ curl http://localhost:5123/api/health  # Telemetry Service
   - RBAC enforcement
   - Unit tests
   - See cloud-tenant-registry checklist above for details
-- [x] (P1) cloud-notification-service implementation: Only prisma/schema.prisma exists. Needs full service scaffold, endpoints (POST /api/v1/notifications/send, GET /api/v1/notifications/history), RabbitMQ consumer for notification.jobs queue.
+- [x] (P1) cloud-notification-service implementation: Service scaffolded with endpoints `POST /api/v1/notifications/send`, `GET /api/v1/notifications/history`, `GET /api/v1/notifications/inbox`, Prisma tables + RabbitMQ worker for non-`in_app` delivery.
 - [x] (P1) edge-feed-intake tests: Add unit/integration tests (test folder exists but no tests present).
 - [x] (P1) BFF sensor module proxy endpoints: Sensor module implemented in tenant-registry, BFF proxy endpoints added
   - Evidence: `cloud-layer/cloud-api-gateway-bff/src/routes/sensorsRoutes.ts` (lines 20-40)
@@ -1378,6 +1434,20 @@ curl http://localhost:5123/api/health  # Telemetry Service
   - Query endpoints: GET /api/v1/analytics/kpis, /anomalies, /forecasts.
   - Unit tests for compute logic.
   - Updated STATUS.md checklist and Service List status to "done".
+
+---
+
+## Doc Change Summary (2025-12-27)
+
+- Added service inventory rows for `cloud-llm-insights-service` and optional `cloud-ml-model-service` (Status = TODO).
+- Updated `cloud-analytics-service` checklist to include the planned insights orchestrator endpoints and downstream call expectations.
+
+## Next Implementation Steps
+
+1) Implement `cloud-llm-insights-service`.  
+2) Add orchestrator endpoints to `cloud-analytics-service`.  
+3) Add BFF proxy endpoints for dashboard insights.  
+4) Implement `cloud-ml-model-service` (optional).  
   - Updated docs/progress/cloud-analytics-service.md with evidence steps.
 
 - **Completed `edge-ingress-gateway` (Antigravity)**:

@@ -10,27 +10,52 @@ import { logger } from './utils/logger'
 const app = express()
 const port = process.env.APP_PORT || 3000
 
-const allowedOrigins = ['http://localhost:3000']
+// API responses should not be cached by browsers during dev; 304s break clients expecting JSON.
+app.set('etag', false)
 
-if (process.env.NODE_ENV === 'development') {
-  const corsOptions = {
-    origin: function (
-      origin: string | undefined,
-      callback: (err: Error | null, allow?: boolean) => void
-    ) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true)
-      } else {
-        callback(new Error('Not allowed by CORS'))
-      }
-    },
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-  }
-  app.use(cors(corsOptions))
+const allowedOrigins = new Set<string>(['http://localhost:3000'])
+
+// In dev, allow any localhost/127.0.0.1 origin to avoid confusing "Network Error" in the browser.
+// In production, keep CORS strict (only allow known origins).
+const isDev = process.env.NODE_ENV !== 'production'
+
+const corsOptions: cors.CorsOptions = {
+  origin(origin, callback) {
+    if (!origin) return callback(null, true)
+    if (allowedOrigins.has(origin)) return callback(null, true)
+
+    if (isDev) {
+      const isLocalhost =
+        /^https?:\/\/localhost:\d+$/.test(origin) ||
+        /^https?:\/\/127\.0\.0\.1:\d+$/.test(origin)
+      if (isLocalhost) return callback(null, true)
+    }
+
+    return callback(null, false)
+  },
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'authorization',
+    'content-type',
+    'x-tenant-id',
+    'x-request-id',
+    'x-trace-id',
+    'idempotency-key',
+  ],
+  credentials: true,
 }
+
+app.use(cors(corsOptions))
 
 // Use middlewares
 app.use(transactionIdMiddleware)
+app.use((req: Request, res: Response, next: NextFunction): void => {
+  if (req.path.startsWith('/api/')) {
+    res.setHeader('Cache-Control', 'no-store')
+    res.setHeader('Pragma', 'no-cache')
+  }
+  next()
+})
 app.use((req: Request, res: Response, next: NextFunction): void => {
   res.setHeader('X-commit-ID', process.env.COMMIT_ID || 'Unknown')
   next()

@@ -85,7 +85,7 @@ curl http://localhost:5124/api/health  # cloud-analytics-service
 curl http://localhost:5125/api/health  # cloud-api-gateway-bff
 
 # Frontend
-curl http://localhost:5130/  # dashboard-web
+curl http://localhost:5142/  # dashboard-web
 ```
 
 ### API Documentation

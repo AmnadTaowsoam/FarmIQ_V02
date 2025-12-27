@@ -1,5 +1,31 @@
 # RabbitMQ Queue Fix Scripts
 
+This folder also contains helper scripts for database setup and seed/migration workflows.
+
+## Quick start (Cloud dev)
+
+### Build + start + seed (recommended)
+
+```powershell
+cd cloud-layer
+.\scripts\dev-up-and-seed.ps1
+```
+
+### Seed via docker-compose (no PowerShell required inside containers)
+
+```powershell
+cd cloud-layer
+docker compose -f docker-compose.dev.yml up -d --build
+docker compose -f docker-compose.dev.yml -f docker-compose.seed.yml --profile seed up --build cloud-seed
+```
+
+If you have flaky DNS/network, run the seed compose *without* `--build` so it reuses already-built images:
+
+```powershell
+docker compose -f docker-compose.dev.yml up -d --build
+docker compose -f docker-compose.dev.yml -f docker-compose.seed.yml --profile seed up cloud-seed
+```
+
 Scripts to fix RabbitMQ queue configuration issues, specifically the `PRECONDITION_FAILED` error when queue arguments don't match.
 
 ## Problem

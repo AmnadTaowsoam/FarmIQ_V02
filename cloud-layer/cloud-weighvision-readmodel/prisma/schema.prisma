@@ -3,7 +3,10 @@
 
 generator client {
   provider = "prisma-client-js"
-  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+  // Support both Prisma runtime detections on Alpine:
+  // - linux-musl-openssl-3.0.x (OpenSSL 3)
+  // - linux-musl (fallback when OpenSSL version can't be detected)
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "linux-musl"]
 }
 
 datasource db {

@@ -1,7 +1,7 @@
 Purpose: Service registry for FarmIQ development environment.  
 Scope: Port mappings, internal URLs, and service discovery for docker-compose setup.  
 Owner: FarmIQ Platform Team  
-Last updated: 2025-12-18
+Last updated: 2025-12-27
 
 **This is the authoritative port plan for FarmIQ. All services must use these exact ports.**  
 
@@ -30,8 +30,17 @@ Last updated: 2025-12-18
 | cloud-telemetry-service | cloud | cloud-telemetry-service:3000 | 5123 | 3000 | /api | http://localhost:5123/api/health |
 | cloud-analytics-service | cloud | cloud-analytics-service:8000 | 5124 | 8000 | /api | http://localhost:5124/api/health |
 | cloud-api-gateway-bff | cloud | cloud-api-gateway-bff:3000 | 5125 | 3000 | /api | http://localhost:5125/api/health |
+| cloud-config-rules-service | cloud | cloud-config-rules-service:3000 | 5126 | 3000 | /api | http://localhost:5126/api/health |
+| cloud-audit-log-service | cloud | cloud-audit-log-service:3000 | 5127 | 3000 | /api | http://localhost:5127/api/health |
+| cloud-notification-service | cloud | cloud-notification-service:3000 | 5128 | 3000 | /api | http://localhost:5128/api/health |
+| cloud-reporting-export-service | cloud | cloud-reporting-export-service:3000 | 5129 | 3000 | /api | http://localhost:5129/api/health |
+| cloud-feed-service | cloud | cloud-feed-service:3000 | 5130 | 3000 | /api | http://localhost:5130/api/health |
+| cloud-barn-records-service | cloud | cloud-barn-records-service:3000 | 5131 | 3000 | /api | http://localhost:5131/api/health |
+| cloud-weighvision-readmodel | cloud | cloud-weighvision-readmodel:3000 | 5132 | 3000 | /api | http://localhost:5132/api/health |
+| cloud-standards-service | cloud | cloud-standards-service:3000 | 5133 | 3000 | /api | http://localhost:5133/api/health |
+| cloud-llm-insights-service | cloud | cloud-llm-insights-service:8000 | 5134 | 8000 | /api | http://localhost:5134/api/health |
 | **Frontend** |
-| dashboard-web | ui | dashboard-web:80 | 5130 | 80 | / | http://localhost:5130 |
+| dashboard-web | ui | (vite dev server) | 5142 | 5142 | / | http://localhost:5142 |
 
 ---
 
@@ -47,8 +56,8 @@ Internal service-to-service communication uses the service name as hostname (e.g
 
 - **Infrastructure**: 5140-5151
 - **Edge Services**: 5100-5108
-- **Cloud Services**: 5120-5125
-- **Frontend**: 5130
+- **Cloud Services**: 5120-5134
+- **Frontend**: 5142
 
 ---
 
@@ -72,7 +81,7 @@ curl http://localhost:5124/api/health
 curl http://localhost:5125/api/health
 
 # Frontend
-curl http://localhost:5130/
+curl http://localhost:5142/
 ```
 
 ---

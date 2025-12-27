@@ -1,17 +1,21 @@
 import asyncio
 import contextlib
 import logging
+import time
 from contextlib import asynccontextmanager
 from typing import Any
 
+import httpx
 from fastapi import FastAPI, Request
+from fastapi import HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import Settings
-from app.db import AnalyticsDb
-from app.logging_ import configure_logging, request_id_ctx, trace_id_ctx
+from app.db import AnalyticsDb, InMemoryAnalyticsDb
+from app.insights_routes import router as insights_router
+from app.logging_ import configure_logging, request_id_ctx, tenant_id_ctx, trace_id_ctx
 from app.rabbitmq import RabbitConsumer
 from app.routes import router as analytics_router
 from app.routes import router as kpi_router
@@ -25,6 +29,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        if settings.testing:
+            db = InMemoryAnalyticsDb()
+            app.state.db = db
+            app.state.settings = settings
+            app.state.rabbit = None
+            yield
+            return
+
         db = AnalyticsDb(settings.database_url)
         await db.connect()
         await db.ensure_schema()
@@ -70,14 +82,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.middleware("http")
     async def request_context(request: Request, call_next):
+        started = time.perf_counter()
         request_id = request.headers.get("x-request-id") or settings.new_id()
         trace_id = request.headers.get("x-trace-id") or settings.new_id()
         request_id_ctx.set(request_id)
         trace_id_ctx.set(trace_id)
+        tenant_id_ctx.set("")
 
         response = await call_next(request)
         response.headers["x-request-id"] = request_id
         response.headers["x-trace-id"] = trace_id
+
+        duration_ms = int((time.perf_counter() - started) * 1000)
+        logger.info(
+            "Request completed",
+            extra={
+                "service": settings.service_name,
+                "path": str(request.url.path),
+                "statusCode": response.status_code,
+                "duration_ms": duration_ms,
+            },
+        )
         return response
 
     @app.exception_handler(RequestValidationError)
@@ -92,6 +117,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     "traceId": trace_id,
                 }
             },
+        )
+
+    @app.exception_handler(HTTPException)
+    async def http_error_handler(_request: Request, exc: HTTPException):
+        trace_id = trace_id_ctx.get()
+        code = "INTERNAL_ERROR"
+        if exc.status_code == 401:
+            code = "UNAUTHORIZED"
+        elif exc.status_code == 403:
+            code = "FORBIDDEN"
+        elif exc.status_code == 404:
+            code = "NOT_FOUND"
+        elif exc.status_code == 409:
+            code = "CONFLICT"
+
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"error": {"code": code, "message": exc.detail, "traceId": trace_id}},
         )
 
     @app.exception_handler(Exception)
@@ -125,15 +168,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         db_ok = await db.ping()
         rabbit_ok = True if rabbit is None else rabbit.is_connected()
 
-        if not db_ok or not rabbit_ok:
+        llm_ok = True
+        if settings.insights_orchestrator_enabled and settings.ready_check_llm_insights and settings.llm_insights_base_url:
+            try:
+                async with httpx.AsyncClient(timeout=1.5) as client:
+                    resp = await client.head(settings.llm_insights_base_url.rstrip("/") + "/api/health")
+                llm_ok = resp.status_code < 400
+            except Exception:
+                llm_ok = False
+
+        if not db_ok or not rabbit_ok or not llm_ok:
             return JSONResponse(
                 status_code=503,
-                content={"status": "not_ready", "db": db_ok, "rabbitmq": rabbit_ok},
+                content={"status": "not_ready", "db": db_ok, "rabbitmq": rabbit_ok, "llmInsights": llm_ok},
             )
 
-        return {"status": "ready", "db": True, "rabbitmq": rabbit_ok}
+        return {"status": "ready", "db": True, "rabbitmq": rabbit_ok, "llmInsights": llm_ok}
 
     app.include_router(analytics_router, prefix="/api/v1/analytics", tags=["Analytics"])
+    app.include_router(insights_router, prefix="/api/v1/analytics", tags=["Insights"])
     # Include KPI routes directly under /api/v1/kpi (feeding endpoint is in same router)
     app.include_router(kpi_router, prefix="/api/v1", tags=["KPI"])
     return app
