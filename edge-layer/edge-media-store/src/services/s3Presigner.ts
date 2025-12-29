@@ -4,7 +4,10 @@ import { PresignFn } from './presign'
 import { buildS3ClientFromEnv } from './s3Client'
 
 export function buildS3PresignerFromEnv(): PresignFn {
-  const client = buildS3ClientFromEnv()
+  const presignEndpoint = process.env.MEDIA_PRESIGN_ENDPOINT
+  const client = buildS3ClientFromEnv(
+    presignEndpoint ? { endpoint: presignEndpoint } : undefined
+  )
 
   return async ({ bucket, key, contentType, expiresIn }) => {
     const command = new PutObjectCommand({

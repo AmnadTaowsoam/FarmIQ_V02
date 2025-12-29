@@ -19,6 +19,12 @@ export async function ensureMediaSchema(prisma: PrismaClient): Promise<void> {
     );
   `)
 
+  // Idempotency: allow the same object_key to exist across tenants, but prevent duplicates within a tenant.
+  await prisma.$executeRawUnsafe(`
+    CREATE UNIQUE INDEX IF NOT EXISTS media_objects_tenant_object_key_uidx
+    ON media_objects(tenant_id, object_key);
+  `)
+
   await prisma.$executeRawUnsafe(`
     CREATE INDEX IF NOT EXISTS media_objects_tenant_session_idx
     ON media_objects(tenant_id, session_id);
@@ -34,4 +40,3 @@ export async function ensureMediaSchema(prisma: PrismaClient): Promise<void> {
     ON media_objects(bucket, object_key);
   `)
 }
-

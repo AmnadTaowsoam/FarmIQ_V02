@@ -8,6 +8,7 @@ import { setupSwagger } from './utils/swagger'
 import { PresignFn } from './services/presign'
 import type { S3Client } from '@aws-sdk/client-s3'
 import type { PrismaClient } from '@prisma/client'
+import { headBucket } from './services/s3Client'
 
 export function createApp(params: {
   config: MediaConfig
@@ -33,12 +34,41 @@ export function createApp(params: {
       res.status(503).json({ status: 'not_ready', bucket: 'missing', presign: 'disabled' })
       return
     }
-    params.prisma.$queryRaw`SELECT 1`
-      .then(() => {
-        res.status(200).json({ status: 'ready', bucket: params.config.bucket, presign: 'ok', db: 'up' })
+    Promise.allSettled([
+      params.prisma.$queryRaw`SELECT 1`,
+      headBucket({ client: params.s3, bucket: params.config.bucket }),
+    ])
+      .then((results) => {
+        const dbOk = results[0].status === 'fulfilled'
+        const bucketOk = results[1].status === 'fulfilled'
+
+        if (dbOk && bucketOk) {
+          res.status(200).json({
+            status: 'ready',
+            bucket: params.config.bucket,
+            presign: 'ok',
+            db: 'up',
+            s3: 'up',
+          })
+          return
+        }
+
+        res.status(503).json({
+          status: 'not_ready',
+          bucket: params.config.bucket,
+          presign: 'ok',
+          db: dbOk ? 'up' : 'down',
+          s3: bucketOk ? 'up' : 'down',
+        })
       })
       .catch(() => {
-        res.status(503).json({ status: 'not_ready', bucket: params.config.bucket, presign: 'ok', db: 'down' })
+        res.status(503).json({
+          status: 'not_ready',
+          bucket: params.config.bucket,
+          presign: 'ok',
+          db: 'down',
+          s3: 'down',
+        })
       })
   })
 

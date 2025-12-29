@@ -104,6 +104,45 @@ export function buildMediaRoutes(deps: {
       })
     }
 
+    // Idempotency: if we've already recorded this object_key for the tenant, treat completion as a replay.
+    const existing = await deps.prisma.$queryRawUnsafe<
+      Array<{
+        id: string
+        object_key: string
+        bucket: string
+        etag: string | null
+        size_bytes: number | null
+      }>
+    >(
+      `SELECT id, object_key, bucket, etag, size_bytes
+       FROM media_objects
+       WHERE tenant_id = $1::text AND object_key = $2::text
+       LIMIT 1`,
+      parsed.data.tenant_id,
+      parsed.data.object_key
+    )
+    if (existing[0]) {
+      const row = existing[0]
+      const eventId = uuidv5(`${row.id}:media.stored`, mediaNamespace)
+      logger.info('Media complete replay (idempotent)', {
+        tenantId: parsed.data.tenant_id,
+        mediaId: row.id,
+        eventId,
+        objectKey: row.object_key,
+        sizeBytes: row.size_bytes ?? undefined,
+        traceId: res.locals.traceId,
+      })
+      return res.status(200).json({
+        media_id: row.id,
+        event_id: eventId,
+        object_key: row.object_key,
+        bucket: row.bucket,
+        etag: row.etag,
+        size_bytes: row.size_bytes,
+        inference_job_id: null,
+      })
+    }
+
     let head
     try {
       head = await headObject({ client: deps.s3, bucket: deps.config.bucket, key: parsed.data.object_key })
@@ -144,13 +183,13 @@ export function buildMediaRoutes(deps: {
         $1::uuid, $2::text, $3::text, $4::text, $5::text, $6::text,
         $7::text, $8::text, $9::text, $10::text, $11::bigint, $12::timestamptz, NOW()
       )
-      ON CONFLICT (bucket, object_key)
+      ON CONFLICT (tenant_id, object_key)
       DO UPDATE SET
-        tenant_id = EXCLUDED.tenant_id,
         farm_id = EXCLUDED.farm_id,
         barn_id = EXCLUDED.barn_id,
         device_id = EXCLUDED.device_id,
         session_id = COALESCE(EXCLUDED.session_id, media_objects.session_id),
+        bucket = EXCLUDED.bucket,
         etag = COALESCE(EXCLUDED.etag, media_objects.etag),
         mime_type = EXCLUDED.mime_type,
         size_bytes = COALESCE(EXCLUDED.size_bytes, media_objects.size_bytes),

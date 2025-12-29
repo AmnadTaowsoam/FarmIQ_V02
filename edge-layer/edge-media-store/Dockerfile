@@ -3,6 +3,7 @@ FROM node:24-alpine AS development
 WORKDIR /usr/src/app
 
 COPY package*.json ./
+COPY edge-contracts.tgz ./
 RUN npm ci
 
 COPY . .
@@ -15,6 +16,7 @@ FROM node:24-alpine AS build
 WORKDIR /usr/src/app
 
 COPY package*.json ./
+COPY edge-contracts.tgz ./
 RUN npm ci
 
 COPY . .
@@ -27,6 +29,7 @@ WORKDIR /usr/src/app
 ENV NODE_ENV=production
 
 COPY package*.json ./
+COPY edge-contracts.tgz ./
 RUN npm ci --only=production
 
 COPY --from=build /usr/src/app/dist ./dist
