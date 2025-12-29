@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+import { Prisma, PrismaClient } from '@prisma/client'
 import { logger } from '../utils/logger'
 import { newUuidV7 } from '../utils/uuid'
 
@@ -15,6 +15,85 @@ export async function getAllTenants() {
     })
   } catch (error) {
     logger.error('Error fetching tenants:', error)
+    throw error
+  }
+}
+
+export async function getAdminTenants(params: {
+  page: number
+  pageSize: number
+  search?: string
+  status?: string
+  type?: string
+  region?: string
+}) {
+  const { page, pageSize, search, status, type, region } = params
+  const where: Prisma.TenantWhereInput = {
+    ...(status ? { status } : {}),
+    ...(type ? { type } : {}),
+    ...(region ? { region } : {}),
+    ...(search
+      ? {
+          OR: [
+            { name: { contains: search, mode: Prisma.QueryMode.insensitive } },
+            { region: { contains: search, mode: Prisma.QueryMode.insensitive } },
+          ],
+        }
+      : {}),
+  }
+
+  try {
+    logger.info('Fetching admin tenants list', { page, pageSize, search, status, type, region })
+
+    const [total, tenants] = await Promise.all([
+      prisma.tenant.count({ where }),
+      prisma.tenant.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: page * pageSize,
+        take: pageSize,
+        include: {
+          _count: {
+            select: {
+              farms: true,
+              barns: true,
+              batches: true,
+              devices: true,
+              sensors: true,
+              sensorBindings: true,
+              sensorCalibrations: true,
+            },
+          },
+        },
+      }),
+    ])
+
+    const data = tenants.map((tenant) => ({
+      id: tenant.id,
+      name: tenant.name,
+      type: tenant.type,
+      status: tenant.status,
+      region: tenant.region,
+      createdAt: tenant.createdAt,
+      updatedAt: tenant.updatedAt,
+      farmCount: tenant._count.farms,
+      barnCount: tenant._count.barns,
+      batchCount: tenant._count.batches,
+      deviceCount: tenant._count.devices,
+      sensorCount: tenant._count.sensors,
+      sensorBindingCount: tenant._count.sensorBindings,
+      sensorCalibrationCount: tenant._count.sensorCalibrations,
+    }))
+
+    return {
+      data,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+    }
+  } catch (error) {
+    logger.error('Error fetching admin tenants:', error)
     throw error
   }
 }
@@ -55,6 +134,8 @@ export async function getTenantById(id: string) {
 export async function createTenant(data: {
   name: string
   status?: string
+  type?: string
+  region?: string
 }) {
   try {
     logger.info('Creating tenant:', data)
@@ -63,6 +144,8 @@ export async function createTenant(data: {
         id: newUuidV7(),
         name: data.name,
         status: data.status || 'active',
+        type: data.type || 'standard',
+        region: data.region || 'TH',
       },
     })
   } catch (error) {
@@ -79,6 +162,8 @@ export async function updateTenant(
   data: {
     name?: string
     status?: string
+    type?: string
+    region?: string
   }
 ) {
   try {
@@ -107,4 +192,3 @@ export async function deleteTenant(id: string) {
     throw error
   }
 }
-

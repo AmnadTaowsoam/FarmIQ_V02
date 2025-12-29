@@ -6,6 +6,8 @@ import { logger } from '../utils/logger'
 export const tenantSchema = z.object({
   name: z.string().min(1),
   status: z.enum(['active', 'inactive', 'suspended']).optional(),
+  type: z.enum(['standard', 'enterprise', 'trial']).optional(),
+  region: z.string().min(1).max(10).optional(),
 })
 
 export const farmSchema = z.object({

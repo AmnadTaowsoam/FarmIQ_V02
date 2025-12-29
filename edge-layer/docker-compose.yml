@@ -159,6 +159,9 @@ services:
       - APP_PORT=3000
       - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
       - CLOUD_INGESTION_URL=http://cloud-ingestion:3000/api/v1/edge/batch
+      - CLOUD_INGESTION_URL_REQUIRED=true
+      - CLOUD_AUTH_MODE=${CLOUD_AUTH_MODE:-api_key}
+      - CLOUD_API_KEY=${CLOUD_API_KEY:-edge-local-key}
       - DD_SERVICE=edge-sync-forwarder
       - DD_ENV=development
     networks:

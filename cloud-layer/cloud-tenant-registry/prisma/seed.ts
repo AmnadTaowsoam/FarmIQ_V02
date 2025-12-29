@@ -28,21 +28,25 @@ async function main() {
   // Create Tenants with fixed IDs
   const tenant1 = await prisma.tenant.upsert({
     where: { id: SEED_IDS.TENANT_1 },
-    update: { name: 'Tenant Alpha', status: 'active' },
+    update: { name: 'Tenant Alpha', status: 'active', type: 'standard', region: 'TH' },
     create: {
       id: SEED_IDS.TENANT_1,
       name: 'Tenant Alpha',
       status: 'active',
+      type: 'standard',
+      region: 'TH',
     },
   })
 
   const tenant2 = await prisma.tenant.upsert({
     where: { id: SEED_IDS.TENANT_2 },
-    update: { name: 'Tenant Beta', status: 'active' },
+    update: { name: 'Tenant Beta', status: 'active', type: 'standard', region: 'TH' },
     create: {
       id: SEED_IDS.TENANT_2,
       name: 'Tenant Beta',
       status: 'active',
+      type: 'standard',
+      region: 'TH',
     },
   })
   console.log(`Upserted 2 tenants`)

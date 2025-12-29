@@ -5,6 +5,7 @@ import {
   createTenant,
   updateTenant,
   deleteTenant,
+  getAdminTenants,
 } from '../services/tenantService'
 import { logger } from '../utils/logger'
 
@@ -21,6 +22,40 @@ export async function getTenants(_req: Request, res: Response) {
       error: {
         code: 'INTERNAL_ERROR',
         message: 'Failed to fetch tenants',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+  }
+}
+
+/**
+ * Get admin tenants list with counts and pagination
+ */
+export async function getAdminTenantsHandler(req: Request, res: Response) {
+  try {
+    const page = Number.parseInt((req.query.page as string) || '0', 10)
+    const pageSize = Number.parseInt((req.query.pageSize as string) || '25', 10)
+    const search = (req.query.search as string) || undefined
+    const status = (req.query.status as string) || undefined
+    const type = (req.query.type as string) || undefined
+    const region = (req.query.region as string) || undefined
+
+    const result = await getAdminTenants({
+      page: Number.isNaN(page) ? 0 : page,
+      pageSize: Number.isNaN(pageSize) ? 25 : pageSize,
+      search,
+      status,
+      type,
+      region,
+    })
+
+    res.json(result)
+  } catch (error) {
+    logger.error('Error in getAdminTenantsHandler:', error)
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to fetch admin tenants',
         traceId: res.locals.traceId || 'unknown',
       },
     })
@@ -152,4 +187,3 @@ export async function deleteTenantHandler(req: Request, res: Response) {
     })
   }
 }
-

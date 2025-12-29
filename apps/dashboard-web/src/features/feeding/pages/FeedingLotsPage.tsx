@@ -69,6 +69,17 @@ const formatDate = (value?: string) => {
   return date.toLocaleDateString();
 };
 
+const parseNumber = (value: unknown): number | null => {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
 export const FeedingLotsPage: React.FC = () => {
   const { tenantId, farmId, barnId, batchId } = useActiveContext();
   const toast = useToast();
@@ -103,16 +114,48 @@ export const FeedingLotsPage: React.FC = () => {
   const lotColumns: Column<LotRecord>[] = useMemo(() => [
     { id: 'lotCode', label: 'Lot Code', format: (_v, row) => row.lotCode || row.lot_code || '—' },
     { id: 'feedFormulaId', label: 'Formula', format: (_v, row) => row.feedFormulaId || row.feed_formula_id || '—' },
-    { id: 'quantityKg', label: 'Qty (kg)', align: 'right', format: (_v, row) => (row.quantityKg ?? row.quantity_kg ?? 0).toLocaleString() },
-    { id: 'remainingKg', label: 'Remaining (kg)', align: 'right', format: (_v, row) => (row.remainingKg ?? row.remaining_kg ?? 0).toLocaleString() },
+    {
+      id: 'quantityKg',
+      label: 'Qty (kg)',
+      align: 'right',
+      format: (_v, row) => {
+        const quantity = parseNumber(row.quantityKg ?? row.quantity_kg);
+        return quantity !== null ? quantity.toLocaleString() : '—';
+      },
+    },
+    {
+      id: 'remainingKg',
+      label: 'Remaining (kg)',
+      align: 'right',
+      format: (_v, row) => {
+        const remaining = parseNumber(row.remainingKg ?? row.remaining_kg);
+        return remaining !== null ? remaining.toLocaleString() : '—';
+      },
+    },
     { id: 'receivedDate', label: 'Received', format: (_v, row) => formatDate(row.receivedDate || row.received_date) },
   ], []);
 
   const deliveryColumns: Column<DeliveryRecord>[] = useMemo(() => [
     { id: 'feedLotId', label: 'Lot', format: (_v, row) => row.feedLotId || row.feed_lot_id || '—' },
     { id: 'deliveredAt', label: 'Delivered At', format: (_v, row) => formatDate(row.deliveredAt || row.delivered_at) },
-    { id: 'quantityKg', label: 'Qty (kg)', align: 'right', format: (_v, row) => (row.quantityKg ?? row.quantity_kg ?? 0).toLocaleString() },
-    { id: 'unitCost', label: 'Unit Cost', align: 'right', format: (_v, row) => row.unitCost ?? row.unit_cost ? (row.unitCost ?? row.unit_cost)?.toFixed(2) : '—' },
+    {
+      id: 'quantityKg',
+      label: 'Qty (kg)',
+      align: 'right',
+      format: (_v, row) => {
+        const quantity = parseNumber(row.quantityKg ?? row.quantity_kg);
+        return quantity !== null ? quantity.toLocaleString() : '—';
+      },
+    },
+    {
+      id: 'unitCost',
+      label: 'Unit Cost',
+      align: 'right',
+      format: (_v, row) => {
+        const unitCost = parseNumber(row.unitCost ?? row.unit_cost);
+        return unitCost !== null ? unitCost.toFixed(2) : '—';
+      },
+    },
   ], []);
 
   const fetchLots = async (cursor?: string, replace = false) => {

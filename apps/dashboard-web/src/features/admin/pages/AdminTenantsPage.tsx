@@ -88,15 +88,39 @@ export const AdminTenantsPage: React.FC = () => {
       type: 'number',
     },
     {
+      field: 'barnCount',
+      headerName: 'Barns',
+      width: 100,
+      type: 'number',
+    },
+    {
+      field: 'batchCount',
+      headerName: 'Batches',
+      width: 110,
+      type: 'number',
+    },
+    {
       field: 'deviceCount',
       headerName: 'Devices',
       width: 100,
       type: 'number',
     },
     {
-      field: 'userCount',
-      headerName: 'Users',
+      field: 'sensorCount',
+      headerName: 'Sensors',
       width: 100,
+      type: 'number',
+    },
+    {
+      field: 'sensorBindingCount',
+      headerName: 'Bindings',
+      width: 110,
+      type: 'number',
+    },
+    {
+      field: 'sensorCalibrationCount',
+      headerName: 'Calibrations',
+      width: 130,
       type: 'number',
     },
     {

@@ -21,8 +21,12 @@ export interface MockTenant {
     updatedAt: string;
     farmCount: number;
     barnCount: number;
+    batchCount: number;
     deviceCount: number;
-    userCount: number;
+    sensorCount: number;
+    sensorBindingCount: number;
+    sensorCalibrationCount: number;
+    userCount?: number;
 }
 
 export function generateMockTenants(count: number = 50): MockTenant[] {
@@ -45,7 +49,11 @@ export function generateMockTenants(count: number = 50): MockTenant[] {
         updatedAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
         farmCount: Math.floor(Math.random() * 20) + 1,
         barnCount: Math.floor(Math.random() * 50) + 5,
+        batchCount: Math.floor(Math.random() * 80) + 10,
         deviceCount: Math.floor(Math.random() * 200) + 10,
+        sensorCount: Math.floor(Math.random() * 300) + 10,
+        sensorBindingCount: Math.floor(Math.random() * 100) + 5,
+        sensorCalibrationCount: Math.floor(Math.random() * 100) + 5,
         userCount: Math.floor(Math.random() * 50) + 2,
     }));
 }

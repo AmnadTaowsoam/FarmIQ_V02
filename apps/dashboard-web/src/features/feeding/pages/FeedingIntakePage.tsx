@@ -58,6 +58,17 @@ const formatDateTime = (value?: string) => {
   return date.toLocaleString();
 };
 
+const parseNumber = (value: unknown): number | null => {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
 export const FeedingIntakePage: React.FC = () => {
   const { tenantId, farmId, barnId, batchId, timeRange } = useActiveContext();
   const [searchParams] = useSearchParams();
@@ -100,7 +111,15 @@ export const FeedingIntakePage: React.FC = () => {
   const columns: Column<IntakeRecord>[] = useMemo(() => [
     { id: 'occurredAt', label: 'Occurred At', format: (_value, row) => formatDateTime(row.occurredAt || row.occurred_at) },
     { id: 'source', label: 'Source', format: (_value, row) => row.source || '—' },
-    { id: 'quantityKg', label: 'Quantity (kg)', align: 'right', format: (_value, row) => (row.quantityKg ?? row.quantity_kg ?? 0).toFixed(2) },
+    {
+      id: 'quantityKg',
+      label: 'Quantity (kg)',
+      align: 'right',
+      format: (_value, row) => {
+        const quantity = parseNumber(row.quantityKg ?? row.quantity_kg);
+        return quantity !== null ? quantity.toFixed(2) : '—';
+      },
+    },
     { id: 'barnId', label: 'Barn', format: (_value, row) => row.barnId || row.barn_id || '—' },
     { id: 'batchId', label: 'Batch', format: (_value, row) => row.batchId || row.batch_id || '—' },
     { id: 'feedLotId', label: 'Feed Lot', format: (_value, row) => row.feedLotId || row.feed_lot_id || '—' },

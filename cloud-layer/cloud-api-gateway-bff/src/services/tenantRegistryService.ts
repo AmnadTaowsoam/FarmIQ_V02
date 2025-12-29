@@ -6,6 +6,10 @@ export interface TenantRegistryServiceClient {
     query: Record<string, string>
     headers: Record<string, string>
   }): Promise<{ ok: boolean; status: number; data?: unknown }>
+  getAdminTenants(params: {
+    query: Record<string, string>
+    headers: Record<string, string>
+  }): Promise<{ ok: boolean; status: number; data?: unknown }>
 
   getFarms(params: {
     query: Record<string, string>
@@ -98,6 +102,17 @@ export const tenantRegistryServiceClient: TenantRegistryServiceClient = {
     const queryString = buildQueryString(params.query)
     const url = `${registryBaseUrl}/api/v1/tenants${queryString}`
     logger.info('Calling tenant-registry: GET /api/v1/tenants')
+    return callDownstreamJson(url, {
+      method: 'GET',
+      headers: params.headers,
+    })
+  },
+
+  async getAdminTenants(params) {
+    const { registryBaseUrl } = getServiceBaseUrls()
+    const queryString = buildQueryString(params.query)
+    const url = `${registryBaseUrl}/api/v1/admin/tenants${queryString}`
+    logger.info('Calling tenant-registry: GET /api/v1/admin/tenants')
     return callDownstreamJson(url, {
       method: 'GET',
       headers: params.headers,
@@ -251,4 +266,3 @@ export const tenantRegistryServiceClient: TenantRegistryServiceClient = {
     })
   },
 }
-

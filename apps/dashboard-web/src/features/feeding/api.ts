@@ -1,4 +1,4 @@
-import { apiClient } from '../../api/client';
+import { apiClient } from '../../api';
 import { v4 as uuidv4 } from 'uuid';
 
 export type ApiContext = {

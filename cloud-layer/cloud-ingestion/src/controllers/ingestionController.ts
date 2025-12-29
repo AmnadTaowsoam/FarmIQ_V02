@@ -31,6 +31,7 @@ interface IngestionBatch {
 export const ingestBatch = async (req: Request, res: Response) => {
     const traceId = (req.headers['x-trace-id'] as string) || uuidv4();
     const requestId = (req as any).requestId || uuidv4();
+    const tenantHeader = req.headers['x-tenant-id'] as string | undefined;
 
     const batch: IngestionBatch = req.body;
 
@@ -39,6 +40,16 @@ export const ingestBatch = async (req: Request, res: Response) => {
             error: {
                 code: 'VALIDATION_ERROR',
                 message: 'Invalid batch format. tenant_id and events array are required.',
+                traceId,
+            },
+        });
+    }
+
+    if (tenantHeader && tenantHeader !== batch.tenant_id) {
+        return res.status(400).json({
+            error: {
+                code: 'VALIDATION_ERROR',
+                message: 'x-tenant-id header does not match batch.tenant_id',
                 traceId,
             },
         });
@@ -96,6 +107,56 @@ export const ingestBatch = async (req: Request, res: Response) => {
         rejected,
         errors: errors.length > 0 ? errors : undefined,
     });
+};
+
+export const handshake = async (req: Request, res: Response) => {
+    const traceId = (req.headers['x-trace-id'] as string) || uuidv4();
+    const requestId = (req as any).requestId || uuidv4();
+    res.status(200).json({
+        ok: true,
+        service: 'cloud-ingestion',
+        auth_mode: (process.env.CLOUD_AUTH_MODE || 'none').toLowerCase(),
+        request_id: requestId,
+        trace_id: traceId,
+        time: new Date().toISOString(),
+    });
+};
+
+export const getDedupeEntries = async (req: Request, res: Response) => {
+    const traceId = (req.headers['x-trace-id'] as string) || uuidv4();
+    const limit = Math.min(Number(req.query.limit) || 20, 200);
+    const tenantId = typeof req.query.tenant_id === 'string' ? req.query.tenant_id : undefined;
+
+    try {
+        const [entries, total] = await Promise.all([
+            prisma.cloudDedupe.findMany({
+            where: tenantId ? { tenantId } : undefined,
+            orderBy: { firstSeenAt: 'desc' },
+            take: limit,
+            }),
+            prisma.cloudDedupe.count({
+                where: tenantId ? { tenantId } : undefined,
+            }),
+        ]);
+
+        res.status(200).json({
+            count: total,
+            entries: entries.map((entry: { tenantId: string; eventId: string; firstSeenAt: Date }) => ({
+                tenant_id: entry.tenantId,
+                event_id: entry.eventId,
+                first_seen_at: entry.firstSeenAt.toISOString(),
+            })),
+        });
+    } catch (error: any) {
+        logger.error('Error fetching dedupe entries', error);
+        res.status(500).json({
+            error: {
+                code: 'INTERNAL_ERROR',
+                message: 'Failed to fetch dedupe entries',
+                traceId,
+            },
+        });
+    }
 };
 
 function validateEvent(event: IngestionEvent): string | null {

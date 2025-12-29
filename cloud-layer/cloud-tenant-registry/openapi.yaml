@@ -105,6 +105,55 @@ paths:
           description: Tenant deleted
         '404':
           description: Tenant not found
+  /v1/admin/tenants:
+    get:
+      summary: Get admin tenants list with counts
+      tags: [Admin]
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: region
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated tenants with counts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminTenant'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  pageSize:
+                    type: integer
+                  totalPages:
+                    type: integer
   /v1/farms:
     get:
       summary: Get all farms for tenant
@@ -392,6 +441,11 @@ components:
         status:
           type: string
           enum: [active, inactive, suspended]
+        type:
+          type: string
+          enum: [standard, enterprise, trial]
+        region:
+          type: string
         createdAt:
           type: string
           format: date-time
@@ -408,6 +462,11 @@ components:
         status:
           type: string
           enum: [active, inactive, suspended]
+        type:
+          type: string
+          enum: [standard, enterprise, trial]
+        region:
+          type: string
     UpdateTenantRequest:
       type: object
       properties:
@@ -416,6 +475,45 @@ components:
         status:
           type: string
           enum: [active, inactive, suspended]
+        type:
+          type: string
+          enum: [standard, enterprise, trial]
+        region:
+          type: string
+    AdminTenant:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+        region:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        farmCount:
+          type: integer
+        barnCount:
+          type: integer
+        batchCount:
+          type: integer
+        deviceCount:
+          type: integer
+        sensorCount:
+          type: integer
+        sensorBindingCount:
+          type: integer
+        sensorCalibrationCount:
+          type: integer
     Farm:
       type: object
       properties:

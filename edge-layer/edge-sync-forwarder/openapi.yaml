@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: edge-sync-forwarder API
-  version: 1.0.0
+  version: 1.1.0
   description: Outbox-based sync to cloud ingestion with claim/lease, retries, and DLQ.
 servers:
   - url: /
@@ -88,6 +88,15 @@ paths:
                 $ref: '#/components/schemas/DlqQueryResponse'
         '403':
           description: Forbidden (admin endpoints disabled)
+
+  /api/v1/sync/diagnostics/cloud:
+    get:
+      summary: Validate cloud ingestion auth/handshake
+      responses:
+        '200':
+          description: Cloud handshake succeeded
+        '502':
+          description: Cloud handshake failed
 
   /api/v1/sync/redrive:
     post:

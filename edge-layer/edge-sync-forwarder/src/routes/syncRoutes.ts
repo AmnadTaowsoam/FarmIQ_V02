@@ -10,6 +10,7 @@ export function createSyncRoutes(dataSource: DataSource, syncService: SyncServic
   router.get('/state', (req, res) => controller.getState(req, res))
   router.get('/outbox', (req, res) => controller.getOutbox(req, res))
   router.get('/dlq', (req, res) => controller.getDlq(req, res))
+  router.get('/diagnostics/cloud', (req, res) => controller.diagnosticsCloud(req, res))
   router.post('/redrive', (req, res) => controller.redrive(req, res))
   router.post('/dlq/redrive', (req, res) => controller.redrive(req, res))
   router.post('/unclaim-stuck', (req, res) => controller.unclaimStuck(req, res))

@@ -12,6 +12,7 @@ This folder contains human-readable and machine-readable contracts for key APIs 
 - `cloud-ml-model-service.contract.md` — ML model service contract (doc, optional)
 - `cloud-api-gateway-bff.contract.md` — BFF public contract (doc)
 - `cloud-notification-service.contract.md` — Notification service contract (doc)
+- `cloud-ingestion.contract.md` — Cloud ingestion contract (doc)
 - `notifications.payload.md` — Canonical notifications payload mapping (doc)
 - `feed-service.contract.md` — Feed domain contract (doc)
 - `barn-records-service.contract.md` — Barn records contract (doc)

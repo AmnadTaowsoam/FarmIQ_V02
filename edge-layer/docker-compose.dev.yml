@@ -186,6 +186,10 @@ services:
       - LOG_LEVEL=debug
       - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
       - CLOUD_INGESTION_URL=${CLOUD_INGESTION_URL:-http://cloud-ingestion-mock:3000/api/v1/edge/batch}
+      - CLOUD_INGESTION_URL_REQUIRED=${CLOUD_INGESTION_URL_REQUIRED:-false}
+      - CLOUD_AUTH_MODE=${CLOUD_AUTH_MODE:-none}
+      - CLOUD_API_KEY=${CLOUD_API_KEY:-}
+      - CLOUD_HMAC_SECRET=${CLOUD_HMAC_SECRET:-}
       - OUTBOX_MAX_ATTEMPTS=${OUTBOX_MAX_ATTEMPTS:-10}
       - INTERNAL_ADMIN_ENABLED=${INTERNAL_ADMIN_ENABLED:-true}
     networks:

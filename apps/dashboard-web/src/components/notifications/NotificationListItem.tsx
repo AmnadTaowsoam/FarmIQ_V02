@@ -103,9 +103,18 @@ export const NotificationListItem: React.FC<NotificationListItemProps> = ({
             {/* Metadata */}
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
               <Typography variant="caption" color="text.secondary">
-                {showFullDate
-                  ? format(new Date(notification.created_at), 'PPpp')
-                  : formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
+                {(() => {
+                  try {
+                    if (!notification.created_at) return 'Unknown date';
+                    const date = new Date(notification.created_at);
+                    if (isNaN(date.getTime())) return 'Invalid date';
+                    return showFullDate
+                      ? format(date, 'PPpp')
+                      : formatDistanceToNow(date, { addSuffix: true });
+                  } catch {
+                    return 'Invalid date';
+                  }
+                })()}
               </Typography>
 
               {notification.farm_id && (

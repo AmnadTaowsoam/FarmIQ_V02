@@ -215,5 +215,29 @@ export class SyncController {
       })
     }
   }
+
+  /**
+   * GET /api/v1/sync/diagnostics/cloud
+   */
+  async diagnosticsCloud(req: Request, res: Response): Promise<void> {
+    const traceId = res.locals.traceId || 'unknown'
+    try {
+      const result = await this.syncService.checkCloudHandshake()
+      res.status(result.ok ? 200 : 502).json({
+        ok: result.ok,
+        status: result.status,
+        message: result.message,
+      })
+    } catch (error) {
+      logger.error('Error running cloud diagnostics', { error: error instanceof Error ? error.message : String(error), traceId })
+      res.status(500).json({
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to run cloud diagnostics',
+          traceId,
+        },
+      })
+    }
+  }
 }
 

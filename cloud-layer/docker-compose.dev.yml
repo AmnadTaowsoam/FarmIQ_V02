@@ -178,6 +178,9 @@ services:
       - LOG_LEVEL=debug
       - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_ingestion
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
+      - CLOUD_AUTH_MODE=${CLOUD_AUTH_MODE:-none}
+      - CLOUD_API_KEYS=${CLOUD_API_KEYS:-}
+      - CLOUD_HMAC_SECRETS=${CLOUD_HMAC_SECRETS:-}
       - DD_ENV=${DD_ENV:-dev}
       - DD_SERVICE=cloud-ingestion
       - DD_VERSION=${DD_VERSION:-local}

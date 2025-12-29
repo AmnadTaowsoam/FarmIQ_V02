@@ -1,7 +1,8 @@
 import express from 'express'
-import { jwtAuthMiddleware } from '../middlewares/authMiddleware'
+import { jwtAuthMiddleware, requireRole } from '../middlewares/authMiddleware'
 import {
   getTenantsHandler,
+  getAdminTenantsHandler,
   getFarmsHandler,
   getBarnsHandler,
   getBatchesHandler,
@@ -18,6 +19,7 @@ router.use(jwtAuthMiddleware)
  * Tenant Registry Endpoints
  */
 router.get('/tenants', getTenantsHandler)
+router.get('/admin/tenants', requireRole('platform_admin'), getAdminTenantsHandler)
 
 // Farms
 router.get('/farms', getFarmsHandler)
@@ -35,4 +37,3 @@ router.get('/devices', getDevicesHandler)
 router.get('/stations', getStationsHandler)
 
 export default router
-

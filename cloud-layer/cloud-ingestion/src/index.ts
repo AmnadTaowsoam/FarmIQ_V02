@@ -38,7 +38,14 @@ app.use((req: Request, res: Response, next: NextFunction): void => {
   res.setHeader('X-commit-ID', process.env.COMMIT_ID || 'Unknown')
   next()
 })
-app.use(express.json({ limit: '10mb' }))
+app.use(
+  express.json({
+    limit: '10mb',
+    verify: (req, _res, buf) => {
+      ;(req as Request & { rawBody?: string }).rawBody = buf.toString('utf8')
+    },
+  })
+)
 app.use(helmet())
 
 // Setup routes and swagger

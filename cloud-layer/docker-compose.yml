@@ -137,6 +137,9 @@ services:
       - APP_PORT=3000
       - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
+      - CLOUD_AUTH_MODE=${CLOUD_AUTH_MODE:-api_key}
+      - CLOUD_API_KEYS=${CLOUD_API_KEYS:-edge-local-key}
+      - CLOUD_HMAC_SECRETS=${CLOUD_HMAC_SECRETS:-}
       - DD_ENV=${DD_ENV:-prod}
       - DD_SERVICE=cloud-ingestion
       - DD_VERSION=${DD_VERSION:-local}

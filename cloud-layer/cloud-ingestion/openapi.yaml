@@ -1,19 +1,23 @@
 openapi: 3.0.0
 info:
   title: FarmIQ Ingestion Service
-  version: 1.1.0
+  version: 1.2.0
   description: Handles batch event ingestion from edge clusters.
 paths:
   /api/v1/edge/batch:
     post:
       summary: Ingest a batch of events
       description: Receives a batch of MQTT-enveloped events from an edge forwarder. Deduplicates and publishes to RabbitMQ.
+      parameters:
+        - $ref: '#/components/parameters/XTenantId'
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XTraceId'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/BatchRequest'
+              $ref: '#/components/schemas/BatchRequestV1'
       responses:
         '200':
           description: Batch processed
@@ -23,6 +27,43 @@ paths:
                 $ref: '#/components/schemas/BatchResponse'
         '400':
           description: Invalid request
+        '401':
+          description: Unauthorized
+  /api/v1/edge/diagnostics/handshake:
+    get:
+      summary: Cloud ingestion auth handshake
+      description: Validates auth headers for edge-to-cloud ingestion.
+      parameters:
+        - $ref: '#/components/parameters/XTenantId'
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XTraceId'
+      responses:
+        '200':
+          description: Handshake ok
+        '401':
+          description: Unauthorized
+  /api/v1/edge/diagnostics/dedupe:
+    get:
+      summary: Fetch recent dedupe entries (diagnostic)
+      parameters:
+        - $ref: '#/components/parameters/XTenantId'
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/XTraceId'
+        - name: tenant_id
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 200
+      responses:
+        '200':
+          description: Recent dedupe entries
+        '401':
+          description: Unauthorized
   /api/health:
     get:
       summary: Health check
@@ -38,8 +79,41 @@ paths:
         '503':
           description: Service Unavailable
 components:
+  parameters:
+    XTenantId:
+      name: x-tenant-id
+      in: header
+      schema:
+        type: string
+      required: false
+      description: Tenant identifier for batch context.
+    XRequestId:
+      name: x-request-id
+      in: header
+      schema:
+        type: string
+      required: false
+      description: Request correlation id.
+    XTraceId:
+      name: x-trace-id
+      in: header
+      schema:
+        type: string
+      required: false
+      description: Trace id propagated from edge.
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: API key auth (CLOUD_AUTH_MODE=api_key).
+    HmacAuth:
+      type: apiKey
+      in: header
+      name: x-edge-signature
+      description: HMAC auth header (CLOUD_AUTH_MODE=hmac).
   schemas:
-    BatchRequest:
+    BatchRequestV1:
       type: object
       required: [tenant_id, events]
       properties:
@@ -54,8 +128,9 @@ components:
         events:
           type: array
           items:
-            $ref: '#/components/schemas/EventEnvelope'
-    EventEnvelope:
+            $ref: '#/components/schemas/EventEnvelopeV1'
+      description: Batch request schema v1.0.
+    EventEnvelopeV1:
       type: object
       required: [event_id, event_type, tenant_id, farm_id, barn_id, occurred_at, trace_id, schema_version, payload]
       properties:
@@ -86,8 +161,10 @@ components:
           type: string
         schema_version:
           type: string
+          enum: ['1.0']
         payload:
           type: object
+      description: Event envelope schema v1.0.
     BatchResponse:
       type: object
       properties:

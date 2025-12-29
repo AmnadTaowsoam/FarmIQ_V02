@@ -26,7 +26,7 @@ import {
 // API Client Configuration
 // ============================================================================
 
-const USE_MOCKS = import.meta.env.VITE_USE_ADMIN_MOCKS === 'true'; // Default to real API (set VITE_USE_ADMIN_MOCKS=true to use mocks)
+const USE_MOCKS = import.meta.env.VITE_USE_ADMIN_MOCKS !== 'false';
 const BFF_BASE_URL = import.meta.env.VITE_BFF_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:5125';
 
 class AdminApiClient {
@@ -231,14 +231,18 @@ class AdminApiClient {
             const newTenant: MockTenant = {
                 id: `tenant_${Date.now()}`,
                 name: data.name || 'New Tenant',
-                type: data.type || 'standard',
+                type: (data.type as MockTenant['type']) || 'standard',
                 status: 'active',
-                region: data.region || 'us-east-1',
+                region: data.region || 'TH',
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
                 farmCount: 0,
                 barnCount: 0,
+                batchCount: 0,
                 deviceCount: 0,
+                sensorCount: 0,
+                sensorBindingCount: 0,
+                sensorCalibrationCount: 0,
                 userCount: 0,
             };
             this.mockData.tenants.unshift(newTenant);

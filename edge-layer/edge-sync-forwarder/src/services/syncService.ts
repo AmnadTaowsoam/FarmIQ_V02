@@ -4,6 +4,7 @@ import { SyncConfig, loadSyncConfigFromEnv } from '../config'
 import { logger } from '../utils/logger'
 import { OutboxEntity } from '../db/entities/OutboxEntity'
 import axios, { AxiosError } from 'axios'
+import { createHmac } from 'crypto'
 
 export interface CloudEventPayload {
   event_id: string
@@ -11,12 +12,23 @@ export interface CloudEventPayload {
   farm_id?: string | null
   barn_id?: string | null
   device_id?: string | null
+  station_id?: string | null
   session_id?: string | null
   event_type: string
   occurred_at: string
   trace_id?: string | null
+  schema_version: string
   payload: Record<string, unknown>
 }
+
+export interface CloudBatchPayload {
+  tenant_id: string
+  edge_id?: string
+  sent_at: string
+  events: CloudEventPayload[]
+}
+
+type CloudAuthMode = 'none' | 'api_key' | 'hmac'
 
 /**
  * Main sync service that orchestrates claiming, sending, and acking
@@ -24,9 +36,13 @@ export interface CloudEventPayload {
 export class SyncService {
   private outboxService: OutboxService
   private instanceId: string
+  private edgeId: string
   private cloudIngestionUrl: string
   private cloudHeadersJson?: Record<string, string>
   private cloudAuthorization?: string
+  private cloudAuthMode: CloudAuthMode
+  private cloudApiKey?: string
+  private cloudHmacSecret?: string
   private mode: 'send' | 'noop'
   private config: SyncConfig
   private syncInterval?: NodeJS.Timeout
@@ -41,9 +57,14 @@ export class SyncService {
     // Generate stable instance ID (use hostname or random UUID)
     this.instanceId = process.env.HOSTNAME || process.env.INSTANCE_ID || `forwarder-${Date.now()}-${Math.random().toString(36).substring(7)}`
     this.mode = (process.env.SYNC_FORWARDER_MODE ?? 'send') === 'noop' ? 'noop' : 'send'
+    this.edgeId = process.env.EDGE_ID || this.instanceId
 
     const cloudUrl = process.env.CLOUD_INGESTION_URL
-    if (!cloudUrl && this.mode !== 'noop') {
+    const requiresUrl =
+      process.env.CLOUD_INGESTION_URL_REQUIRED != null
+        ? process.env.CLOUD_INGESTION_URL_REQUIRED === 'true'
+        : this.mode !== 'noop' && process.env.NODE_ENV !== 'development'
+    if (!cloudUrl && requiresUrl) {
       throw new Error('CLOUD_INGESTION_URL is required (or set SYNC_FORWARDER_MODE=noop)')
     }
     if (cloudUrl) {
@@ -57,6 +78,15 @@ export class SyncService {
     this.cloudIngestionUrl = cloudUrl || ''
 
     this.cloudAuthorization = process.env.CLOUD_INGESTION_AUTHORIZATION || undefined
+    this.cloudAuthMode = this.parseAuthMode(process.env.CLOUD_AUTH_MODE)
+    this.cloudApiKey = process.env.CLOUD_API_KEY || undefined
+    this.cloudHmacSecret = process.env.CLOUD_HMAC_SECRET || undefined
+    if (this.cloudAuthMode === 'api_key' && !this.cloudApiKey) {
+      throw new Error('CLOUD_API_KEY is required when CLOUD_AUTH_MODE=api_key')
+    }
+    if (this.cloudAuthMode === 'hmac' && !this.cloudHmacSecret) {
+      throw new Error('CLOUD_HMAC_SECRET is required when CLOUD_AUTH_MODE=hmac')
+    }
 
     const headersJson = process.env.CLOUD_INGESTION_HEADERS_JSON
     if (headersJson) {
@@ -84,8 +114,10 @@ export class SyncService {
 
     logger.info('SyncService initialized', {
       instanceId: this.instanceId,
+      edgeId: this.edgeId,
       cloudTarget,
       mode: this.mode,
+      authMode: this.cloudAuthMode,
       config: this.config,
     })
   }
@@ -167,36 +199,36 @@ export class SyncService {
 
       // Send to cloud
       const result = await this.sendBatchToCloud(claimed)
-
-      if (result.success) {
-        // Mark as acked
-        await this.outboxService.markBatchAcked(
-          claimed.map((e) => e.id),
-          this.instanceId
-        )
-
-        const latency = Date.now() - startTime
-        logger.info('Sync batch completed successfully', {
-          instanceId: this.instanceId,
-          batchSize: claimed.length,
-          latencyMs: latency,
-        })
-      } else {
-        // Mark as failed and prepare for retry
-        await this.outboxService.markBatchFailed(
-          claimed,
-          result.errorCode || 'UNKNOWN_ERROR',
-          result.errorMessage || 'Unknown error',
-          this.instanceId
-        )
-
-        logger.warn('Sync batch failed', {
-          instanceId: this.instanceId,
-          batchSize: claimed.length,
-          errorCode: result.errorCode,
-          errorMessage: result.errorMessage,
-        })
+      if (result.ackedIds.length > 0) {
+        await this.outboxService.markBatchAcked(result.ackedIds, this.instanceId)
       }
+      if (result.failed.length > 0) {
+        const grouped = new Map<string, OutboxEntity[]>()
+        for (const failure of result.failed) {
+          const key = `${failure.errorCode}|${failure.errorMessage}`
+          const bucket = grouped.get(key) ?? []
+          bucket.push(failure.entity)
+          grouped.set(key, bucket)
+        }
+        for (const [key, entities] of grouped.entries()) {
+          const [errorCode, errorMessage] = key.split('|')
+          await this.outboxService.markBatchFailed(
+            entities,
+            errorCode || 'UNKNOWN_ERROR',
+            errorMessage || 'Unknown error',
+            this.instanceId
+          )
+        }
+      }
+
+      const latency = Date.now() - startTime
+      logger.info('Sync batch completed', {
+        instanceId: this.instanceId,
+        batchSize: claimed.length,
+        ackedCount: result.ackedIds.length,
+        failedCount: result.failed.length,
+        latencyMs: latency,
+      })
     } catch (error) {
       logger.error('Error in sync cycle', {
         instanceId: this.instanceId,
@@ -226,95 +258,234 @@ export class SyncService {
   /**
    * Send batch to cloud-ingestion with idempotency
    */
-  private async sendBatchToCloud(entities: OutboxEntity[]): Promise<{ success: boolean; errorCode?: string; errorMessage?: string; sentCount: number }> {
+  private async sendBatchToCloud(
+    entities: OutboxEntity[]
+  ): Promise<{ ackedIds: string[]; failed: Array<{ entity: OutboxEntity; errorCode: string; errorMessage: string }> }> {
     if (this.mode === 'noop') {
       logger.warn('SYNC_FORWARDER_MODE=noop; skipping cloud send', {
         instanceId: this.instanceId,
         batchSize: entities.length,
       })
-      return { success: true, sentCount: entities.length }
+      return { ackedIds: entities.map((entity) => entity.id), failed: [] }
     }
 
-    // Transform entities to cloud event format
-    const events: CloudEventPayload[] = entities.map((entity) => ({
-      event_id: entity.id, // Use sync_outbox.id as event_id for cloud idempotency
-      tenant_id: entity.tenantId,
-      farm_id: entity.farmId || null,
-      barn_id: entity.barnId || null,
-      device_id: entity.deviceId || null,
-      session_id: entity.sessionId || null,
-      event_type: entity.eventType,
-      occurred_at: entity.occurredAt?.toISOString() || new Date().toISOString(),
-      trace_id: entity.traceId || null,
-      payload: entity.payload,
-    }))
+    if (!this.cloudIngestionUrl) {
+      const errorCode = 'MISSING_CLOUD_URL'
+      const errorMessage = 'CLOUD_INGESTION_URL is not configured'
+      return {
+        ackedIds: [],
+        failed: entities.map((entity) => ({ entity, errorCode, errorMessage })),
+      }
+    }
 
-    try {
-      const requestId = `sync-${Date.now()}-${Math.random().toString(36).substring(7)}`
-      const extraHeaders: Record<string, string> = {
-        ...(this.cloudHeadersJson ?? {}),
-      }
-      if (this.cloudAuthorization) {
-        extraHeaders['Authorization'] = this.cloudAuthorization
-      }
-      const response = await axios.post(
-        this.cloudIngestionUrl,
-        { events },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'x-request-id': requestId,
-            'x-trace-id': requestId,
-            ...extraHeaders,
-          },
+    const ackedIds: string[] = []
+    const failed: Array<{ entity: OutboxEntity; errorCode: string; errorMessage: string }> = []
+
+    const grouped = new Map<string, OutboxEntity[]>()
+    for (const entity of entities) {
+      const bucket = grouped.get(entity.tenantId) ?? []
+      bucket.push(entity)
+      grouped.set(entity.tenantId, bucket)
+    }
+
+    for (const [tenantId, batch] of grouped.entries()) {
+      const events = batch.map((entity) => {
+        const payload = entity.payload ?? {}
+        const schemaVersion =
+          typeof (payload as Record<string, unknown>).schema_version === 'string'
+            ? (payload as Record<string, unknown>).schema_version
+            : '1.0'
+        const stationId =
+          typeof (payload as Record<string, unknown>).station_id === 'string'
+            ? (payload as Record<string, unknown>).station_id
+            : typeof (payload as Record<string, unknown>).stationId === 'string'
+              ? (payload as Record<string, unknown>).stationId
+              : null
+
+        return {
+          event_id: entity.id, // Use sync_outbox.id as event_id for cloud idempotency
+          tenant_id: entity.tenantId,
+          farm_id: entity.farmId || null,
+          barn_id: entity.barnId || null,
+          device_id: entity.deviceId || null,
+          station_id: stationId,
+          session_id: entity.sessionId || null,
+          event_type: entity.eventType,
+          occurred_at: entity.occurredAt?.toISOString() || new Date().toISOString(),
+          trace_id: entity.traceId || null,
+          schema_version: schemaVersion,
+          payload: payload as Record<string, unknown>,
+        } as CloudEventPayload
+      })
+
+      try {
+        const requestId = `sync-${Date.now()}-${Math.random().toString(36).substring(7)}`
+        const traceId = events.find((event) => event.trace_id)?.trace_id || requestId
+        const batchPayload: CloudBatchPayload = {
+          tenant_id: tenantId,
+          edge_id: this.edgeId,
+          sent_at: new Date().toISOString(),
+          events,
+        }
+        const body = JSON.stringify(batchPayload)
+        const headers = this.buildCloudHeaders({
+          tenantId,
+          requestId,
+          traceId,
+          body,
+        })
+        const response = await axios.post(this.cloudIngestionUrl, body, {
+          headers,
           timeout: 30000, // 30 second timeout
         }
-      )
+        )
 
-      // Treat 2xx as success
-      if (response.status >= 200 && response.status < 300) {
-        return {
-          success: true,
-          sentCount: entities.length,
+        // Treat 2xx as success
+        if (response.status >= 200 && response.status < 300) {
+          const errors = Array.isArray((response.data as any)?.errors)
+            ? ((response.data as any).errors as Array<{ event_id: string; error: string }>)
+            : []
+          const errorMap = new Map<string, string>()
+          for (const err of errors) {
+            if (err?.event_id && err?.error) {
+              errorMap.set(err.event_id, err.error)
+            }
+          }
+          for (const entity of batch) {
+            const err = errorMap.get(entity.id)
+            if (err) {
+              failed.push({
+                entity,
+                errorCode: 'REJECTED',
+                errorMessage: err,
+              })
+            } else {
+              ackedIds.push(entity.id)
+            }
+          }
+        } else {
+          const errorCode = `HTTP_${response.status}`
+          const errorMessage = `Unexpected status code: ${response.status}`
+          for (const entity of batch) {
+            failed.push({ entity, errorCode, errorMessage })
+          }
         }
-      } else {
-        return {
-          success: false,
-          errorCode: `HTTP_${response.status}`,
-          errorMessage: `Unexpected status code: ${response.status}`,
-          sentCount: 0,
+      } catch (error) {
+        const axiosError = error as AxiosError
+
+        let errorCode = 'UNKNOWN_ERROR'
+        let errorMessage = 'Unknown error'
+
+        if (axiosError.response) {
+          // Server responded with error status
+          errorCode = `HTTP_${axiosError.response.status}`
+          errorMessage = axiosError.response.data
+            ? typeof axiosError.response.data === 'string'
+              ? axiosError.response.data
+              : JSON.stringify(axiosError.response.data)
+            : axiosError.message
+        } else if (axiosError.request) {
+          // Request made but no response
+          errorCode = 'NETWORK_ERROR'
+          errorMessage = 'No response from cloud-ingestion'
+        } else {
+          // Error in request setup
+          errorCode = 'REQUEST_ERROR'
+          errorMessage = axiosError.message
         }
+
+        for (const entity of batch) {
+          failed.push({ entity, errorCode, errorMessage })
+        }
+      }
+    }
+
+    return { ackedIds, failed }
+  }
+
+  private parseAuthMode(value: string | undefined): CloudAuthMode {
+    const normalized = (value ?? 'none').toLowerCase()
+    if (normalized === 'none' || normalized === 'api_key' || normalized === 'hmac') {
+      return normalized
+    }
+    throw new Error(`CLOUD_AUTH_MODE must be one of none|api_key|hmac (received ${value})`)
+  }
+
+  private buildCloudHeaders(params: {
+    tenantId: string
+    requestId: string
+    traceId: string
+    body: string
+  }): Record<string, string> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'x-tenant-id': params.tenantId,
+      'x-request-id': params.requestId,
+      'x-trace-id': params.traceId,
+      ...(this.cloudHeadersJson ?? {}),
+    }
+
+    if (this.cloudAuthorization) {
+      headers['Authorization'] = this.cloudAuthorization
+    }
+
+    if (this.cloudAuthMode === 'api_key' && this.cloudApiKey) {
+      headers['x-api-key'] = this.cloudApiKey
+    }
+
+    if (this.cloudAuthMode === 'hmac' && this.cloudHmacSecret) {
+      const signature = createHmac('sha256', this.cloudHmacSecret)
+        .update(params.body)
+        .digest('hex')
+      headers['x-edge-signature'] = signature
+    }
+
+    return headers
+  }
+
+  async checkCloudHandshake(): Promise<{
+    ok: boolean
+    status: number
+    message: string
+  }> {
+    if (!this.cloudIngestionUrl) {
+      return {
+        ok: false,
+        status: 500,
+        message: 'CLOUD_INGESTION_URL is not configured',
+      }
+    }
+
+    const base = new URL(this.cloudIngestionUrl)
+    const handshakeUrl = `${base.origin}/api/v1/edge/diagnostics/handshake`
+    const requestId = `handshake-${Date.now()}-${Math.random().toString(36).substring(7)}`
+    const body = ''
+    const headers = this.buildCloudHeaders({
+      tenantId: 'unknown',
+      requestId,
+      traceId: requestId,
+      body,
+    })
+
+    try {
+      const response = await axios.get(handshakeUrl, {
+        headers,
+        timeout: 10000,
+      })
+      return {
+        ok: response.status >= 200 && response.status < 300,
+        status: response.status,
+        message: typeof response.data === 'string' ? response.data : JSON.stringify(response.data),
       }
     } catch (error) {
       const axiosError = error as AxiosError
-
-      let errorCode = 'UNKNOWN_ERROR'
-      let errorMessage = 'Unknown error'
-
-      if (axiosError.response) {
-        // Server responded with error status
-        errorCode = `HTTP_${axiosError.response.status}`
-        errorMessage = axiosError.response.data
-          ? typeof axiosError.response.data === 'string'
-            ? axiosError.response.data
-            : JSON.stringify(axiosError.response.data)
-          : axiosError.message
-      } else if (axiosError.request) {
-        // Request made but no response
-        errorCode = 'NETWORK_ERROR'
-        errorMessage = 'No response from cloud-ingestion'
-      } else {
-        // Error in request setup
-        errorCode = 'REQUEST_ERROR'
-        errorMessage = axiosError.message
-      }
-
-      return {
-        success: false,
-        errorCode,
-        errorMessage,
-        sentCount: 0,
-      }
+      const status = axiosError.response?.status ?? 500
+      const message = axiosError.response?.data
+        ? typeof axiosError.response.data === 'string'
+          ? axiosError.response.data
+          : JSON.stringify(axiosError.response.data)
+        : axiosError.message
+      return { ok: false, status, message }
     }
   }
 

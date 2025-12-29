@@ -105,6 +105,47 @@ export async function getTenantsHandler(req: Request, res: Response): Promise<vo
 }
 
 /**
+ * GET /api/v1/admin/tenants
+ */
+export async function getAdminTenantsHandler(req: Request, res: Response): Promise<void> {
+  const startTime = Date.now()
+
+  const query: Record<string, string> = {}
+  Object.keys(req.query).forEach((key) => {
+    if (req.query[key]) {
+      query[key] = req.query[key] as string
+    }
+  })
+
+  try {
+    const result = await tenantRegistryServiceClient.getAdminTenants({
+      query,
+      headers: buildDownstreamHeaders(req, res),
+    })
+
+    const duration = Date.now() - startTime
+    logger.info('Get admin tenants request completed', {
+      route: '/api/v1/admin/tenants',
+      downstreamService: 'tenant-registry',
+      duration_ms: duration,
+      status_code: result.status,
+      requestId: res.locals.requestId,
+    })
+
+    handleDownstreamResponse(result, res)
+  } catch (error) {
+    logger.error('Error in getAdminTenantsHandler', error)
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to fetch admin tenants',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+  }
+}
+
+/**
  * GET /api/v1/farms
  */
 export async function getFarmsHandler(req: Request, res: Response): Promise<void> {
@@ -378,4 +419,3 @@ export async function getStationsHandler(req: Request, res: Response): Promise<v
     })
   }
 }
-

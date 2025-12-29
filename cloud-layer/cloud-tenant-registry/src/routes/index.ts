@@ -7,6 +7,7 @@ import deviceRoutes from './deviceRoutes'
 import stationRoutes from './stationRoutes'
 import topologyRoutes from './topologyRoutes'
 import sensorRoutes from './sensorRoutes'
+import adminTenantRoutes from './adminTenantRoutes'
 
 /**
  * Setup all routes for cloud-tenant-registry service
@@ -16,6 +17,7 @@ export function setupRoutes(app: Express) {
   // Health and ready endpoints are in index.ts
   // Business routes under /api/v1
   app.use('/api/v1/tenants', tenantRoutes)
+  app.use('/api/v1/admin', adminTenantRoutes)
   app.use('/api/v1/farms', farmRoutes)
   app.use('/api/v1/barns', barnRoutes)
   app.use('/api/v1/batches', batchRoutes)

@@ -107,6 +107,10 @@ Copy-Item .env.example .env
 - `APP_PORT=3000`
 - `DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}`
 - `CLOUD_INGESTION_URL=http://cloud-ingestion:3000` (or external URL in prod)
+- `CLOUD_INGESTION_URL_REQUIRED=true` (default true outside dev)
+- `CLOUD_AUTH_MODE=none|api_key|hmac`
+- `CLOUD_API_KEY=...` (when `CLOUD_AUTH_MODE=api_key`)
+- `CLOUD_HMAC_SECRET=...` (when `CLOUD_AUTH_MODE=hmac`)
 - `DD_SERVICE=edge-sync-forwarder`
 - `DD_ENV=development`
 
@@ -135,6 +139,9 @@ Copy-Item .env.example .env
 - `APP_PORT=3000`
 - `DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}`
 - `RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672`
+- `CLOUD_AUTH_MODE=none|api_key|hmac`
+- `CLOUD_API_KEYS=key1,key2` (when `CLOUD_AUTH_MODE=api_key`)
+- `CLOUD_HMAC_SECRETS=secret1,secret2` (when `CLOUD_AUTH_MODE=hmac`)
 - `DD_SERVICE=cloud-ingestion`
 - `DD_ENV=development`
 
@@ -247,4 +254,3 @@ For production deployments:
 - `docs/dev/01-running-locally.md` - Running services locally
 - `docs/shared/02-service-registry.md` - Service URLs and ports
 - `docs/shared/02-observability-datadog.md` - Datadog configuration
-
