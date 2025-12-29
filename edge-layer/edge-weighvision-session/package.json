@@ -28,9 +28,9 @@
     "keywords": [],
     "author": "",
     "license": "SEE LICENSE IN LICENSE.md",
-    "dependencies": {
-        "@prisma/client": "^5.16.1",
-        "@farmiq/edge-contracts": "file:../shared/edge-contracts.tgz",
+        "dependencies": {
+            "@prisma/client": "^5.16.1",
+        "@farmiq/edge-contracts": "file:./edge-contracts.tgz",
         "@types/chai": "^4.3.5",
         "@types/express": "^4.17.17",
         "@types/mocha": "^10.0.1",
@@ -92,7 +92,7 @@
         "tsconfig-paths": "^4.2.0",
         "typescript": "^5.4.5"
     },
-    "prisma": {
+        "prisma": {
         "seed": "npx ts-node --project tsconfig.prisma.json --transpile-only prisma/seed.ts"
     }
 }

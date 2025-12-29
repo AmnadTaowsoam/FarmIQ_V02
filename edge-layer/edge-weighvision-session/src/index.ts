@@ -8,6 +8,7 @@ import { logger } from './utils/logger'
 import { setupSwagger } from './utils/swagger'
 import { PrismaClient } from '@prisma/client'
 import type { Server } from 'http'
+import { ensureWeighVisionSchema } from './db/ensureSchema'
 
 const app = express()
 const port = process.env.APP_PORT || 3000
@@ -28,6 +29,7 @@ setupSwagger(app)
 const startServer = async () => {
   try {
     await prisma.$connect()
+    await ensureWeighVisionSchema(prisma)
     logger.info('Database connection has been established successfully.')
     server = app.listen(port, () => {
       logger.info(`edge-weighvision-session listening on port ${port}`)

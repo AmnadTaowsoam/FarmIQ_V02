@@ -6,6 +6,7 @@ WORKDIR /usr/src/app
 RUN apk add --no-cache openssl
 
 COPY package*.json ./
+COPY edge-contracts.tgz ./
 RUN npm ci
 
 COPY . .

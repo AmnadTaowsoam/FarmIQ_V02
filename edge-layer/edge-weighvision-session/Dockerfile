@@ -6,6 +6,7 @@ WORKDIR /usr/src/app
 RUN apk add --no-cache openssl
 
 COPY package*.json ./
+COPY edge-contracts.tgz ./
 RUN npm ci
 
 COPY . .
@@ -21,6 +22,7 @@ WORKDIR /usr/src/app
 RUN apk add --no-cache openssl
 
 COPY package*.json ./
+COPY edge-contracts.tgz ./
 RUN npm ci
 
 COPY . .
@@ -33,6 +35,7 @@ WORKDIR /usr/src/app
 ENV NODE_ENV=production
 
 COPY package*.json ./
+COPY edge-contracts.tgz ./
 RUN npm ci --only=production
 
 COPY --from=build /usr/src/app/dist ./dist

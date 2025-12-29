@@ -54,9 +54,9 @@ export const createSession = async (data: CreateSessionParams) => {
     traceId,
   } = data
 
-  return await prisma.$transaction(async (tx) => {
+  const session = await prisma.$transaction(async (tx) => {
     // Idempotent upsert
-    const session = await tx.weightSession.upsert({
+    const createdOrExisting = await tx.weightSession.upsert({
       where: { sessionId },
       create: {
         sessionId,
@@ -98,7 +98,7 @@ export const createSession = async (data: CreateSessionParams) => {
       where: { sessionId },
     })
 
-    if (weights.length > 0 && !session.initialWeightKg) {
+    if (weights.length > 0 && !createdOrExisting.initialWeightKg) {
       const firstWeight = weights.sort(
         (a, b) => a.occurredAt.getTime() - b.occurredAt.getTime()
       )[0]
@@ -108,50 +108,53 @@ export const createSession = async (data: CreateSessionParams) => {
       })
     }
 
-    // Emit sync_outbox event (idempotent by eventId).
-    try {
-      await tx.$executeRawUnsafe(
-        `
-                INSERT INTO sync_outbox (
-                    id, tenant_id, farm_id, barn_id, device_id, session_id,
-                    event_type, occurred_at, trace_id, payload_json,
-                    status, next_attempt_at, priority, attempt_count, created_at, updated_at
-                ) VALUES (
-                    $1::uuid, $2::text, $3::text, $4::text, $5::text, $6::text,
-                    'weighvision.session.created', $7::timestamptz, $8::text, $9::jsonb,
-                    'pending', NOW(), 0, 0, NOW(), NOW()
-                )
-                ON CONFLICT (id) DO NOTHING
-                `,
-        eventId,
-        tenantId,
-        farmId,
-        barnId,
-        deviceId,
-        sessionId,
-        new Date(startAt),
-        traceId || null,
-        JSON.stringify({
-          session_id: sessionId,
-          tenant_id: tenantId,
-          farm_id: farmId,
-          barn_id: barnId,
-          device_id: deviceId,
-          station_id: stationId,
-          batch_id: batchId,
-          start_at: startAt,
-        })
-      )
-    } catch (error: unknown) {
-      logger.error('Failed to write sync_outbox weighvision.session.created', {
-        error: errorMessage(error),
-        eventId,
-        traceId,
-      })
-    }
-
-    return session
+    return createdOrExisting
   })
+
+  // Emit sync_outbox event (idempotent by eventId).
+  // Write outside the session transaction so a transient outbox failure does not roll back session persistence.
+  try {
+    await prisma.$executeRawUnsafe(
+      `
+      INSERT INTO sync_outbox (
+        id, tenant_id, farm_id, barn_id, device_id, session_id,
+        event_type, occurred_at, trace_id, payload_json,
+        status, next_attempt_at, priority, attempt_count, created_at, updated_at
+      ) VALUES (
+        $1::uuid, $2::text, $3::text, $4::text, $5::text, $6::text,
+        'weighvision.session.created', $7::timestamptz, $8::text, $9::jsonb,
+        'pending', NOW(), 0, 0, NOW(), NOW()
+      )
+      ON CONFLICT (id) DO NOTHING
+      `,
+      eventId,
+      tenantId,
+      farmId,
+      barnId,
+      deviceId,
+      sessionId,
+      new Date(startAt),
+      traceId || null,
+      JSON.stringify({
+        session_id: sessionId,
+        tenant_id: tenantId,
+        farm_id: farmId,
+        barn_id: barnId,
+        device_id: deviceId,
+        station_id: stationId,
+        batch_id: batchId,
+        start_at: startAt,
+      })
+    )
+  } catch (error: unknown) {
+    logger.error('Failed to write sync_outbox weighvision.session.created', {
+      error: errorMessage(error),
+      eventId,
+      traceId,
+    })
+  }
+
+  return session
 }
 
 export const getSession = async (sessionId: string) => {
@@ -242,7 +245,7 @@ export const finalizeSession = async (
     traceId: string
   }
 ) => {
-  return await prisma.$transaction(async (tx) => {
+  const updatedSession = await prisma.$transaction(async (tx) => {
     const session = await tx.weightSession.findUnique({
       where: { sessionId },
       include: { weights: { orderBy: { occurredAt: 'desc' }, take: 1 } },
@@ -263,49 +266,48 @@ export const finalizeSession = async (
       },
     })
 
-    // Emit sync_outbox finalized event (idempotent by eventId).
-    try {
-      await tx.$executeRawUnsafe(
-        `
-                INSERT INTO sync_outbox (
-                    id, tenant_id, device_id, session_id,
-                    event_type, occurred_at, trace_id, payload_json,
-                    status, next_attempt_at, priority, attempt_count, created_at, updated_at
-                ) VALUES (
-                    $1::uuid, $2::text, $3::text, $4::text,
-                    'weighvision.session.finalized', $5::timestamptz, $6::text, $7::jsonb,
-                    'pending', NOW(), 0, 0, NOW(), NOW()
-                )
-                ON CONFLICT (id) DO NOTHING
-                `,
-        data.eventId,
-        session.tenantId,
-        session.deviceId,
-        sessionId,
-        new Date(data.occurredAt),
-        data.traceId || null,
-        JSON.stringify({
-          session_id: sessionId,
-          tenant_id: session.tenantId,
-          device_id: session.deviceId,
-          final_weight_kg: finalWeight,
-          image_count: updatedSession.imageCount,
-          end_at: endTime.toISOString(),
-        })
-      )
-    } catch (error: unknown) {
-      logger.error(
-        'Failed to write sync_outbox weighvision.session.finalized',
-        {
-          error: errorMessage(error),
-          eventId: data.eventId,
-          traceId: data.traceId,
-        }
-      )
-    }
-
     return updatedSession
   })
+
+  // Emit sync_outbox finalized event (idempotent by eventId).
+  try {
+    await prisma.$executeRawUnsafe(
+      `
+      INSERT INTO sync_outbox (
+        id, tenant_id, device_id, session_id,
+        event_type, occurred_at, trace_id, payload_json,
+        status, next_attempt_at, priority, attempt_count, created_at, updated_at
+      ) VALUES (
+        $1::uuid, $2::text, $3::text, $4::text,
+        'weighvision.session.finalized', $5::timestamptz, $6::text, $7::jsonb,
+        'pending', NOW(), 0, 0, NOW(), NOW()
+      )
+      ON CONFLICT (id) DO NOTHING
+      `,
+      data.eventId,
+      data.tenantId,
+      updatedSession.deviceId,
+      sessionId,
+      new Date(data.occurredAt),
+      data.traceId || null,
+      JSON.stringify({
+        session_id: sessionId,
+        tenant_id: data.tenantId,
+        device_id: updatedSession.deviceId,
+        final_weight_kg: updatedSession.finalWeightKg,
+        image_count: updatedSession.imageCount,
+        end_at: updatedSession.endAt?.toISOString(),
+      })
+    )
+  } catch (error: unknown) {
+    logger.error('Failed to write sync_outbox weighvision.session.finalized', {
+      error: errorMessage(error),
+      eventId: data.eventId,
+      traceId: data.traceId,
+    })
+  }
+
+  return updatedSession
 }
 
 export const attach = async (
