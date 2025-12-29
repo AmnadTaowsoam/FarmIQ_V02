@@ -64,7 +64,7 @@ export async function postJson(params: {
         status: response.status,
         requestId: params.requestId,
         traceId: params.traceId,
-        bodySnippet: text.slice(0, 500),
+        responseBytes: Buffer.byteLength(text, 'utf8'),
       })
       return { ok: false, status: response.status, error: text }
     }
@@ -115,7 +115,7 @@ export async function postJsonForJson<T>(params: {
         status: response.status,
         requestId: params.requestId,
         traceId: params.traceId,
-        bodySnippet: text.slice(0, 500),
+        responseBytes: Buffer.byteLength(text, 'utf8'),
       })
       return { ok: false, status: response.status, error: text }
     }

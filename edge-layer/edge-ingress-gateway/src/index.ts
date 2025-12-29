@@ -77,8 +77,7 @@ app.get('/api/ready', (_req: Request, res: Response) => {
     })
 })
 
-// Log connection details
-logger.info(`Connecting to the database at ${process.env.DATABASE_URL}`)
+logger.info('Connecting to database')
 
 // Server variable to be used for graceful shutdown
 let server: ReturnType<typeof app.listen> | undefined

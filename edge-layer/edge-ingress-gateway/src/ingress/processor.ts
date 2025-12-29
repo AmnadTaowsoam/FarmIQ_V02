@@ -309,6 +309,7 @@ export async function processIngressMessage(params: {
           url: `${base}/api/v1/weighvision/sessions`,
           body: {
             sessionId,
+            eventId: envelope.event_id,
             tenantId: envelope.tenant_id,
             farmId: topic.farmId,
             barnId: topic.barnId,
@@ -366,7 +367,11 @@ export async function processIngressMessage(params: {
       if (eventType === 'weighvision.session.finalized') {
         return {
           url: `${base}/api/v1/weighvision/sessions/${encodeURIComponent(sessionId)}/finalize`,
-          body: {},
+          body: {
+            tenantId: envelope.tenant_id,
+            eventId: envelope.event_id,
+            occurredAt: envelope.ts,
+          },
         }
       }
       return null

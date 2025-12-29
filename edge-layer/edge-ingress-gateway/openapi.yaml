@@ -59,13 +59,7 @@ paths:
 
   /api/v1/media/images/presign:
     post:
-      summary: Request a presigned upload URL (passthrough to edge-media-store)
-      parameters:
-        - in: header
-          name: x-tenant-id
-          required: true
-          schema:
-            type: string
+      summary: Deprecated presign proxy endpoint (devices call edge-media-store directly)
       requestBody:
         required: true
         content:
@@ -73,18 +67,12 @@ paths:
             schema:
               $ref: '#/components/schemas/PresignRequest'
       responses:
-        '200':
-          description: Presign response
+        '410':
+          description: Gone (call edge-media-store directly)
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PresignResponse'
-        '400':
-          description: Validation error
-        '403':
-          description: Tenant mismatch
-        '502':
-          description: Downstream error
+                $ref: '#/components/schemas/ErrorResponse'
 
 components:
   schemas:
