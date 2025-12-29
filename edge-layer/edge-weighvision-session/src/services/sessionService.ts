@@ -3,8 +3,12 @@ import { logger } from '../utils/logger';
 
 const prisma = new PrismaClient();
 
+export const pingDb = async () => {
+    await prisma.$queryRaw`SELECT 1`;
+};
+
 export const createSession = async (data: any) => {
-    const { sessionId, tenantId, farmId, barnId, deviceId, stationId, batchId, startAt, traceId } = data;
+    const { sessionId, eventId, tenantId, farmId, barnId, deviceId, stationId, batchId, startAt, traceId } = data;
 
     return await prisma.$transaction(async (tx) => {
         // Idempotent upsert
@@ -56,36 +60,45 @@ export const createSession = async (data: any) => {
             });
         }
 
-        // Emit outbox event if status is 'created' and not already emitted
-        // Using a check on the event type and session_id in payload
-        const outboxExists = await tx.outbox.findFirst({
-            where: {
+        // Emit sync_outbox event (idempotent by eventId).
+        try {
+            await tx.$executeRawUnsafe(
+                `
+                INSERT INTO sync_outbox (
+                    id, tenant_id, farm_id, barn_id, device_id, session_id,
+                    event_type, occurred_at, trace_id, payload_json,
+                    status, next_attempt_at, priority, attempt_count, created_at, updated_at
+                ) VALUES (
+                    $1::uuid, $2::text, $3::text, $4::text, $5::text, $6::text,
+                    'weighvision.session.created', $7::timestamptz, $8::text, $9::jsonb,
+                    'pending', NOW(), 0, 0, NOW(), NOW()
+                )
+                ON CONFLICT (id) DO NOTHING
+                `,
+                eventId,
                 tenantId,
-                eventType: 'weighvision.session.created',
-                payload: {
-                    path: ['session_id'],
-                    equals: sessionId
-                }
-            }
-        });
-
-        if (!outboxExists) {
-            await tx.outbox.create({
-                data: {
-                    eventType: 'weighvision.session.created',
-                    tenantId,
-                    traceId: traceId || 'internal',
-                    payload: {
-                        session_id: sessionId,
-                        tenant_id: tenantId,
-                        farm_id: farmId,
-                        barn_id: barnId,
-                        device_id: deviceId,
-                        station_id: stationId,
-                        batch_id: batchId,
-                        occurred_at: startAt
-                    }
-                }
+                farmId,
+                barnId,
+                deviceId,
+                sessionId,
+                new Date(startAt),
+                traceId || null,
+                JSON.stringify({
+                    session_id: sessionId,
+                    tenant_id: tenantId,
+                    farm_id: farmId,
+                    barn_id: barnId,
+                    device_id: deviceId,
+                    station_id: stationId,
+                    batch_id: batchId,
+                    start_at: startAt
+                })
+            );
+        } catch (error: any) {
+            logger.error('Failed to write sync_outbox weighvision.session.created', {
+                error: error?.message ?? String(error),
+                eventId,
+                traceId
             });
         }
 
@@ -172,7 +185,7 @@ export const bindMedia = async (sessionId: string, data: any) => {
     });
 };
 
-export const finalizeSession = async (sessionId: string, traceId: string) => {
+export const finalizeSession = async (sessionId: string, data: { tenantId: string, eventId: string, occurredAt: string, traceId: string }) => {
     return await prisma.$transaction(async (tx) => {
         const session = await tx.weightSession.findUnique({
             where: { sessionId },
@@ -194,21 +207,43 @@ export const finalizeSession = async (sessionId: string, traceId: string) => {
             }
         });
 
-        // Emit finalized event
-        await tx.outbox.create({
-            data: {
-                eventType: 'weighvision.session.finalized',
-                tenantId: session.tenantId,
-                traceId: traceId || 'internal',
-                payload: {
+        // Emit sync_outbox finalized event (idempotent by eventId).
+        try {
+            await tx.$executeRawUnsafe(
+                `
+                INSERT INTO sync_outbox (
+                    id, tenant_id, device_id, session_id,
+                    event_type, occurred_at, trace_id, payload_json,
+                    status, next_attempt_at, priority, attempt_count, created_at, updated_at
+                ) VALUES (
+                    $1::uuid, $2::text, $3::text, $4::text,
+                    'weighvision.session.finalized', $5::timestamptz, $6::text, $7::jsonb,
+                    'pending', NOW(), 0, 0, NOW(), NOW()
+                )
+                ON CONFLICT (id) DO NOTHING
+                `,
+                data.eventId,
+                session.tenantId,
+                session.deviceId,
+                sessionId,
+                new Date(data.occurredAt),
+                data.traceId || null,
+                JSON.stringify({
                     session_id: sessionId,
                     tenant_id: session.tenantId,
+                    device_id: session.deviceId,
                     final_weight_kg: finalWeight,
                     image_count: updatedSession.imageCount,
-                    end_at: endTime
-                }
-            }
-        });
+                    end_at: endTime.toISOString()
+                })
+            );
+        } catch (error: any) {
+            logger.error('Failed to write sync_outbox weighvision.session.finalized', {
+                error: error?.message ?? String(error),
+                eventId: data.eventId,
+                traceId: data.traceId
+            });
+        }
 
         return updatedSession;
     });

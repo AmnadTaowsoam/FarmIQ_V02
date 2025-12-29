@@ -64,8 +64,7 @@ app.use('/api', createHealthRoutes(prisma))
 // Setup Swagger
 setupSwagger(app)
 
-// Log connection details
-logger.info(`Connecting to the database at ${process.env.DATABASE_URL}`)
+logger.info('Connecting to database')
 
 // Server variable to be used for graceful shutdown
 let server: ReturnType<typeof app.listen> | undefined

@@ -46,7 +46,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: Session details
@@ -62,7 +61,6 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
       requestBody:
         required: true
         content:
@@ -105,7 +103,12 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinalizeSession'
       responses:
         '200':
           description: Session finalized
@@ -118,6 +121,7 @@ components:
       type: object
       required:
         - sessionId
+        - eventId
         - tenantId
         - farmId
         - barnId
@@ -125,13 +129,14 @@ components:
         - stationId
         - startAt
       properties:
-        sessionId: { type: string, format: uuid }
-        tenantId: { type: string, format: uuid }
-        farmId: { type: string, format: uuid }
-        barnId: { type: string, format: uuid }
-        deviceId: { type: string, format: uuid }
-        stationId: { type: string, format: uuid }
-        batchId: { type: string, format: uuid }
+        sessionId: { type: string }
+        eventId: { type: string, description: "MQTT event_id (used as sync_outbox.id for idempotency)" }
+        tenantId: { type: string }
+        farmId: { type: string }
+        barnId: { type: string }
+        deviceId: { type: string }
+        stationId: { type: string }
+        batchId: { type: string }
         startAt: { type: string, format: date-time }
 
     BindWeight:
@@ -159,3 +164,14 @@ components:
         mediaObjectId: { type: string }
         occurredAt: { type: string, format: date-time }
         eventId: { type: string, format: uuid }
+
+    FinalizeSession:
+      type: object
+      required:
+        - tenantId
+        - eventId
+        - occurredAt
+      properties:
+        tenantId: { type: string }
+        eventId: { type: string, description: "MQTT event_id (used as sync_outbox.id for idempotency)" }
+        occurredAt: { type: string, format: date-time }

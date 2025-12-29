@@ -1,7 +1,8 @@
+import './utils/datadog';
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
-import { requestIdMiddleware } from './middlewares/transactionId';
+import { requestContextMiddleware } from './middlewares/transactionId';
 import sessionRoutes from './routes/sessionRoutes';
 import { logger } from './utils/logger';
 import { setupSwagger } from './utils/swagger';
@@ -14,7 +15,7 @@ const prisma = new PrismaClient();
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
-app.use(requestIdMiddleware);
+app.use(requestContextMiddleware);
 
 // Routes
 app.use('/api', sessionRoutes);

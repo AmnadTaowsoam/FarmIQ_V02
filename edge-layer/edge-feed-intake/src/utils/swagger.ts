@@ -15,6 +15,11 @@ const openApiSpec = yaml.load(fs.readFileSync(openApiPath, 'utf8')) as Record<
  * @param {Express} app - Express application
  */
 export function setupSwagger(app: Express): void {
+  app.get('/api-docs/openapi.json', (_req, res) => {
+    res.setHeader('Content-Type', 'application/json')
+    res.status(200).send(openApiSpec)
+  })
+
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openApiSpec))
 }
 
