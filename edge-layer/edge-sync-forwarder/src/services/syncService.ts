@@ -25,6 +25,9 @@ export class SyncService {
   private outboxService: OutboxService
   private instanceId: string
   private cloudIngestionUrl: string
+  private cloudHeadersJson?: Record<string, string>
+  private cloudAuthorization?: string
+  private mode: 'send' | 'noop'
   private config: SyncConfig
   private syncInterval?: NodeJS.Timeout
   private isRunning: boolean = false
@@ -37,11 +40,52 @@ export class SyncService {
     this.outboxService = new OutboxService(dataSource, this.config)
     // Generate stable instance ID (use hostname or random UUID)
     this.instanceId = process.env.HOSTNAME || process.env.INSTANCE_ID || `forwarder-${Date.now()}-${Math.random().toString(36).substring(7)}`
-    this.cloudIngestionUrl = process.env.CLOUD_INGESTION_URL || 'http://cloud-ingestion:3000/api/v1/edge/batch'
+    this.mode = (process.env.SYNC_FORWARDER_MODE ?? 'send') === 'noop' ? 'noop' : 'send'
+
+    const cloudUrl = process.env.CLOUD_INGESTION_URL
+    if (!cloudUrl && this.mode !== 'noop') {
+      throw new Error('CLOUD_INGESTION_URL is required (or set SYNC_FORWARDER_MODE=noop)')
+    }
+    if (cloudUrl) {
+      try {
+        // Validate URL early; avoid logging query params.
+        new URL(cloudUrl)
+      } catch {
+        throw new Error('CLOUD_INGESTION_URL must be a valid URL')
+      }
+    }
+    this.cloudIngestionUrl = cloudUrl || ''
+
+    this.cloudAuthorization = process.env.CLOUD_INGESTION_AUTHORIZATION || undefined
+
+    const headersJson = process.env.CLOUD_INGESTION_HEADERS_JSON
+    if (headersJson) {
+      try {
+        const parsed = JSON.parse(headersJson) as Record<string, unknown>
+        this.cloudHeadersJson = Object.fromEntries(
+          Object.entries(parsed)
+            .filter(([, v]) => typeof v === 'string')
+            .map(([k, v]) => [k, v as string])
+        )
+      } catch {
+        throw new Error('CLOUD_INGESTION_HEADERS_JSON must be valid JSON object')
+      }
+    }
+
+    let cloudTarget: string | undefined
+    if (this.cloudIngestionUrl) {
+      try {
+        const u = new URL(this.cloudIngestionUrl)
+        cloudTarget = `${u.origin}${u.pathname}`
+      } catch {
+        cloudTarget = undefined
+      }
+    }
 
     logger.info('SyncService initialized', {
       instanceId: this.instanceId,
-      cloudIngestionUrl: this.cloudIngestionUrl,
+      cloudTarget,
+      mode: this.mode,
       config: this.config,
     })
   }
@@ -183,6 +227,14 @@ export class SyncService {
    * Send batch to cloud-ingestion with idempotency
    */
   private async sendBatchToCloud(entities: OutboxEntity[]): Promise<{ success: boolean; errorCode?: string; errorMessage?: string; sentCount: number }> {
+    if (this.mode === 'noop') {
+      logger.warn('SYNC_FORWARDER_MODE=noop; skipping cloud send', {
+        instanceId: this.instanceId,
+        batchSize: entities.length,
+      })
+      return { success: true, sentCount: entities.length }
+    }
+
     // Transform entities to cloud event format
     const events: CloudEventPayload[] = entities.map((entity) => ({
       event_id: entity.id, // Use sync_outbox.id as event_id for cloud idempotency
@@ -199,6 +251,12 @@ export class SyncService {
 
     try {
       const requestId = `sync-${Date.now()}-${Math.random().toString(36).substring(7)}`
+      const extraHeaders: Record<string, string> = {
+        ...(this.cloudHeadersJson ?? {}),
+      }
+      if (this.cloudAuthorization) {
+        extraHeaders['Authorization'] = this.cloudAuthorization
+      }
       const response = await axios.post(
         this.cloudIngestionUrl,
         { events },
@@ -207,6 +265,7 @@ export class SyncService {
             'Content-Type': 'application/json',
             'x-request-id': requestId,
             'x-trace-id': requestId,
+            ...extraHeaders,
           },
           timeout: 30000, // 30 second timeout
         }

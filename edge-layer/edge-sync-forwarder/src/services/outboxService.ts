@@ -1,6 +1,6 @@
 import { DataSource, QueryRunner } from 'typeorm'
 import { OutboxEntity, OutboxStatus } from '../db/entities/OutboxEntity'
-import { isEligibleForClaim, markAsAcked, prepareForRetry } from './outboxStateMachine'
+import { isEligibleForClaim, prepareForRetry } from './outboxStateMachine'
 import { logger } from '../utils/logger'
 import { SyncConfig } from '../config'
 
@@ -50,8 +50,12 @@ export class OutboxService {
           FROM sync_outbox
           WHERE
             status IN ('pending', 'claimed')
-            AND next_attempt_at <= $1
-            AND (claimed_by IS NULL OR lease_expires_at < $1)
+            AND (next_attempt_at IS NULL OR next_attempt_at <= $1)
+            AND (
+              claimed_by IS NULL
+              OR lease_expires_at IS NULL
+              OR lease_expires_at < $1
+            )
           ORDER BY priority DESC, occurred_at ASC
           LIMIT $2
           FOR UPDATE SKIP LOCKED
@@ -65,44 +69,121 @@ export class OutboxService {
           updated_at = NOW()
         FROM candidates c
         WHERE o.id = c.id
-        RETURNING o.*
+        RETURNING
+          o.id,
+          o.tenant_id,
+          o.farm_id,
+          o.barn_id,
+          o.device_id,
+          o.session_id,
+          o.event_type,
+          o.occurred_at,
+          o.trace_id,
+          o.payload_json,
+          o.payload_size_bytes,
+          o.status,
+          o.priority,
+          o.attempt_count,
+          o.last_attempt_at,
+          o.next_attempt_at,
+          o.claimed_by,
+          o.claimed_at,
+          o.lease_expires_at,
+          o.last_error_code,
+          o.last_error_message,
+          o.failed_at,
+          o.dlq_reason,
+          o.created_at,
+          o.updated_at
         `,
         [now, batchSize, instanceId, leaseExpiresAt]
       )
 
       await queryRunner.commitTransaction()
 
-      // Map raw results to entities
-      const claimed: OutboxEntity[] = result.map((row: any) => {
-        const entity = new OutboxEntity()
-        Object.assign(entity, {
-          id: row.id,
-          tenantId: row.tenant_id,
-          farmId: row.farm_id,
-          barnId: row.barn_id,
-          deviceId: row.device_id,
-          sessionId: row.session_id,
-          eventType: row.event_type,
-          occurredAt: row.occurred_at ? new Date(row.occurred_at) : null,
-          traceId: row.trace_id,
-          payload: row.payload_json,
-          payloadSizeBytes: row.payload_size_bytes,
-          status: row.status as OutboxStatus,
-          priority: row.priority,
-          attemptCount: row.attempt_count,
-          lastAttemptAt: row.last_attempt_at ? new Date(row.last_attempt_at) : null,
-          nextAttemptAt: row.next_attempt_at ? new Date(row.next_attempt_at) : new Date(),
-          claimedBy: row.claimed_by,
-          claimedAt: row.claimed_at ? new Date(row.claimed_at) : null,
-          leaseExpiresAt: row.lease_expires_at ? new Date(row.lease_expires_at) : null,
-          lastErrorCode: row.last_error_code,
-          lastErrorMessage: row.last_error_message,
-          failedAt: row.failed_at ? new Date(row.failed_at) : null,
-          dlqReason: row.dlq_reason,
-          createdAt: row.created_at ? new Date(row.created_at) : new Date(),
-          updatedAt: row.updated_at ? new Date(row.updated_at) : new Date(),
-        })
-        return entity
+      const rawRows: any[] =
+        Array.isArray(result) &&
+        result.length === 2 &&
+        Array.isArray(result[0]) &&
+        typeof result[1] === 'number'
+          ? (result[0] as any[])
+          : (result as any[])
+
+      const get = (row: any, key: string, idx: number) => {
+        if (Array.isArray(row)) return row[idx]
+        if (!row || typeof row !== 'object') return undefined
+        if (key in row) return (row as any)[key]
+        const idxKey = String(idx)
+        if (idxKey in row) return (row as any)[idxKey]
+
+        const keys = Object.keys(row)
+        const suffixMatch = keys.find(
+          (k) => k === key.toUpperCase() || k.endsWith(`.${key}`) || k.endsWith(`_${key}`)
+        )
+        if (suffixMatch) return (row as any)[suffixMatch]
+
+        return undefined
+      }
+
+      // Map raw results to plain objects (supports both object and rowMode=array outputs).
+      const claimed: OutboxEntity[] = rawRows.map((row) => {
+        const id =
+          get(row, 'id', 0) ??
+          get(row, 'o.id', 0) ??
+          get(row, 'sync_outbox.id', 0) ??
+          (Array.isArray(row) ? row[0] : (row as any)['0']) ??
+          Object.values(row)[0]
+        const tenantId =
+          get(row, 'tenant_id', 1) ??
+          get(row, 'o.tenant_id', 1) ??
+          get(row, 'sync_outbox.tenant_id', 1) ??
+          (Array.isArray(row) ? row[1] : (row as any)['1'])
+        return {
+          id: String(id),
+          tenantId: String(tenantId),
+          farmId: get(row, 'farm_id', 2) ?? null,
+          barnId: get(row, 'barn_id', 3) ?? null,
+          deviceId: get(row, 'device_id', 4) ?? null,
+          sessionId: get(row, 'session_id', 5) ?? null,
+          eventType: String(get(row, 'event_type', 6)),
+          occurredAt: get(row, 'occurred_at', 7)
+            ? new Date(get(row, 'occurred_at', 7))
+            : null,
+          traceId: get(row, 'trace_id', 8) ?? null,
+          payload: (get(row, 'payload_json', 9) as Record<string, unknown>) ?? {},
+          payloadSizeBytes:
+            get(row, 'payload_size_bytes', 10) != null
+              ? Number(get(row, 'payload_size_bytes', 10))
+              : null,
+          status: get(row, 'status', 11) as OutboxStatus,
+          priority: Number(get(row, 'priority', 12) ?? 0),
+          attemptCount: Number(get(row, 'attempt_count', 13) ?? 0),
+          lastAttemptAt: get(row, 'last_attempt_at', 14)
+            ? new Date(get(row, 'last_attempt_at', 14))
+            : null,
+          nextAttemptAt: get(row, 'next_attempt_at', 15)
+            ? new Date(get(row, 'next_attempt_at', 15))
+            : new Date(),
+          claimedBy: get(row, 'claimed_by', 16) ?? null,
+          claimedAt: get(row, 'claimed_at', 17)
+            ? new Date(get(row, 'claimed_at', 17))
+            : null,
+          leaseExpiresAt: get(row, 'lease_expires_at', 18)
+            ? new Date(get(row, 'lease_expires_at', 18))
+            : null,
+          lastErrorCode: get(row, 'last_error_code', 19) ?? null,
+          lastErrorMessage: get(row, 'last_error_message', 20) ?? null,
+          failedAt: get(row, 'failed_at', 21)
+            ? new Date(get(row, 'failed_at', 21))
+            : null,
+          dlqReason: get(row, 'dlq_reason', 22) ?? null,
+          createdAt: get(row, 'created_at', 23)
+            ? new Date(get(row, 'created_at', 23))
+            : new Date(),
+          updatedAt: get(row, 'updated_at', 24)
+            ? new Date(get(row, 'updated_at', 24))
+            : new Date(),
+        } as OutboxEntity
       })
 
       logger.info('Claimed outbox batch', {
@@ -147,47 +228,27 @@ export class OutboxService {
    * Mark batch as successfully sent and acked
    */
   async markBatchAcked(entityIds: string[], instanceId: string): Promise<void> {
-    const queryRunner = this.dataSource.createQueryRunner()
-    await queryRunner.connect()
-    await queryRunner.startTransaction()
+    if (entityIds.length === 0) return
+    await this.dataSource.query(
+      `
+      UPDATE sync_outbox
+      SET
+        status = 'acked',
+        last_attempt_at = NOW(),
+        claimed_by = NULL,
+        claimed_at = NULL,
+        lease_expires_at = NULL,
+        last_error_code = NULL,
+        last_error_message = NULL,
+        updated_at = NOW()
+      WHERE id = ANY($1::uuid[])
+        AND claimed_by = $2
+        AND status = 'claimed'
+      `,
+      [entityIds, instanceId]
+    )
 
-    try {
-      for (const id of entityIds) {
-        const entity = await queryRunner.manager.findOne(OutboxEntity, {
-          where: { id },
-        })
-
-        if (!entity) {
-          logger.warn('Entity not found for ack', { id, instanceId })
-          continue
-        }
-
-        if (entity.claimedBy !== instanceId) {
-          logger.warn('Entity not claimed by this instance, skipping ack', {
-            id,
-            instanceId,
-            claimedBy: entity.claimedBy,
-          })
-          continue
-        }
-
-        markAsAcked(entity)
-        await queryRunner.manager.save(entity)
-      }
-
-      await queryRunner.commitTransaction()
-
-      logger.info('Marked batch as acked', { instanceId, count: entityIds.length })
-    } catch (error) {
-      await queryRunner.rollbackTransaction()
-      logger.error('Failed to mark batch as acked', {
-        instanceId,
-        error: error instanceof Error ? error.message : String(error),
-      })
-      throw error
-    } finally {
-      await queryRunner.release()
-    }
+    logger.info('Marked batch as acked', { instanceId, count: entityIds.length })
   }
 
   /**
@@ -199,32 +260,56 @@ export class OutboxService {
     errorMessage: string,
     instanceId: string
   ): Promise<void> {
+    if (entities.length === 0) return
+
     const queryRunner = this.dataSource.createQueryRunner()
     await queryRunner.connect()
     await queryRunner.startTransaction()
 
     try {
       for (const entity of entities) {
-        if (entity.claimedBy !== instanceId) {
-          logger.warn('Entity not claimed by this instance, skipping failure update', {
-            id: entity.id,
-            instanceId,
-            claimedBy: entity.claimedBy,
-          })
-          continue
-        }
-
-        prepareForRetry(
-          entity,
+        const next = prepareForRetry(
+          { ...entity },
           errorCode,
           errorMessage,
           entity.attemptCount,
           this.config.maxAttempts,
-          1, // base backoff seconds
+          1,
           this.config.backoffCapSeconds
         )
 
-        await queryRunner.manager.save(entity)
+        await queryRunner.query(
+          `
+          UPDATE sync_outbox
+          SET
+            status = $2,
+            attempt_count = $3,
+            next_attempt_at = $4,
+            last_attempt_at = NOW(),
+            last_error_code = $5,
+            last_error_message = $6,
+            failed_at = $7,
+            dlq_reason = $8,
+            claimed_by = NULL,
+            claimed_at = NULL,
+            lease_expires_at = NULL,
+            updated_at = NOW()
+          WHERE id = $1::uuid
+            AND claimed_by = $9
+            AND status = 'claimed'
+          `,
+          [
+            entity.id,
+            next.status,
+            next.attemptCount,
+            next.nextAttemptAt,
+            next.lastErrorCode,
+            next.lastErrorMessage,
+            next.failedAt,
+            next.dlqReason,
+            instanceId,
+          ]
+        )
       }
 
       await queryRunner.commitTransaction()
@@ -257,50 +342,45 @@ export class OutboxService {
     lastSuccessAt: Date | null
     lastErrorAt: Date | null
   }> {
-    const repo = this.dataSource.getRepository(OutboxEntity)
-
-    const [pendingCount, claimedCount, dlqCount] = await Promise.all([
-      repo.count({ where: { status: 'pending' } }),
-      repo.count({ where: { status: 'claimed' } }),
-      repo.count({ where: { status: 'dlq' } }),
-    ])
-
-    // Find oldest pending event
-    const oldestPending = await repo
-      .createQueryBuilder('o')
-      .where('o.status = :status', { status: 'pending' })
-      .orderBy('o.created_at', 'ASC')
-      .limit(1)
-      .getOne()
-
-    const oldestPendingAgeSeconds = oldestPending
-      ? Math.floor((Date.now() - oldestPending.createdAt.getTime()) / 1000)
-      : null
-
-    // Find last successful ack
-    const lastSuccess = await repo
-      .createQueryBuilder('o')
-      .where('o.status = :status', { status: 'acked' })
-      .orderBy('o.last_attempt_at', 'DESC')
-      .limit(1)
-      .getOne()
-
-    // Find last error (from failed rows)
-    const lastError = await repo
-      .createQueryBuilder('o')
-      .where('o.status IN (:...statuses)', { statuses: ['dlq', 'failed'] })
-      .andWhere('o.last_attempt_at IS NOT NULL')
-      .orderBy('o.last_attempt_at', 'DESC')
-      .limit(1)
-      .getOne()
+    const [row] = (await this.dataSource.query(
+      `
+      SELECT
+        COUNT(*) FILTER (WHERE status = 'pending')::int AS pending_count,
+        COUNT(*) FILTER (WHERE status = 'claimed')::int AS claimed_count,
+        COUNT(*) FILTER (WHERE status = 'dlq')::int AS dlq_count,
+        (
+          SELECT EXTRACT(EPOCH FROM (NOW() - MIN(created_at)))::int
+          FROM sync_outbox
+          WHERE status = 'pending'
+        ) AS oldest_pending_age_seconds,
+        (
+          SELECT MAX(last_attempt_at)
+          FROM sync_outbox
+          WHERE status IN ('acked','sent')
+        ) AS last_success_at,
+        (
+          SELECT MAX(last_attempt_at)
+          FROM sync_outbox
+          WHERE status IN ('dlq','failed')
+        ) AS last_error_at
+      FROM sync_outbox
+      `
+    )) as Array<{
+      pending_count: number
+      claimed_count: number
+      dlq_count: number
+      oldest_pending_age_seconds: number | null
+      last_success_at: string | null
+      last_error_at: string | null
+    }>
 
     return {
-      pendingCount,
-      claimedCount,
-      dlqCount,
-      oldestPendingAgeSeconds,
-      lastSuccessAt: lastSuccess?.lastAttemptAt || null,
-      lastErrorAt: lastError?.lastAttemptAt || null,
+      pendingCount: row?.pending_count ?? 0,
+      claimedCount: row?.claimed_count ?? 0,
+      dlqCount: row?.dlq_count ?? 0,
+      oldestPendingAgeSeconds: row?.oldest_pending_age_seconds ?? null,
+      lastSuccessAt: row?.last_success_at ? new Date(row.last_success_at) : null,
+      lastErrorAt: row?.last_error_at ? new Date(row.last_error_at) : null,
     }
   }
 

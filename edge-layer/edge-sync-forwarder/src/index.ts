@@ -41,18 +41,26 @@ app.get('/api/health', (_req: Request, res: Response): void => {
 // Ready endpoint (checks DB connectivity)
 app.get('/api/ready', async (_req: Request, res: Response): Promise<void> => {
   try {
-    const dataSource = createDataSource()
-    if (!dataSource.isInitialized) {
-      await dataSource.initialize()
+    if (!dataSource) {
+      dataSource = createDataSource()
     }
+    if (!dataSource.isInitialized) await dataSource.initialize()
 
     // Test DB connection
     await dataSource.query('SELECT 1')
+    const [{ exists }] = (await dataSource.query(
+      `SELECT to_regclass('public.sync_outbox') IS NOT NULL AS exists`
+    )) as Array<{ exists: boolean }>
 
     // Note: Cloud endpoint health check removed from readiness probe
     // to avoid false negatives when cloud is temporarily unreachable
 
-    res.status(200).json({ status: 'ready' })
+    if (!exists) {
+      res.status(503).json({ status: 'not ready', error: 'sync_outbox missing' })
+      return
+    }
+
+    res.status(200).json({ status: 'ready', db: 'up', outbox: 'ok' })
   } catch (error) {
     logger.error('Readiness check failed', { error: error instanceof Error ? error.message : String(error) })
     res.status(503).json({ status: 'not ready', error: 'Database or dependencies unavailable' })
