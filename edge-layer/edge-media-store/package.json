@@ -18,6 +18,7 @@
   "license": "SEE LICENSE IN LICENSE.md",
   "dependencies": {
     "@prisma/client": "^5.16.1",
+    "@farmiq/edge-contracts": "file:../shared/edge-contracts.tgz",
     "@aws-sdk/client-s3": "^3.678.0",
     "@aws-sdk/s3-request-presigner": "^3.678.0",
     "dd-trace": "^4.46.0",

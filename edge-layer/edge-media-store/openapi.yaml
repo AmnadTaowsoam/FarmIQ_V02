@@ -65,6 +65,101 @@ paths:
         '403':
           description: Tenant mismatch
 
+  /api/v1/media/images/complete:
+    post:
+      summary: Confirm upload completion (HEAD object, persist metadata, emit outbox)
+      parameters:
+        - in: header
+          name: x-tenant-id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteRequest'
+      responses:
+        '200':
+          description: Completion recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompleteResponse'
+        '400':
+          description: Validation error
+        '403':
+          description: Tenant mismatch
+        '404':
+          description: Object not found
+        '409':
+          description: Mismatch (size/content-type)
+
+  /api/v1/media/objects/{mediaId}:
+    get:
+      summary: Get media bytes (internal)
+      parameters:
+        - in: path
+          name: mediaId
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: x-tenant-id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: File bytes
+        '404':
+          description: Not found
+
+  /api/v1/media/objects/by-key:
+    get:
+      summary: Get media bytes by object_key (internal)
+      parameters:
+        - in: query
+          name: object_key
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: x-tenant-id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: File bytes
+        '404':
+          description: Not found
+
+  /api/v1/media/objects/{mediaId}/meta:
+    get:
+      summary: Get media metadata (internal)
+      parameters:
+        - in: path
+          name: mediaId
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: x-tenant-id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Metadata
+          content:
+            application/json:
+              schema:
+                type: object
+        '404':
+          description: Not found
+
 components:
   schemas:
     ReadyResponse:
@@ -130,3 +225,39 @@ components:
           type: object
           additionalProperties:
             type: string
+
+    CompleteRequest:
+      type: object
+      required:
+        - tenant_id
+        - farm_id
+        - barn_id
+        - device_id
+        - object_key
+        - mime_type
+      properties:
+        tenant_id: { type: string }
+        farm_id: { type: string }
+        barn_id: { type: string }
+        device_id: { type: string }
+        session_id: { type: string }
+        object_key: { type: string }
+        mime_type: { type: string }
+        size_bytes: { type: integer }
+        captured_at: { type: string, format: date-time }
+
+    CompleteResponse:
+      type: object
+      required:
+        - media_id
+        - event_id
+        - object_key
+        - bucket
+      properties:
+        media_id: { type: string }
+        event_id: { type: string }
+        object_key: { type: string }
+        bucket: { type: string }
+        etag: { type: string, nullable: true }
+        size_bytes: { type: integer, nullable: true }
+        inference_job_id: { type: string, nullable: true }

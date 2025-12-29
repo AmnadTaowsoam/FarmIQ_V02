@@ -11,11 +11,15 @@ describe('edge-media-store presign', () => {
   }
 
   const presign = async () => 'https://presigned.local/upload'
+  const s3 = {} as any
+  const prisma = {} as any
 
   it('returns upload_url and object_key for valid request', async () => {
     const app = createApp({
       config: baseConfig,
       presign,
+      s3,
+      prisma,
       now: () => new Date('2025-01-02T03:04:05Z'),
     })
 
@@ -38,7 +42,7 @@ describe('edge-media-store presign', () => {
   })
 
   it('rejects non-image content types', async () => {
-    const app = createApp({ config: baseConfig, presign })
+    const app = createApp({ config: baseConfig, presign, s3, prisma })
 
     const res = await request(app)
       .post('/api/v1/media/images/presign')
@@ -57,7 +61,7 @@ describe('edge-media-store presign', () => {
   })
 
   it('rejects tenant mismatch', async () => {
-    const app = createApp({ config: baseConfig, presign })
+    const app = createApp({ config: baseConfig, presign, s3, prisma })
 
     const res = await request(app)
       .post('/api/v1/media/images/presign')
