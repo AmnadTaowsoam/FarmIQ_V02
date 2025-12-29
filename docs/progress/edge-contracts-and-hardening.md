@@ -330,19 +330,112 @@ curl -fsS -X POST http://localhost:5108/api/v1/sync/trigger
 
 ## Implemented (P1): Media → Inference → Session bind → Outbox
 
+### Summary
+
+- `edge-media-store` (MinIO/S3-compatible) issues presigned PUT URLs but does **not** emit `media.stored` until the upload is confirmed.
+- `POST /api/v1/media/images/complete` verifies the object via S3 HEAD, persists `media_objects`, then emits `media.stored` into `sync_outbox`.
+- `edge-vision-inference` can be triggered manually (or by `edge-media-store` when enabled) and emits `inference.completed` into `sync_outbox`.
+- `edge-weighvision-session` supports explicit attachment of media/inference results to a session via `POST /api/v1/weighvision/sessions/{sessionId}/attach`.
+
 ### End-to-end happy path (dev)
 
-Assumptions:
-- `edge-media-store` is configured with MinIO (`MEDIA_ENDPOINT`, `MEDIA_BUCKET`, credentials).
-- `edge-sync-forwarder` created the `sync_outbox` table (producers only insert).
-- Optional: `TRIGGER_INFERENCE_ON_COMPLETE=true` on `edge-media-store` to auto-trigger inference.
-
-1) Presign → PUT upload
+Prefer the smoke script in P2; this is a minimal manual variant.
 
 ```bash
-PRESIGN_JSON=$(curl -fsS -X POST http://localhost:5106/api/v1/media/images/presign \\
-  -H 'content-type: application/json' \\
-  -H 'x-tenant-id: t-001' \\
-  -H 'x-request-id: req-presign-1' \\
-  -H 'x-trace-id: trace-media-1' \\
-  -d '{\"tenant_id\":\"t-001\",\"farm_id\":\"f-001\",\"barn_id\":\"b-001\",\"device_id\":\"wv-001\",\"content_type\":\"image/jpeg\",\"filename\":\"frame.jpg\"}')\n+\n+UPLOAD_URL=$(echo \"$PRESIGN_JSON\" | jq -r .upload_url)\n+OBJECT_KEY=$(echo \"$PRESIGN_JSON\" | jq -r .object_key)\n+\n+curl -fsS -X PUT \"$UPLOAD_URL\" -H 'Content-Type: image/jpeg' --data-binary @./tests/fixtures/frame.jpg\n+```\n+\n+2) Complete upload (verifies via S3 HEAD, persists `media_objects`, emits `media.stored`)\n+\n+```bash\n+COMPLETE_JSON=$(curl -fsS -X POST http://localhost:5106/api/v1/media/images/complete \\\n+  -H 'content-type: application/json' \\\n+  -H 'x-tenant-id: t-001' \\\n+  -H 'x-request-id: req-complete-1' \\\n+  -H 'x-trace-id: trace-media-2' \\\n+  -d \"{\\\"tenant_id\\\":\\\"t-001\\\",\\\"farm_id\\\":\\\"f-001\\\",\\\"barn_id\\\":\\\"b-001\\\",\\\"device_id\\\":\\\"wv-001\\\",\\\"object_key\\\":\\\"$OBJECT_KEY\\\",\\\"mime_type\\\":\\\"image/jpeg\\\",\\\"session_id\\\":\\\"s-123\\\"}\")\n+\n+MEDIA_ID=$(echo \"$COMPLETE_JSON\" | jq -r .media_id)\n+EVENT_ID=$(echo \"$COMPLETE_JSON\" | jq -r .event_id)\n+echo \"media_id=$MEDIA_ID event_id=$EVENT_ID\"\n+```\n+\n+3) Inference job (manual trigger if not auto-triggered)\n+\n+```bash\n+curl -fsS -X POST http://localhost:8000/api/v1/inference/jobs \\\n+  -H 'content-type: application/json' \\\n+  -H 'x-tenant-id: t-001' \\\n+  -H 'x-request-id: req-infer-1' \\\n+  -H 'x-trace-id: trace-infer-1' \\\n+  -d \"{\\\"tenant_id\\\":\\\"t-001\\\",\\\"farm_id\\\":\\\"f-001\\\",\\\"barn_id\\\":\\\"b-001\\\",\\\"device_id\\\":\\\"wv-001\\\",\\\"session_id\\\":\\\"s-123\\\",\\\"media_id\\\":\\\"$MEDIA_ID\\\"}\"\n+```\n+\n+4) Session bind (if you want explicit attach, or for manual backfill)\n+\n+```bash\n+curl -fsS -X POST http://localhost:5105/api/v1/weighvision/sessions/s-123/attach \\\n+  -H 'content-type: application/json' \\\n+  -H 'x-tenant-id: t-001' \\\n+  -H 'x-request-id: req-attach-1' \\\n+  -H 'x-trace-id: trace-attach-1' \\\n+  -d \"{\\\"media_id\\\":\\\"$MEDIA_ID\\\"}\"\n+```\n+\n+5) Verify outbox backlog and trigger send\n+\n+```bash\n+curl -fsS http://localhost:5108/api/v1/sync/state\n+curl -fsS -X POST http://localhost:5108/api/v1/sync/trigger\n+```
+set -euo pipefail
+
+PRESIGN_JSON="$(curl -fsS -X POST http://localhost:5106/api/v1/media/images/presign \
+  -H 'content-type: application/json' \
+  -H 'x-tenant-id: t-001' \
+  -H 'x-request-id: req-presign-1' \
+  -H 'x-trace-id: trace-media-1' \
+  -d '{"tenant_id":"t-001","farm_id":"f-001","barn_id":"b-001","device_id":"wv-001","content_type":"image/jpeg","filename":"frame.jpg"}')"
+
+UPLOAD_URL="$(python - <<'PY'
+import json,os
+print(json.loads(os.environ["PRESIGN_JSON"])["upload_url"])
+PY
+)"
+OBJECT_KEY="$(python - <<'PY'
+import json,os
+print(json.loads(os.environ["PRESIGN_JSON"])["object_key"])
+PY
+)"
+
+curl -fsS -X PUT "$UPLOAD_URL" -H 'Content-Type: image/jpeg' --data-binary @./edge-layer/scripts/tmp/frame.jpg
+
+COMPLETE_JSON="$(curl -fsS -X POST http://localhost:5106/api/v1/media/images/complete \
+  -H 'content-type: application/json' \
+  -H 'x-tenant-id: t-001' \
+  -H 'x-request-id: req-complete-1' \
+  -H 'x-trace-id: trace-media-2' \
+  -d "{\"tenant_id\":\"t-001\",\"farm_id\":\"f-001\",\"barn_id\":\"b-001\",\"device_id\":\"wv-001\",\"object_key\":\"$OBJECT_KEY\",\"mime_type\":\"image/jpeg\",\"session_id\":\"s-123\"}")"
+
+MEDIA_ID="$(python - <<'PY'
+import json,os
+print(json.loads(os.environ["COMPLETE_JSON"])["media_id"])
+PY
+)"
+
+curl -fsS -X POST http://localhost:5107/api/v1/inference/jobs \
+  -H 'content-type: application/json' \
+  -H 'x-tenant-id: t-001' \
+  -H 'x-request-id: req-infer-1' \
+  -H 'x-trace-id: trace-infer-1' \
+  -d "{\"tenant_id\":\"t-001\",\"farm_id\":\"f-001\",\"barn_id\":\"b-001\",\"device_id\":\"wv-001\",\"session_id\":\"s-123\",\"media_id\":\"$MEDIA_ID\"}"
+
+curl -fsS -X POST http://localhost:5105/api/v1/weighvision/sessions/s-123/attach \
+  -H 'content-type: application/json' \
+  -H 'x-tenant-id: t-001' \
+  -H 'x-request-id: req-attach-1' \
+  -H 'x-trace-id: trace-attach-1' \
+  -d "{\"media_id\":\"$MEDIA_ID\"}"
+
+curl -fsS http://localhost:5108/api/v1/sync/state
+curl -fsS -X POST http://localhost:5108/api/v1/sync/trigger
+```
+
+---
+
+## Implemented (P2): Idempotency + Smoke tests + MinIO readiness + DLQ
+
+### Smoke tests (recommended)
+
+- Bash: `edge-layer/scripts/edge-smoke-http.sh`, `edge-layer/scripts/edge-smoke-mqtt.sh`
+- PowerShell: `edge-layer/scripts/edge-smoke-http.ps1`, `edge-layer/scripts/edge-smoke-mqtt.ps1`
+
+Prereqs:
+- Docker + Docker Compose
+- For MQTT smoke: `mosquitto_pub` (or install `mosquitto-clients`)
+
+Run:
+
+```bash
+bash edge-layer/scripts/edge-smoke-http.sh --up
+bash edge-layer/scripts/edge-smoke-mqtt.sh --up
+```
+
+### Idempotency semantics
+
+- `POST /api/v1/media/images/complete` is idempotent by `(tenant_id, object_key)`; retries return the existing `media_id` and do not re-emit `media.stored`.
+- WeighVision session attach is idempotent by `(session_id, media_id)`; retries return the existing binding.
+
+### MinIO readiness + bootstrap
+
+- `edge-media-store` ensures the configured bucket exists on startup (dev default), and `/api/ready` checks DB + S3 bucket reachability.
+- Presigned URLs in dev are generated with `MEDIA_PRESIGN_ENDPOINT=http://localhost:9000` so `curl` from the host can PUT to MinIO.
+
+### DLQ + redrive (sync-forwarder)
+
+The dev stack includes a `cloud-ingestion-mock` target. To force failures and exercise DLQ:
+
+```bash
+DLQ_TEST=true bash edge-layer/scripts/edge-smoke-http.sh --up
+```
+
+Manual DLQ inspection/redrive:
+
+```bash
+curl -fsS http://localhost:5108/api/v1/sync/dlq
+curl -fsS -X POST http://localhost:5108/api/v1/sync/dlq/redrive
+```
