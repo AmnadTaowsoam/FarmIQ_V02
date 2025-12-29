@@ -1,0 +1,275 @@
+openapi: 3.0.0
+info:
+  title: edge-telemetry-timeseries API
+  version: 1.0.0
+  description: Service for telemetry persistence and aggregation on edge.
+
+servers:
+  - url: /api
+    description: Base path for all endpoints
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Healthy
+  /ready:
+    get:
+      summary: Readiness check (DB connectivity)
+      responses:
+        '200':
+          description: Ready
+        '503':
+          description: Not ready
+
+  /v1/telemetry/readings:
+    post:
+      summary: Ingest telemetry readings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngestReadingsRequest'
+      responses:
+        '200':
+          description: Readings ingested
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestReadingsResponse'
+        '400':
+          description: Invalid request
+
+    get:
+      summary: Query telemetry readings
+      parameters:
+        - name: tenant_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: device_id
+          in: query
+          schema:
+            type: string
+        - name: start_time
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: end_time
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+            maximum: 1000
+      responses:
+        '200':
+          description: Readings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadingsResponse'
+
+  /v1/telemetry/aggregates:
+    get:
+      summary: Query telemetry aggregates
+      parameters:
+        - name: tenant_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: device_id
+          in: query
+          schema:
+            type: string
+        - name: window
+          in: query
+          schema:
+            type: string
+            enum: [1m, 1h, 1d]
+            default: 1h
+        - name: start_time
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: end_time
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+            maximum: 1000
+      responses:
+        '200':
+          description: Aggregates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregatesResponse'
+
+  /v1/telemetry/metrics:
+    get:
+      summary: Service metrics
+      responses:
+        '200':
+          description: Metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricsResponse'
+
+components:
+  schemas:
+    TelemetryEvent:
+      type: object
+      required:
+        - tenant_id
+        - device_id
+        - event_type
+        - ts
+        - payload
+      properties:
+        schema_version:
+          type: string
+        event_id:
+          type: string
+        trace_id:
+          type: string
+        tenant_id:
+          type: string
+        device_id:
+          type: string
+        event_type:
+          type: string
+        ts:
+          type: string
+          format: date-time
+        farm_id:
+          type: string
+        barn_id:
+          type: string
+        payload:
+          type: object
+          properties:
+            metric:
+              type: string
+            value:
+              type: number
+            unit:
+              type: string
+
+    IngestReadingsRequest:
+      type: object
+      required:
+        - events
+      properties:
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/TelemetryEvent'
+
+    IngestReadingsResponse:
+      type: object
+      properties:
+        ingested_count:
+          type: integer
+
+    TelemetryReading:
+      type: object
+      properties:
+        id:
+          type: string
+        tenant_id:
+          type: string
+        farm_id:
+          type: string
+        barn_id:
+          type: string
+        device_id:
+          type: string
+        metric_type:
+          type: string
+        metric_value:
+          type: number
+        unit:
+          type: string
+        occurred_at:
+          type: string
+          format: date-time
+        ingested_at:
+          type: string
+          format: date-time
+
+    ReadingsResponse:
+      type: object
+      properties:
+        readings:
+          type: array
+          items:
+            $ref: '#/components/schemas/TelemetryReading'
+        count:
+          type: integer
+
+    TelemetryAggregate:
+      type: object
+      properties:
+        id:
+          type: string
+        tenant_id:
+          type: string
+        device_id:
+          type: string
+        window:
+          type: string
+        bucket_start_at:
+          type: string
+          format: date-time
+        bucket_end_at:
+          type: string
+          format: date-time
+        metric_type:
+          type: string
+        avg_value:
+          type: number
+        min_value:
+          type: number
+        max_value:
+          type: number
+        count:
+          type: integer
+
+    AggregatesResponse:
+      type: object
+      properties:
+        aggregates:
+          type: array
+          items:
+            $ref: '#/components/schemas/TelemetryAggregate'
+        count:
+          type: integer
+
+    MetricsResponse:
+      type: object
+      properties:
+        ingestion_rate_per_minute:
+          type: number
+        total_readings:
+          type: integer
+        total_aggregates:
+          type: integer
+

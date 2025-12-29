@@ -1,0 +1,452 @@
+# Node.js with React
+# Build a Node.js project that uses React.
+# Add steps that analyze code, save build artifacts, deploy, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/javascript
+
+trigger:
+  - qa # change to your branch
+
+variables:
+  containerRegistryConection: 'app-nonprd-registry'
+  imageName: 'node-boilerplate'
+  pool: 'GCP-NONPRD-POOL'
+  environment: 'qa'
+  GCP_PROJECT_ID: 'app-nonprod-project'
+  GCP_REPO: 'app-nonprod-ar'
+  updateK8sScriptFile: 'updateK8smanifest.sh'
+  k8sManifestRepoUrl: 'git@ssh.dev.azure.com:v3/betagro-dev/nodejs-boilerplate/nodejs-boilerplate-manifest' # add your k8s  manifest repository here (SSH approach only)
+  containerImageRepository: 'asia-southeast1-docker.pkg.dev/$(GCP_PROJECT_ID)/$(GCP_REPO)/$(imageName)'
+  #Jmeter variable | Only compatible with one test plan
+  jmeterVersion: '5.6.2'
+  jmeterPluginsManagerVersion: '1.10'
+  testPlan: 'ADFM-LoadTest.jmx' #Change this accordingly to load test name, Declare more test plans if needed
+  resultsDir: '$(Build.ArtifactStagingDirectory)/jmeter-results'
+  reportDir: '$(Build.ArtifactStagingDirectory)/jmeter-report'
+  # Build configuration
+  nodeVersion: '18.x'
+  workingDirectory: '$(System.DefaultWorkingDirectory)'
+  bearerToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjE2LCJwcmV2VXNlcklkIjpudWxsLCJwYXJlbnRJZCI6bnVsbCwicHJldlJvbGVJZCI6IkwxIiwicm9sZUlkIjoiTDEiLCJlbWFpbCI6ImwxQGV4YW1wbGUuY29tIiwicGhvbmUiOiIwODg4ODg4ODg4IiwiZmFybUlkIjpudWxsLCJmYXJtVHlwZUlkIjpudWxsLCJmYXJtVHlwZSI6bnVsbCwic3ViRmFybVR5cGVJZCI6bnVsbCwic3ViRmFybVR5cGUiOm51bGwsImZhbWlseUNvZGUiOm51bGwsInVzZXJUeXBlIjoiUEVSU09OQUwiLCJjcmVhdGVkQnlJZCI6MTYsInVwZGF0ZWRCeUlkIjoxNiwiZGVsZXRlZEJ5SWQiOjE2LCJpYXQiOjE3NTAyMjgxNDksImV4cCI6MTc1MDIzODk0OX0.iO1c72UWhfLaVSBFUJXXAmvLwGAkkDKvmH8fK2uytYs'
+  #The structure for token injection are as followed
+  #a user defined variable 'token' contains the Bearer token without the word Bearer.
+  #'token' is then called in the HTTPS header config.
+# CI
+stages:
+  # Uncomment Stage for JMETER testing in pipeline
+  # - stage: LoadTest
+  #   displayName: 'JMeter Load Test'
+  #   pool:
+  #     vmImage: 'ubuntu-latest' # Using your custom pool
+  #   jobs:
+  #     - job: RunJMeterTest
+  #       displayName: 'Execute JMeter Load Test'
+  #       timeoutInMinutes: 60
+
+  #       steps:
+  #         - checkout: self
+  #           displayName: 'Checkout Source Code'
+
+  #         - task: JavaToolInstaller@0
+  #           displayName: 'Install Java 11'
+  #           inputs:
+  #             versionSpec: '11'
+  #             jdkArchitectureOption: 'x64'
+  #             jdkSourceOption: 'PreInstalled'
+
+  #         - script:
+  #             | #Already compatible with ultimate thread group plugin, install extra plugins here
+  #             # Create directories
+  #             mkdir -p $(resultsDir)
+  #             mkdir -p $(reportDir)
+  #             mkdir -p ~/jmeter
+
+  #             # Download and install JMeter
+  #             echo "Downloading JMeter $(jmeterVersion)..."
+  #             cd ~/jmeter
+  #             wget -q https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-$(jmeterVersion).tgz
+  #             tar -xzf apache-jmeter-$(jmeterVersion).tgz
+
+  #             # Set JMeter home
+  #             export JMETER_HOME=~/jmeter/apache-jmeter-$(jmeterVersion)
+  #             echo "##vso[task.setvariable variable=JMETER_HOME]$JMETER_HOME"
+
+  #             # Download JMeter Plugins Manager
+  #             echo "Downloading JMeter Plugins Manager..."
+  #             wget -q https://repo1.maven.org/maven2/kg/apc/jmeter-plugins-manager/1.11/jmeter-plugins-manager-$(jmeterPluginsManagerVersion).jar -O $JMETER_HOME/lib/ext/jmeter-plugins-manager-$(jmeterPluginsManagerVersion).jar
+
+  #             # Download Command Line Tool for Plugins Manager
+  #             wget -q https://jmeter-plugins.org/files/packages/jpgc-cmd-2.2.zip
+  #             unzip -q jpgc-cmd-2.2.zip -d $JMETER_HOME/
+
+  #             # Install Ultimate Thread Group plugin
+  #             echo "Installing Ultimate Thread Group plugin..."
+  #             java -cp $JMETER_HOME/lib/ext/jmeter-plugins-manager-1.3.jar org.jmeterplugins.repository.PluginManagerCMDInstaller
+  #             $JMETER_HOME/bin/PluginsManagerCMD.sh install jpgc-casutg,jpgc-synthesis
+
+  #             # Verify installation
+  #             echo "JMeter installation completed:"
+  #             ls -la $JMETER_HOME/bin/
+
+  #           displayName: 'Install JMeter and Plugins'
+  #         #Repeat injection for each test plans
+  #         - script: |
+  #             echo "Injecting fresh bearer token into existing User Defined Variable 'token'..."
+
+  #             # Validate test plan exists
+  #             if [ ! -f "$(testPlan)" ]; then
+  #               echo "Error: Test plan $(testPlan) not found!"
+  #               exit 1
+  #             fi
+
+  #             # Create a backup of the original test plan
+  #             cp "$(testPlan)" "$(testPlan).backup"
+
+  #             # Get bearer token from pipeline variable
+  #             BEARER_TOKEN="${BEARER_TOKEN:-$(bearerToken)}"
+
+  #             if [ -z "$BEARER_TOKEN" ]; then
+  #               echo "Warning: No bearer token provided. Using existing token in test plan."
+  #               exit 0
+  #             else
+  #               echo "Fresh bearer token loaded successfully (length: ${#BEARER_TOKEN} characters)"
+  #             fi
+
+  #             # Install xmlstarlet for XML manipulation
+  #             sudo apt-get update && sudo apt-get install -y xmlstarlet
+
+  #             echo "Updating existing User Defined Variable 'token' with fresh bearer token..."
+
+  #             # Repeat the script below for other test plans
+
+  #             # Update the existing token variable value
+  #             xmlstarlet ed --inplace \
+  #               -u "//Arguments/collectionProp[@name='Arguments.arguments']/elementProp[@name='token']/stringProp[@name='Argument.value']" \
+  #               -v "$BEARER_TOKEN" \
+  #               "$(testPlan)"
+
+  #             # Validate the modified test plan
+  #             echo "Validating modified test plan..."
+  #             if xmlstarlet val "$(testPlan)" 2>/dev/null; then
+  #               echo "✓ Test plan is valid XML after token injection"
+  #             else
+  #               echo "✗ Test plan XML validation failed, restoring backup"
+  #               cp "$(testPlan).backup" "$(testPlan)"
+  #               exit 1
+  #             fi
+
+  #             # Verify the token was updated (show first 30 characters for verification)
+  #             UPDATED_TOKEN=$(xmlstarlet sel -t -v "//Arguments/collectionProp[@name='Arguments.arguments']/elementProp[@name='token']/stringProp[@name='Argument.value']" "$(testPlan)" 2>/dev/null)
+  #             echo "Token variable updated successfully:"
+  #             echo "  Variable Name: token"
+  #             echo "  Token Preview: ${UPDATED_TOKEN:0:30}..."
+  #             echo "  Authorization Header: Bearer \${token}"
+
+  #             echo "✅ Bearer token injection completed successfully!"
+  #             echo "All HTTP requests will now use the fresh token via Authorization header"
+
+  #           displayName: 'Inject Fresh Bearer Token'
+  #           env:
+  #             BEARER_TOKEN: $(bearerToken)
+
+  #         # Repeat script below for other test plan
+  #         - script: |
+  #             echo "JMeter Home: $(JMETER_HOME)"
+  #             echo "Test Plan: $(testPlan)"
+  #             echo "Results Directory: $(resultsDir)"
+
+  #             # Validate test plan exists
+  #             if [ ! -f "$(testPlan)" ]; then
+  #               echo "Error: Test plan $(testPlan) not found!"
+  #               echo "Available .jmx files in current directory:"
+  #               find . -name "*.jmx" -type f || echo "No .jmx files found"
+  #               exit 1
+  #             fi
+
+  #             # Make JMeter executable
+  #             chmod +x $(JMETER_HOME)/bin/jmeter
+  #             chmod +x $(JMETER_HOME)/bin/jmeter.sh
+
+  #             # Run JMeter test
+  #             echo "Starting JMeter load test..."
+  #             $(JMETER_HOME)/bin/jmeter.sh \
+  #               -n \
+  #               -t $(testPlan) \
+  #               -l $(resultsDir)/results.jtl \
+  #               -e \
+  #               -o $(reportDir) \
+  #               -Jjmeter.reportgenerator.overall_granularity=60000 \
+  #               -Jjmeter.reportgenerator.graph.responseTimeOverTime.granularity=60000 \
+  #               -Djava.awt.headless=true
+
+  #             echo "JMeter test completed!"
+
+  #           displayName: 'Run JMeter Load Test'
+  #           env:
+  #             JAVA_OPTS: '-Xms1g -Xmx4g'
+
+  #         - script: |
+  #             echo "Processing test results..."
+
+  #             # Check if results file exists and has content
+  #             if [ ! -f "$(resultsDir)/results.jtl" ]; then
+  #               echo "Error: Results file not found!"
+  #               exit 1
+  #             fi
+
+  #             # Basic results validation
+  #             RESULT_COUNT=$(wc -l < $(resultsDir)/results.jtl)
+  #             echo "Total result lines: $RESULT_COUNT"
+
+  #             if [ $RESULT_COUNT -le 1 ]; then
+  #               echo "Warning: Very few or no results found!"
+  #             fi
+
+  #             # Extract basic metrics using awk
+  #             echo "=== Basic Test Results ==="
+  #             awk -F',' '
+  #             NR==1 {print "Processing results..."; next}
+  #             {
+  #               total++
+  #               if ($8 == "true") failures++
+  #               response_time += $2
+  #               if (NR==2 || $2 < min_time) min_time = $2
+  #               if (NR==2 || $2 > max_time) max_time = $2
+  #             }
+  #             END {
+  #               print "Total Requests: " total
+  #               print "Failed Requests: " failures
+  #               print "Success Rate: " ((total-failures)/total*100) "%"
+  #               print "Average Response Time: " (response_time/total) " ms"
+  #               print "Min Response Time: " min_time " ms"
+  #               print "Max Response Time: " max_time " ms"
+  #             }' $(resultsDir)/results.jtl
+
+  #             echo "=========================="
+
+  #           displayName: 'Process Test Results'
+
+  #         - task: PublishTestResults@2
+  #           displayName: 'Publish Test Results'
+  #           inputs:
+  #             testResultsFormat: 'JUnit'
+  #             testResultsFiles: '$(resultsDir)/**/*.xml'
+  #             failTaskOnFailedTests: false
+  #             testRunTitle: 'JMeter Load Test Results'
+  #           condition: always()
+
+  #         - task: PublishBuildArtifacts@1
+  #           displayName: 'Publish JMeter Results'
+  #           inputs:
+  #             pathToPublish: '$(resultsDir)'
+  #             artifactName: 'jmeter-results'
+  #             publishLocation: 'Container'
+  #           condition: always()
+
+  #         - task: PublishBuildArtifacts@1
+  #           displayName: 'Publish JMeter HTML Report'
+  #           inputs:
+  #             pathToPublish: '$(reportDir)'
+  #             artifactName: 'jmeter-html-report'
+  #             publishLocation: 'Container'
+  #           condition: always()
+
+  #         - script: |
+  #             # Performance check - verify at least one run passes with avg runtime ≤ 3.5 seconds
+  #             echo "Checking if at least one run meets performance criteria..."
+
+  #             # Install bc for mathematical operations if not available
+  #             if ! command -v bc &> /dev/null; then
+  #               echo "Installing bc calculator..."
+  #               sudo apt-get update && sudo apt-get install -y bc
+  #             fi
+
+  #             # Extract metrics for check
+  #             RESULTS_FILE="$(resultsDir)/results.jtl"
+
+  #             # Calculate success rate
+  #             SUCCESS_RATE=$(awk -F',' '
+  #             NR==1 {next}
+  #             {total++; if ($8 == "true") failures++}
+  #             END {
+  #               if (total > 0) {
+  #                 print ((total-failures)/total*100)
+  #               } else {
+  #                 print 0
+  #               }
+  #             }' $RESULTS_FILE)
+
+  #             # Calculate average response time in seconds
+  #             AVG_RESPONSE_TIME_MS=$(awk -F',' '
+  #             NR==1 {next}
+  #             {response_time += $2; count++}
+  #             END {
+  #               if (count > 0) {
+  #                 print (response_time/count)
+  #               } else {
+  #                 print 0
+  #               }
+  #             }' $RESULTS_FILE)
+
+  #             # Convert to seconds
+  #             AVG_RESPONSE_TIME_SEC=$(echo "$AVG_RESPONSE_TIME_MS / 1000" | bc -l)
+
+  #             echo "Success Rate: $SUCCESS_RATE%"
+  #             echo "Average Response Time: $AVG_RESPONSE_TIME_SEC seconds ($AVG_RESPONSE_TIME_MS ms)"
+
+  #             # Performance criteria
+  #             TARGET_RUNTIME=3.5
+
+  #             # Check if we have at least one successful run with acceptable performance
+  #             HAS_SUCCESS=$(echo "$SUCCESS_RATE" | awk '{if ($1 > 0) print "YES"; else print "NO"}')
+  #             RUNTIME_CHECK=$(echo "$AVG_RESPONSE_TIME_SEC $TARGET_RUNTIME" | awk '{if ($1 <= $2) print "PASS"; else print "FAIL"}')
+
+  #             if [ "$HAS_SUCCESS" = "YES" ] && [ "$RUNTIME_CHECK" = "PASS" ]; then
+  #               echo "✓ SUCCESS: At least one run passed with average runtime ($AVG_RESPONSE_TIME_SEC s) ≤ target ($TARGET_RUNTIME s)"
+  #               exit 0
+  #             else
+  #               if [ "$HAS_SUCCESS" = "NO" ]; then
+  #                 echo "✗ No successful runs found (Success rate: $SUCCESS_RATE%)"
+  #               fi
+  #               if [ "$RUNTIME_CHECK" = "FAIL" ]; then
+  #                 echo "✗ Average runtime ($AVG_RESPONSE_TIME_SEC s) exceeds target ($TARGET_RUNTIME s)"
+  #               fi
+  #               echo "Performance criteria not met - but pipeline will continue"
+  #               exit 0
+  #             fi
+
+  #           displayName: 'Performance Check'
+  #           condition: always()
+
+  # Uncomment Stage for Unit Testing in pipeline
+  # - stage: UnitTest
+  #   displayName: 'Unit Tests & Code Quality'
+  #   dependsOn: [] # Run in parallel with LoadTest
+  #   pool:
+  #     vmImage: 'ubuntu-latest'
+  #   jobs:
+  #     - job: UnitTest
+  #       displayName: 'Run Tests & Quality Checks'
+  #       steps:
+  #         # Install Node.js
+  #         - task: NodeTool@0
+  #           displayName: 'Install Node.js $(nodeVersion)'
+  #           inputs:
+  #             versionSpec: '$(nodeVersion)'
+
+  #         # Debug step to check environment
+  #         - bash: |
+  #             echo "Current directory: $(pwd)"
+  #             ls -la
+  #             echo "Node version: $(node --version)"
+  #             echo "NPM version: $(npm --version)"
+  #             if [ -f "package.json" ]; then
+  #               echo "package.json exists - contents:"
+  #               cat package.json | grep -E 'test|jest|coverage' || echo "No test/jest/coverage scripts found"
+  #             else
+  #               echo "ERROR: package.json not found!"
+  #             fi
+  #           displayName: 'Debug Environment'
+
+  #         - task: Cache@2
+  #           displayName: 'Cache yarn dependencies'
+  #           inputs:
+  #             key: 'yarn | "$(Agent.OS)" | yarn.lock'
+  #             restoreKeys: |
+  #               yarn | "$(Agent.OS)"
+  #             path: '$(System.DefaultWorkingDirectory)/node_modules'
+
+  #         - task: Bash@3
+  #           displayName: 'Install dependencies with Yarn'
+  #           inputs:
+  #             targetType: 'inline'
+  #             script: |
+  #               yarn install
+  #             workingDirectory: '$(workingDirectory)'
+
+  #         - task: Bash@3
+  #           displayName: 'Run unit tests with coverage'
+  #           inputs:
+  #             targetType: 'inline'
+  #             script: |
+  #               yarn run test:cov
+  #             workingDirectory: '$(workingDirectory)'
+
+  #         # Publish code coverage
+  #         - task: PublishCodeCoverageResults@2
+  #           displayName: 'Publish code coverage'
+  #           inputs:
+  #             codeCoverageTool: 'Cobertura'
+  #             summaryFileLocation: '$(workingDirectory)/coverage/cobertura-coverage.xml'
+  #             reportDirectory: '$(workingDirectory)/coverage'
+  #             failIfCoverageEmpty: true
+  #           condition: succeededOrFailed()
+
+  - stage: Build
+    displayName: Build stage
+    condition: succeeded()
+    jobs:
+      - job: Build
+        displayName: Build
+        pool:
+          vmImage: 'ubuntu-latest'
+
+        steps:
+          - script: |
+              echo $sourceVersion
+              commitHash=${sourceVersion:0:8}
+              echo $commitHash
+              echo "##vso[task.setvariable variable=commitHash]$commitHash"
+            env: { sourceVersion: $(Build.SourceVersion) }
+            displayName: Git Hash 8-digit
+
+          - task: Docker@2
+            displayName: Login to Dev ACR
+            inputs:
+              command: login
+              containerRegistry: '$(containerRegistryConection)'
+
+          - task: Bash@3
+            displayName: Import Docker image from DEV ACR to QA ACR
+            inputs:
+              targetType: inline
+              script: |
+                docker pull $(containerImageRepository):dev-$(Build.SourceVersion)
+
+          - task: Bash@3
+            displayName: Retag the image and push
+            inputs:
+              targetType: inline
+              script: |
+                docker tag $(containerImageRepository):dev-$(Build.SourceVersion) $(containerImageRepository):qa-$(Build.SourceVersion)
+                docker push $(containerImageRepository):qa-$(Build.SourceVersion)
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish Artifact: drop'
+
+  #CD
+  - stage: Update
+    displayName: Update K8s Manifests
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - job: UpdateManifests
+        displayName: Update K8s Manifests
+        pool:
+          name: $(pool)
+        steps:
+          - checkout: self
+            displayName: 'Checkout source code'
+
+          - task: Bash@3
+            displayName: 'Update K8s Manifest'
+            inputs:
+              targetType: 'filePath'
+              filePath: '$(System.DefaultWorkingDirectory)/$(updateK8sScriptFile)'
+              arguments: '$(environment) $(environment)-$(Build.SourceVersion) $(containerImageRepository) $(k8sManifestRepoUrl)'
+              workingDirectory: '$(System.DefaultWorkingDirectory)'
+              # failOnStderr: true
+            env:
+              ENVIRONMENT: $(environment)
+              IMAGE_TAG: $(environment)-$(Build.SourceVersion)
+              CONTAINER_REGISTRY: $(containerImageRepository)
+              K8S_MANIFEST_REPO: $(k8sManifestRepoUrl)
+

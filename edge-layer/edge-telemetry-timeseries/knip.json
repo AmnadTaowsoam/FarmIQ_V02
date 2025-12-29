@@ -1,0 +1,28 @@
+{
+  "entry": ["src/index.ts"],
+  "project": ["src/**/*.ts"],
+  "ignoreDependencies": [
+    "@types/*",
+    "@babel/eslint-parser",
+    "@babel/plugin-proposal-class-properties",
+    "@babel/preset-react",
+    "dotenv-cli",
+    "eslint-config-prettier",
+    "eslint-import-resolver-typescript",
+    "eslint-plugin-eslint-comments",
+    "eslint-plugin-import",
+    "eslint-plugin-jsdoc",
+    "eslint-plugin-node",
+    "eslint-plugin-prettier",
+    "jest-mock-extended",
+    "mocha",
+    "sequelize-cli",
+    "source-map-support",
+    "ts-mocha",
+    "ts-dotenv",
+    "tsconfig-paths",
+    "sinon",
+    "eslint-plugin-typesafe"
+  ],
+  "ignoreBinaries": ["eslint", "prettier"]
+}

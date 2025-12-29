@@ -1,0 +1,62 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model TelemetryRaw {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  farmId      String?  @map("farm_id")
+  barnId      String?  @map("barn_id")
+  deviceId    String   @map("device_id")
+  metricType  String   @map("metric_type")
+  metricValue Decimal  @db.Decimal(10, 3) @map("metric_value")
+  unit        String?  @map("unit")
+  occurredAt  DateTime @map("occurred_at")
+  ingestedAt  DateTime @default(now()) @map("ingested_at")
+
+  @@index([tenantId, deviceId, occurredAt(sort: Desc)])
+  @@index([tenantId, occurredAt(sort: Desc)])
+  @@map("telemetry_raw")
+}
+
+model TelemetryAgg {
+  id            String   @id @default(uuid())
+  tenantId      String   @map("tenant_id")
+  deviceId      String   @map("device_id")
+  window        String   // 1m, 1h, 1d
+  bucketStartAt DateTime @map("bucket_start_at")
+  bucketEndAt   DateTime @map("bucket_end_at")
+  metricType    String   @map("metric_type")
+  avgValue      Decimal  @db.Decimal(10, 3) @map("avg_value")
+  minValue      Decimal  @db.Decimal(10, 3) @map("min_value")
+  maxValue      Decimal  @db.Decimal(10, 3) @map("max_value")
+  count         Int      @map("count")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@unique([tenantId, deviceId, window, bucketStartAt, metricType])
+  @@index([tenantId, deviceId, window, bucketStartAt(sort: Desc)])
+  @@map("telemetry_agg")
+}
+
+model Example {
+  id        Int @id @default(autoincrement())
+  name      String
+  email     String
+  age       Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Note: sync_outbox table is shared across services and managed by edge-sync-forwarder
+// We write to it using raw SQL or Prisma raw queries since it has additional fields
+// (claim/lease fields) that are managed by the forwarder service
+

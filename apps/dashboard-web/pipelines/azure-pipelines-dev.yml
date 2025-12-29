@@ -1,0 +1,231 @@
+# Node.js with React
+# Build a Node.js project that uses React.
+# Add steps that analyze code, save build artifacts, deploy, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/javascript
+
+trigger:
+  - dev # change to your branch
+
+variables:
+  - group: react-boilerplate-dev # here is variables which can declare in azure devops --> pipeline --> libraly --> variable group
+  
+  - name: containerRegistryConection
+    value: 'app-nonprd-registry'
+  - name: imageName
+    value: 'react-boilerplate'
+  - name: environment
+    value: 'dev'
+  - name: pool
+    value: 'GCP-NONPRD-POOL'
+  - name: GCP_PROJECT_ID
+    value: 'app-nonprod-project'
+  - name: GCP_REPO
+    value: 'app-nonprod-ar'
+  - name: updateK8sScriptFile
+    value: 'updateK8smanifest.sh'
+  - name: containerImageRepository
+    value: 'asia-southeast1-docker.pkg.dev/$(GCP_PROJECT_ID)/$(GCP_REPO)/$(imageName)'
+  - name: k8sManifestRepoUrl
+    value: 'git@ssh.dev.azure.com:v3/betagro-dev/react-boilerplate/react-boilerplate-manifest'
+
+# CI
+stages:
+  - stage: CodeQuality
+    displayName: 'Code Quality & Knip'
+    dependsOn: [] # Run in parallel with other stages
+    jobs:
+      - job: KnipCheck
+        displayName: 'Run Knip Analysis'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - checkout: self
+            displayName: 'Checkout source code'
+          - task: NodeTool@0
+            displayName: 'Install Node.js'
+            inputs:
+              versionSpec: '22.x'
+
+          - script: |
+              npm install
+            displayName: 'Install dependencies with npm'
+          - script: |
+              # Create a directory for results
+              mkdir -p knip-results
+              KNIP_OUTPUT_FILE="knip-results/knip-report.txt"
+              KNIP_SUMMARY_FILE="knip-results/summary.md"
+              KNIP_STATUS_FILE="knip-results/status.txt"
+              
+              # Run Knip and output to text file
+              npm run knip > "$KNIP_OUTPUT_FILE" 2>&1 || true
+              
+              # --- Generate consolidated summary for Knip ---
+              echo "## Knip Analysis Results" > "$KNIP_SUMMARY_FILE"
+              echo "" >> "$KNIP_SUMMARY_FILE"
+              echo "A detailed report is available in 'knip-report.txt' artifact." >> "$KNIP_SUMMARY_FILE"
+              echo "" >> "$KNIP_SUMMARY_FILE"
+              echo "---" >> "$KNIP_SUMMARY_FILE"
+              echo "" >> "$KNIP_SUMMARY_FILE"
+              KNIP_ISSUES_FOUND=0
+              KNIP_SUMMARY_MESSAGE=""
+              
+              if [ -f "$KNIP_OUTPUT_FILE" ]; then
+                if grep -qE "\([1-9][0-9]*\)$" "$KNIP_OUTPUT_FILE"; then
+                  ISSUE_COUNT=$(grep -oE "\(([0-9]+)\)$" "$KNIP_OUTPUT_FILE" | grep -oE "[0-9]+" | awk '{sum+=$1} END {print sum+0}')
+                  
+                  if [ "$ISSUE_COUNT" -gt 0 ]; then
+                    KNIP_ISSUES_FOUND=$ISSUE_COUNT
+                    KNIP_SUMMARY_MESSAGE="Found $KNIP_ISSUES_FOUND potential issue(s) (unused files, dependencies, etc.)."
+                  else
+                    KNIP_ISSUES_FOUND=0
+                    KNIP_SUMMARY_MESSAGE="No issues found."
+                  fi
+                else
+                  KNIP_ISSUES_FOUND=0
+                  KNIP_SUMMARY_MESSAGE="No issues found."
+                fi
+              else
+                KNIP_SUMMARY_MESSAGE="Warning: Knip output file not found at $KNIP_OUTPUT_FILE"
+              fi
+              
+              echo "Summary: $KNIP_SUMMARY_MESSAGE" >> "$KNIP_SUMMARY_FILE"
+              
+              # This echo appears in CI/CD logs - keep it for visibility
+              echo "===================="
+              echo "KNIP CHECK SUMMARY"
+              echo "===================="
+              echo "$KNIP_SUMMARY_MESSAGE"
+              
+              if [ "$KNIP_ISSUES_FOUND" -eq 0 ]; then
+                echo "PASS" > "$KNIP_STATUS_FILE"
+                echo "Knip check passed!"
+                exit 0
+              else
+                echo "ISSUES_FOUND" > "$KNIP_STATUS_FILE"
+                echo "Knip check failed! Please review the issues above."
+                exit 1
+              fi
+            displayName: 'Run Knip Checks'
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish Knip Results'
+            inputs:
+              pathToPublish: 'knip-results'
+              artifactName: 'knip-results'
+              publishLocation: 'Container'
+            condition: always()
+
+          - script: |
+              # Display summary in pipeline logs
+              echo "=== KNIP SUMMARY ==="
+              if [ -f "knip-results/summary.md" ]; then
+                cat knip-results/summary.md
+              fi
+              if [ -f "knip-results/status.txt" ]; then
+                STATUS=$(cat knip-results/status.txt)
+                echo "Overall Knip Status: $STATUS"
+              fi
+            displayName: 'Display Knip Summary '
+            condition: always()
+
+  # Stage: Build (Interacting with GCP starts here)
+  - stage: Build
+    displayName: Build stage
+    condition: succeeded()
+    jobs:
+      - job: Build
+        displayName: Build
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - script: |
+              echo $sourceVersion
+              commitHash=${sourceVersion:0:8}
+              echo $commitHash
+              echo "##vso[task.setvariable variable=commitHash]$commitHash"
+            env: { sourceVersion: $(Build.SourceVersion) }
+            displayName: Git Hash 8-digit
+
+          - task: Docker@2
+            displayName: build
+            inputs:
+              containerRegistry: '$(containerRegistryConection)'
+              repository: '$(GCP_PROJECT_ID)/$(GCP_REPO)/$(imageName)'
+              command: 'build'
+              Dockerfile: '**/Dockerfile'
+              tags: |
+                dev-latest
+                dev-$(Build.SourceVersion)
+              arguments: '--build-arg="GIT_COMMIT_SHA=$(commitHash)"'
+
+          - task: Docker@2
+            displayName: push
+            inputs:
+              containerRegistry: '$(containerRegistryConection)'
+              repository: '$(GCP_PROJECT_ID)/$(GCP_REPO)/$(imageName)'
+              command: 'push'
+              tags: dev-latest
+
+          - task: Docker@2
+            displayName: push
+            inputs:
+              containerRegistry: '$(containerRegistryConection)'
+              repository: '$(GCP_PROJECT_ID)/$(GCP_REPO)/$(imageName)'
+              command: 'push'
+              tags: dev-$(Build.SourceVersion)
+
+          - task: Bash@3
+            displayName: Copy source map files from docker
+            inputs:
+              targetType: inline
+              script: |
+                docker create --name temp-container-$(Build.SourceVersion) $(containerImageRepository):dev-$(Build.SourceVersion)
+                docker cp temp-container-$(Build.SourceVersion):/source-map $(Build.ArtifactStagingDirectory)/source-map
+                docker rm -f temp-container-$(Build.SourceVersion)
+
+          - task: Npm@1
+            displayName: "Install datadog cli"
+            inputs:
+              command: custom
+              verbose: false
+              customCommand: "install -g @datadog/datadog-ci"
+
+          - script: |
+              datadog-ci sourcemaps upload $(Build.ArtifactStagingDirectory)/source-map \
+                --service=$(datadogServiceName) \
+                --release-version=$(commitHash) \
+                --minified-path-prefix=$(appDomainName)
+            env:
+              DATADOG_API_KEY: $(datadog-api-key)
+            displayName: Upload sourcemap to datadog
+
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish Artifact: drop'
+
+  - stage: Update
+    displayName: Update K8s Manifests
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - job: UpdateManifests
+        displayName: Update K8s Manifests
+        pool:
+          name: $(pool)
+        steps:
+          - checkout: self
+            displayName: 'Checkout source code'
+
+          - task: Bash@3
+            displayName: 'Update K8s Manifest'
+            inputs:
+              targetType: 'filePath'
+              filePath: '$(System.DefaultWorkingDirectory)/$(updateK8sScriptFile)'
+              arguments: '$(environment) dev-$(Build.SourceVersion) $(containerImageRepository) $(k8sManifestRepoUrl)'
+              workingDirectory: '$(System.DefaultWorkingDirectory)'
+              # failOnStderr: true
+            env:
+              ENVIRONMENT: $(environment)
+              IMAGE_TAG: dev-$(Build.SourceVersion)
+              CONTAINER_REGISTRY: $(containerImageRepository)
+              K8S_MANIFEST_REPO: $(k8sManifestRepoUrl)

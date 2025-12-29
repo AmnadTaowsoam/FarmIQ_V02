@@ -1,0 +1,25 @@
+# Scan periodically for code vulnerabilities
+
+pr: none
+trigger: none
+
+schedules:
+  - cron: '0 0 * * *'
+    displayName: Every Midnight of the day
+    branches:
+      include:
+        - production
+    always: true
+
+stages:
+  - stage: Scan
+    jobs:
+      - job: Scan
+        steps:
+          - task: Checkmarx AST@2
+            inputs:
+              CheckmarxService: '<CheckmarxService Name>' # the name of Checkmarx Service that created on Azure Devops
+              projectName: '$(Build.Repository.Name)'
+              branchName: '$(Build.SourceBranchName)'
+              tenantName: '<tenantName>' # the tenantName from checkmarx
+              additionalParams: '--report-format pdf --report-pdf-email <E-mail>' # change to your email for get the report

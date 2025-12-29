@@ -1,0 +1,147 @@
+# Node.js with React
+# Build a Node.js project that uses React.
+# Add steps that analyze code, save build artifacts, deploy, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/javascript
+
+trigger:
+  - production # Manual trigger only for production deployments
+
+parameters:
+  - name: sourceImageTag
+    displayName: 'Development Image Tag to Promote'
+    type: string
+    default: 'uat-$(Build.SourceVersion)'
+
+  - name: targetImageTag
+    displayName: 'target image tag'
+    type: string
+    default: 'prod-$(Build.SourceVersion)'
+
+variables:
+
+  group: react-boilerplate-prod
+  # Non-production registry (source)
+  containerRegistryConectionNonProd: 'app-nonprd-registry'
+  GCP_NONPROD_PROJECT_ID: 'app-nonprod-project'
+  GCP_NONPROD_REPO: 'app-nonprod-ar'
+
+  # Production registry (destination)
+  containerRegistryConectionProd: 'app-prd-registry'
+  GCP_PROD_PROJECT_ID: 'app-prod-project-451207'
+  GCP_PROD_REPO: 'app-prod-ar'
+
+  # Common variables
+  imageName: 'react-boilerplate'
+  environment: 'prod'
+  pool: 'GCP-PRD-POOL'
+  updateK8sScriptFile: 'updateK8smanifest.sh'
+  k8sManifestRepoUrl: 'git@ssh.dev.azure.com:v3/betagro-dev/nodejs-boilerplate/nodejs-boilerplate-manifest' # add your k8s  manifest repository here (SSH approach only)
+
+  # Image repository paths
+  sourceImageRepository: 'asia-southeast1-docker.pkg.dev/$(GCP_NONPROD_PROJECT_ID)/$(GCP_NONPROD_REPO)/$(imageName)'
+  targetImageRepository: 'asia-southeast1-docker.pkg.dev/$(GCP_PROD_PROJECT_ID)/$(GCP_PROD_REPO)/$(imageName)'
+
+
+stages:
+  - stage: Promote
+    displayName: 'Promote to Production'
+    condition: succeeded()
+    jobs:
+      - job: PromoteImage
+        displayName: 'Promote Image'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          # Extract commit hash from source tag if using specific version
+          - bash: |
+              if [[ "${{ parameters.sourceImageTag }}" == uat-* && "${{ parameters.sourceImageTag }}" != "uat-latest" ]]; then
+                COMMIT_HASH="${{ parameters.sourceImageTag }}"
+                COMMIT_HASH=${COMMIT_HASH#uat-}
+                echo "Using commit hash: $COMMIT_HASH"
+                echo "##vso[task.setvariable variable=commitHash]$COMMIT_HASH"
+              else
+                echo "Using latest tag or custom tag"
+                # Generate date-based tag for tracking
+                echo "##vso[task.setvariable variable=dateTag]$(date +'%Y%m%d')"
+              fi
+            displayName: 'Extract Commit Information'
+
+          # Login to both registries
+          - task: Docker@2
+            displayName: 'Login to Non-Prod Registry'
+            inputs:
+              command: login
+              containerRegistry: '$(containerRegistryConectionNonProd)'
+
+            # Pull the source image
+          - bash: |
+              docker pull $(sourceImageRepository):${{ parameters.sourceImageTag }}
+            displayName: 'Pull Source Image'
+
+          - task: Docker@2
+            displayName: 'Logout from Non-Prod Registry'
+            inputs:
+              command: logout
+              containerRegistry: '$(containerRegistryConectionNonProd)'
+
+          - task: Docker@2
+            displayName: 'Login to Prod Registry'
+            inputs:
+              command: login
+              containerRegistry: '$(containerRegistryConectionProd)'
+
+          # Tag and push with production tags
+          - bash: |
+              docker tag $(sourceImageRepository):${{ parameters.sourceImageTag }} $(sourceImageRepository):${{ parameters.targetImageTag }}
+              docker push $(sourceImageRepository):${{ parameters.targetImageTag }}
+              docker tag $(sourceImageRepository):${{ parameters.sourceImageTag }} $(sourceImageRepository):${{ parameters.targetImageTag }}
+              docker push $(sourceImageRepository):${{ parameters.targetImageTag }}
+
+            displayName: 'Tag and Push Production Image'
+
+          - task: Npm@1
+            displayName: "Install datadog cli"
+            inputs:
+              command: custom
+              verbose: false
+              customCommand: "install -g @datadog/datadog-ci"
+
+          - script: |
+              datadog-ci sourcemaps upload $(Build.ArtifactStagingDirectory)/source-map \
+                --service=$(datadogServiceName) \
+                --release-version=$(commitHash) \
+                --minified-path-prefix=$(appDomainName)
+            env:
+              DATADOG_API_KEY: $(datadog-api-key)
+            displayName: Upload sourcemap to datadog
+
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish Artifact: drop'
+  #CD
+  - stage: Update
+    displayName: Update K8s Manifests
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - job: UpdateManifests
+        displayName: Update K8s Manifests
+        pool:
+          name: $(pool)
+        steps:
+          - checkout: self
+            displayName: 'Checkout source code'
+
+          - task: Bash@3
+            displayName: 'Update K8s Manifest'
+            inputs:
+              targetType: 'filePath'
+              filePath: '$(System.DefaultWorkingDirectory)/$(updateK8sScriptFile)'
+              arguments: '$(environment) $(environment)-$(Build.SourceVersion) $(containerImageRepository) $(k8sManifestRepoUrl)'
+              workingDirectory: '$(System.DefaultWorkingDirectory)'
+              # failOnStderr: true
+            env:
+              ENVIRONMENT: $(environment)
+              IMAGE_TAG: $(environment)-$(Build.SourceVersion)
+              CONTAINER_REGISTRY: $(containerImageRepository)
+              K8S_MANIFEST_REPO: $(k8sManifestRepoUrl)

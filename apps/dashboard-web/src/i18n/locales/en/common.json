@@ -1,0 +1,108 @@
+{
+  "app": {
+    "name": "FarmIQ"
+  },
+  "nav": {
+    "sections": {
+      "operations": "Operations",
+      "ai": "AI",
+      "admin": "Admin"
+    },
+    "items": {
+      "overview": "Overview",
+      "farms": "Farms",
+      "barns": "Barns",
+      "devices": "Devices",
+      "telemetry": "Telemetry",
+      "weighvision": "WeighVision",
+      "sessions": "Sessions",
+      "analytics": "Analytics",
+      "distribution": "Size Distribution",
+      "sensors": "Sensors",
+      "sensorCatalog": "Sensor Catalog",
+      "sensorBindings": "Sensor Bindings",
+      "sensorMatrix": "Sensor Matrix",
+      "sensorTrends": "Trends & Correlation",
+      "feeding": "Feeding & FCR",
+      "dailyFeed": "Daily Feed",
+      "fcrForecast": "FCR & Forecast",
+      "aiInsights": "AI Insights",
+      "anomalies": "Anomalies",
+      "recommendations": "Recommendations",
+      "scenarioPlanner": "Scenario Planner",
+      "alerts": "Alerts",
+      "notifications": "Notifications",
+      "reports": "Reports & Export",
+      "ops": "Ops",
+      "dataQuality": "Data Quality",
+      "healthMonitor": "Health Monitor",
+      "admin": "Admin",
+      "adminTenants": "Tenants",
+      "adminDevices": "Device Onboarding",
+      "adminUsers": "Users & Roles",
+      "adminAudit": "Audit Log",
+      "profile": "Profile",
+      "settings": "Settings"
+    }
+  },
+  "pages": {
+    "overview": {
+      "title": "Dashboard Overview",
+      "subtitle": "Real-time monitoring for your operations"
+    },
+    "context": {
+      "title": "Select Context",
+      "subtitle": "Choose your tenant, farm, and barn to get started",
+      "helper": "Please select at least a tenant to continue"
+    },
+    "settings": {
+      "title": "Settings",
+      "subtitle": "Manage your workspace preferences"
+    },
+    "profile": {
+      "title": "Profile",
+      "subtitle": "Manage your personal information"
+    }
+  },
+  "actions": {
+    "refresh": "Refresh",
+    "retry": "Retry",
+    "continue": "Continue",
+    "save": "Save",
+    "cancel": "Cancel",
+    "updatePassword": "Update Password",
+    "sendResetLink": "Send Reset Link",
+    "requestReset": "Request Reset",
+    "resetPassword": "Reset Password",
+    "backToLogin": "Back to Login"
+  },
+  "status": {
+    "live": "Live",
+    "cached": "Cached",
+    "offline": "Offline",
+    "lastUpdated": "Last updated",
+    "retry": "Retry"
+  },
+  "empty": {
+    "defaultTitle": "No data yet",
+    "defaultDescription": "Data will appear here when available.",
+    "farmsTitle": "No farms found",
+    "farmsDescription": "No farms are available for this tenant context.",
+    "barnsTitle": "No barns found",
+    "barnsDescription": "Create a barn to start tracking performance.",
+    "devicesTitle": "No devices connected",
+    "devicesDescription": "Connect devices to start streaming telemetry.",
+    "alertsTitle": "No alerts",
+    "alertsDescription": "You're all clear. We will notify you if anything changes."
+  },
+  "auth": {
+    "forgot": {
+      "title": "Forgot Password",
+      "subtitle": "Request a reset link to regain access"
+    },
+    "reset": {
+      "title": "Reset Password",
+      "subtitle": "Set a new password for your account"
+    }
+  }
+}

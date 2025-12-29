@@ -1,0 +1,320 @@
+openapi: 3.0.0
+info:
+  title: edge-sync-forwarder API
+  version: 1.0.0
+  description: Outbox-based sync to cloud ingestion with claim/lease, retries, and DLQ.
+servers:
+  - url: /
+paths:
+  /api/health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/ready:
+    get:
+      summary: Readiness check (DB connectivity)
+      responses:
+        '200':
+          description: Ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadyResponse'
+        '503':
+          description: Not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadyResponse'
+
+  /api/v1/sync/state:
+    get:
+      summary: Get sync state (pending/claimed/DLQ counts, last success/error)
+      responses:
+        '200':
+          description: State summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncState'
+
+  /api/v1/sync/outbox:
+    get:
+      summary: Query outbox entries by status
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, claimed, sending, acked, dlq, failed]
+            default: pending
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+            maximum: 1000
+      responses:
+        '200':
+          description: Outbox entries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutboxQueryResponse'
+
+  /api/v1/sync/dlq:
+    get:
+      summary: Get DLQ entries (requires INTERNAL_ADMIN_ENABLED=true)
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+            maximum: 1000
+      responses:
+        '200':
+          description: DLQ entries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DlqQueryResponse'
+        '403':
+          description: Forbidden (admin endpoints disabled)
+
+  /api/v1/sync/redrive:
+    post:
+      summary: Redrive DLQ entries back to pending (requires INTERNAL_ADMIN_ENABLED=true)
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RedriveRequest'
+      responses:
+        '200':
+          description: Redrive result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RedriveResponse'
+        '403':
+          description: Forbidden (admin endpoints disabled)
+
+  /api/v1/sync/dlq/redrive:
+    post:
+      summary: Alias of /api/v1/sync/redrive (DLQ redrive) (requires INTERNAL_ADMIN_ENABLED=true)
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RedriveRequest'
+      responses:
+        '200':
+          description: Redrive result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RedriveResponse'
+        '403':
+          description: Forbidden (admin endpoints disabled)
+
+  /api/v1/sync/unclaim-stuck:
+    post:
+      summary: Unclaim stuck rows (lease expired) (requires INTERNAL_ADMIN_ENABLED=true)
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnclaimStuckRequest'
+      responses:
+        '200':
+          description: Unclaim result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnclaimStuckResponse'
+        '403':
+          description: Forbidden (admin endpoints disabled)
+
+  /api/v1/sync/trigger:
+    post:
+      summary: Manually trigger a sync cycle
+      responses:
+        '200':
+          description: Triggered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TriggerResponse'
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: healthy
+
+    ReadyResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ready
+
+    SyncState:
+      type: object
+      properties:
+        pending_count:
+          type: integer
+        claimed_count:
+          type: integer
+        dlq_count:
+          type: integer
+        oldest_pending_age_seconds:
+          type: integer
+          nullable: true
+        last_success_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_error_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    OutboxEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+        event_type:
+          type: string
+        status:
+          type: string
+        attempt_count:
+          type: integer
+        next_attempt_at:
+          type: string
+          format: date-time
+          nullable: true
+        claimed_by:
+          type: string
+          nullable: true
+        lease_expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_error_code:
+          type: string
+          nullable: true
+        last_error_message:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    OutboxQueryResponse:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/OutboxEntry'
+        count:
+          type: integer
+
+    DlqEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+        event_type:
+          type: string
+        attempt_count:
+          type: integer
+        last_error_code:
+          type: string
+          nullable: true
+        last_error_message:
+          type: string
+          nullable: true
+        dlq_reason:
+          type: string
+          nullable: true
+        failed_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    DlqQueryResponse:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/DlqEntry'
+        count:
+          type: integer
+
+    RedriveRequest:
+      type: object
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        allDlq:
+          type: boolean
+          default: false
+
+    RedriveResponse:
+      type: object
+      properties:
+        redriven_count:
+          type: integer
+        message:
+          type: string
+
+    UnclaimStuckRequest:
+      type: object
+      properties:
+        olderThanSeconds:
+          type: integer
+          default: 300
+
+    UnclaimStuckResponse:
+      type: object
+      properties:
+        unclaimed_count:
+          type: integer
+        message:
+          type: string
+
+    TriggerResponse:
+      type: object
+      properties:
+        message:
+          type: string

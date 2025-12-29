@@ -1,0 +1,108 @@
+{
+  "app": {
+    "name": "FarmIQ"
+  },
+  "nav": {
+    "sections": {
+      "operations": "การปฏิบัติงาน",
+      "ai": "เอไอ",
+      "admin": "ผู้ดูแลระบบ"
+    },
+    "items": {
+      "overview": "ภาพรวม",
+      "farms": "ฟาร์ม",
+      "barns": "โรงเรือน",
+      "devices": "อุปกรณ์",
+      "telemetry": "เทเลเมทรี",
+      "weighvision": "WeighVision",
+      "sessions": "เซสชัน",
+      "analytics": "วิเคราะห์",
+      "distribution": "การกระจายขนาด",
+      "sensors": "เซนเซอร์",
+      "sensorCatalog": "รายการเซนเซอร์",
+      "sensorBindings": "ผูกเซนเซอร์",
+      "sensorMatrix": "เมทริกซ์เซนเซอร์",
+      "sensorTrends": "แนวโน้มและสหสัมพันธ์",
+      "feeding": "การให้อาหารและ FCR",
+      "dailyFeed": "อาหารรายวัน",
+      "fcrForecast": "FCR และการคาดการณ์",
+      "aiInsights": "ข้อมูลเชิงลึกจากเอไอ",
+      "anomalies": "ความผิดปกติ",
+      "recommendations": "คำแนะนำ",
+      "scenarioPlanner": "วางแผนสถานการณ์",
+      "alerts": "การแจ้งเตือน",
+      "notifications": "การแจ้งเตือน",
+      "reports": "รายงานและส่งออก",
+      "ops": "การปฏิบัติการ",
+      "dataQuality": "คุณภาพข้อมูล",
+      "healthMonitor": "สุขภาพระบบ",
+      "admin": "ผู้ดูแลระบบ",
+      "adminTenants": "ผู้เช่า",
+      "adminDevices": "การเพิ่มอุปกรณ์",
+      "adminUsers": "ผู้ใช้และบทบาท",
+      "adminAudit": "บันทึกตรวจสอบ",
+      "profile": "โปรไฟล์",
+      "settings": "ตั้งค่า"
+    }
+  },
+  "pages": {
+    "overview": {
+      "title": "ภาพรวมแดชบอร์ด",
+      "subtitle": "การติดตามแบบเรียลไทม์สำหรับงานของคุณ"
+    },
+    "context": {
+      "title": "เลือกบริบท",
+      "subtitle": "เลือกผู้เช่า ฟาร์ม และโรงเรือนเพื่อเริ่มต้น",
+      "helper": "กรุณาเลือกอย่างน้อยผู้เช่าเพื่อดำเนินการต่อ"
+    },
+    "settings": {
+      "title": "ตั้งค่า",
+      "subtitle": "จัดการค่ากำหนดของพื้นที่ทำงาน"
+    },
+    "profile": {
+      "title": "โปรไฟล์",
+      "subtitle": "จัดการข้อมูลส่วนตัวของคุณ"
+    }
+  },
+  "actions": {
+    "refresh": "รีเฟรช",
+    "retry": "ลองใหม่",
+    "continue": "ดำเนินการต่อ",
+    "save": "บันทึก",
+    "cancel": "ยกเลิก",
+    "updatePassword": "อัปเดตรหัสผ่าน",
+    "sendResetLink": "ส่งลิงก์รีเซ็ต",
+    "requestReset": "ขอรีเซ็ต",
+    "resetPassword": "รีเซ็ตรหัสผ่าน",
+    "backToLogin": "กลับไปหน้าเข้าสู่ระบบ"
+  },
+  "status": {
+    "live": "สด",
+    "cached": "แคช",
+    "offline": "ออฟไลน์",
+    "lastUpdated": "อัปเดตล่าสุด",
+    "retry": "ลองใหม่"
+  },
+  "empty": {
+    "defaultTitle": "ยังไม่มีข้อมูล",
+    "defaultDescription": "ข้อมูลจะปรากฏเมื่อพร้อมใช้งาน",
+    "farmsTitle": "ไม่พบฟาร์ม",
+    "farmsDescription": "ไม่มีฟาร์มสำหรับบริบทผู้เช่านี้",
+    "barnsTitle": "ไม่พบโรงเรือน",
+    "barnsDescription": "สร้างโรงเรือนเพื่อเริ่มติดตามผล",
+    "devicesTitle": "ยังไม่มีอุปกรณ์เชื่อมต่อ",
+    "devicesDescription": "เชื่อมต่ออุปกรณ์เพื่อเริ่มรับเทเลเมทรี",
+    "alertsTitle": "ไม่มีการแจ้งเตือน",
+    "alertsDescription": "ทุกอย่างเรียบร้อย เราจะแจ้งเมื่อมีการเปลี่ยนแปลง"
+  },
+  "auth": {
+    "forgot": {
+      "title": "ลืมรหัสผ่าน",
+      "subtitle": "ขอลิงก์รีเซ็ตเพื่อเข้าใช้งานอีกครั้ง"
+    },
+    "reset": {
+      "title": "รีเซ็ตรหัสผ่าน",
+      "subtitle": "ตั้งรหัสผ่านใหม่สำหรับบัญชีของคุณ"
+    }
+  }
+}

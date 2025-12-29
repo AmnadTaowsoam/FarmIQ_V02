@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  lint-and-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/dashboard-web/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: apps/dashboard-web
+        run: npm ci
+      
+      - name: Run linter
+        working-directory: apps/dashboard-web
+        run: npm run lint
+      
+      - name: Type check
+        working-directory: apps/dashboard-web
+        run: npm run typecheck
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/dashboard-web/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: apps/dashboard-web
+        run: npm ci
+      
+      - name: Run unit tests
+        working-directory: apps/dashboard-web
+        run: npm run test -- --run
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: apps/dashboard-web/coverage/lcov.info
+          flags: dashboard-web
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/dashboard-web/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: apps/dashboard-web
+        run: npm ci
+      
+      - name: Build
+        working-directory: apps/dashboard-web
+        run: npm run build
+        env:
+          VITE_BFF_BASE_URL: ${{ secrets.VITE_BFF_BASE_URL || 'http://localhost:3000/api' }}
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build
+          path: apps/dashboard-web/build
+          retention-days: 7
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/dashboard-web/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: apps/dashboard-web
+        run: npm ci
+      
+      - name: Install Playwright
+        working-directory: apps/dashboard-web
+        run: npx playwright install --with-deps chromium
+      
+      - name: Run E2E tests
+        working-directory: apps/dashboard-web
+        run: npm run test:e2e
+        env:
+          VITE_BFF_BASE_URL: http://localhost:3000/api
+

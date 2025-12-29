@@ -1,0 +1,132 @@
+openapi: 3.0.0
+info:
+  title: edge-media-store API
+  version: 1.0.0
+  description: Presigned upload and media metadata endpoints for FarmIQ edge media storage.
+servers:
+  - url: /
+paths:
+  /api/health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
+
+  /api/ready:
+    get:
+      summary: Readiness check (configuration)
+      responses:
+        '200':
+          description: Ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadyResponse'
+        '503':
+          description: Not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadyResponse'
+
+  /api/v1/media/images/presign:
+    post:
+      summary: Request a presigned upload URL for an image
+      description: >
+        Returns a presigned PUT URL for direct upload to the media bucket. Max upload size policy is enforced
+        by the storage layer; current limit is configured via MEDIA_MAX_UPLOAD_BYTES.
+      parameters:
+        - in: header
+          name: x-tenant-id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PresignRequest'
+      responses:
+        '200':
+          description: Presigned upload details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PresignResponse'
+        '400':
+          description: Validation error
+        '403':
+          description: Tenant mismatch
+
+components:
+  schemas:
+    ReadyResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ready
+        bucket:
+          type: string
+          example: farmiq-edge-media
+        presign:
+          type: string
+          example: ok
+
+    PresignRequest:
+      type: object
+      required:
+        - tenant_id
+        - farm_id
+        - barn_id
+        - device_id
+        - content_type
+        - filename
+      properties:
+        tenant_id:
+          type: string
+        farm_id:
+          type: string
+        barn_id:
+          type: string
+        device_id:
+          type: string
+        content_type:
+          type: string
+          example: image/jpeg
+        filename:
+          type: string
+          example: frame.jpg
+
+    PresignResponse:
+      type: object
+      required:
+        - object_key
+        - upload_url
+        - expires_in
+        - method
+        - headers
+      properties:
+        object_key:
+          type: string
+          example: tenants/t-1/farms/f-1/barns/b-1/devices/d-1/images/2025/01/01/018f...-...jpg
+        upload_url:
+          type: string
+          example: https://minio.local/presign/...
+        expires_in:
+          type: integer
+          example: 900
+        method:
+          type: string
+          example: PUT
+        headers:
+          type: object
+          additionalProperties:
+            type: string

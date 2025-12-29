@@ -1,0 +1,78 @@
+{
+  "timestamp": "2025-12-21T11:26:14.522Z",
+  "baseUrl": "http://localhost:5125",
+  "tokenSource": "none",
+  "tenantId": null,
+  "duration_ms": 134,
+  "summary": {
+    "total": 8,
+    "passed": 1,
+    "failed": 7
+  },
+  "results": [
+    {
+      "name": "GET /api/health",
+      "url": "http://localhost:5125/api/health",
+      "status": 200,
+      "ok": true,
+      "error": null,
+      "duration_ms": 55
+    },
+    {
+      "name": "GET /api/v1/farms",
+      "url": "http://localhost:5125/api/v1/farms",
+      "status": 404,
+      "ok": false,
+      "error": null,
+      "duration_ms": 38
+    },
+    {
+      "name": "GET /api/v1/barns",
+      "url": "http://localhost:5125/api/v1/barns",
+      "status": 404,
+      "ok": false,
+      "error": null,
+      "duration_ms": 19
+    },
+    {
+      "name": "GET /api/v1/batches",
+      "url": "http://localhost:5125/api/v1/batches",
+      "status": 404,
+      "ok": false,
+      "error": null,
+      "duration_ms": 4
+    },
+    {
+      "name": "GET /api/v1/devices",
+      "url": "http://localhost:5125/api/v1/devices",
+      "status": 404,
+      "ok": false,
+      "error": null,
+      "duration_ms": 3
+    },
+    {
+      "name": "GET /api/v1/sensors",
+      "url": "http://localhost:5125/api/v1/sensors",
+      "status": 404,
+      "ok": false,
+      "error": null,
+      "duration_ms": 4
+    },
+    {
+      "name": "GET /api/v1/feed/intake-records",
+      "url": "http://localhost:5125/api/v1/feed/intake-records",
+      "status": 400,
+      "ok": false,
+      "error": null,
+      "duration_ms": 5
+    },
+    {
+      "name": "GET /api/v1/barn-records/daily-counts",
+      "url": "http://localhost:5125/api/v1/barn-records/daily-counts",
+      "status": 400,
+      "ok": false,
+      "error": null,
+      "duration_ms": 5
+    }
+  ]
+}
