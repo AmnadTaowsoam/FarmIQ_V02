@@ -37,11 +37,13 @@ class InferenceDb:
     async def ensure_schema(self):
         """Ensure database tables exist."""
         async with self.pool.acquire() as conn:
+            # Needed for gen_random_uuid()
+            await conn.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto;")
+
             # Create inference_results table
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS inference_results (
                     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                    event_id UUID,
                     tenant_id VARCHAR(255) NOT NULL,
                     farm_id VARCHAR(255) NOT NULL,
                     barn_id VARCHAR(255) NOT NULL,
@@ -56,6 +58,12 @@ class InferenceDb:
                     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                     metadata JSONB
                 )
+            """)
+
+            # Backfill column for older deployments where inference_results existed without event_id.
+            await conn.execute("""
+                ALTER TABLE inference_results
+                ADD COLUMN IF NOT EXISTS event_id UUID
             """)
 
             await conn.execute("""
