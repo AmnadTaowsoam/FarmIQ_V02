@@ -19,7 +19,7 @@ services:
     volumes:
       - edge_postgres_data:/var/lib/postgresql/data
     networks:
-      - farmiq-edge-net
+      - farmiq-net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-farmiq}"]
       interval: 10s
@@ -39,7 +39,7 @@ services:
       - edge_minio_data:/data
     command: server /data --console-address ":9001"
     networks:
-      - farmiq-edge-net
+      - farmiq-net
     healthcheck:
       test: ["CMD", "stat", "/data"]
       interval: 30s
@@ -61,7 +61,7 @@ services:
       - edge_mqtt_data:/mosquitto/data
       - edge_mqtt_log:/mosquitto/log
     networks:
-      - farmiq-edge-net
+      - farmiq-net
     healthcheck:
       test: ["CMD", "mosquitto_sub", "-h", "localhost", "-t", "$$SYS/health", "-C", "1"]
       interval: 10s
@@ -86,7 +86,7 @@ services:
       - DEDUPE_TTL_MS=259200000
       - DEDUPE_CLEANUP_INTERVAL_MS=60000
     networks:
-      - farmiq-edge-net
+      - farmiq-net
 
   edge-telemetry-timeseries:
     build:
@@ -104,7 +104,7 @@ services:
       - LOG_LEVEL=debug
       - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
     networks:
-      - farmiq-edge-net
+      - farmiq-net
 
   edge-weighvision-session:
     build:
@@ -122,7 +122,7 @@ services:
       - LOG_LEVEL=debug
       - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
     networks:
-      - farmiq-edge-net
+      - farmiq-net
 
   edge-media-store:
     build:
@@ -142,7 +142,7 @@ services:
       - MEDIA_REGION=${MEDIA_REGION:-us-east-1}
       - MEDIA_BUCKET=${MEDIA_BUCKET:-farmiq-media}
     networks:
-      - farmiq-edge-net
+      - farmiq-net
 
   edge-vision-inference:
     build:
@@ -156,7 +156,7 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
       - MEDIA_STORE_URL=http://edge-media-store:3000
     networks:
-      - farmiq-edge-net
+      - farmiq-net
 
   edge-sync-forwarder:
     build:
@@ -172,7 +172,7 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
       - CLOUD_INGESTION_URL=http://host.docker.internal:5122/api/v1/edge/batch
     networks:
-      - farmiq-edge-net
+      - farmiq-net
 
   edge-policy-sync:
     build:
@@ -193,7 +193,7 @@ services:
       - POLICY_SYNC_TIMEOUT_SECONDS=10
       - EDGE_CONTEXTS=${EDGE_CONTEXTS:-[]}
     networks:
-      - farmiq-edge-net
+      - farmiq-net
 
   edge-retention-janitor:
     build:
@@ -213,7 +213,7 @@ services:
       - JANITOR_INTERVAL_SECONDS=21600
       - JANITOR_DRY_RUN=true
     networks:
-      - farmiq-edge-net
+      - farmiq-net
 
   edge-observability-agent:
     build:
@@ -236,10 +236,10 @@ services:
       - EDGE_MEDIA_URL=http://edge-media-store:3000
       - EDGE_SYNC_URL=http://edge-sync-forwarder:3000
     networks:
-      - farmiq-edge-net
+      - farmiq-net
 
 networks:
-  farmiq-edge-net:
+  farmiq-net:
     driver: bridge
 
 volumes:
