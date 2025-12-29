@@ -49,7 +49,7 @@ async function main() {
       barnId: config.barnId,
       deviceId: config.deviceId,
       stationId: config.stationId,
-      batchId: SEED_IDS.BATCH_1A_1,
+      batchId: null,
       status,
       startAt: new Date(now - hoursAgo * 60 * 60 * 1000),
       endAt: status === 'finalized' ? new Date(now - hoursAgo * 60 * 60 * 1000 + 30 * 60 * 1000) : null,

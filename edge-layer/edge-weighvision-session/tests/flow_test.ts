@@ -31,6 +31,7 @@ async function runTest() {
     console.log('Step 2: Creating session...');
     const session = await sessionService.createSession({
         sessionId,
+        eventId: uuidv4(),
         tenantId,
         farmId,
         barnId,
@@ -56,7 +57,12 @@ async function runTest() {
 
     // 4. Finalize
     console.log('Step 4: Finalizing session...');
-    const finalized = await sessionService.finalizeSession(sessionId, 'test-trace');
+    const finalized = await sessionService.finalizeSession(sessionId, {
+        tenantId,
+        eventId: uuidv4(),
+        occurredAt: new Date().toISOString(),
+        traceId: 'test-trace',
+    });
     console.log(`Session status: ${finalized.status}, final weight: ${finalized.finalWeightKg}`);
 
     console.log('--- Flow Test Completed ---');

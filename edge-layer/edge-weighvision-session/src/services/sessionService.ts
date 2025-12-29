@@ -1,69 +1,117 @@
-import { PrismaClient } from '@prisma/client';
-import { logger } from '../utils/logger';
+import { PrismaClient } from '@prisma/client'
+import { logger } from '../utils/logger'
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient()
+
+type CreateSessionParams = {
+  sessionId: string
+  eventId: string
+  tenantId: string
+  farmId: string
+  barnId: string
+  deviceId: string
+  stationId: string
+  batchId?: string
+  startAt: string
+  traceId: string
+}
+
+type BindWeightParams = {
+  tenantId: string
+  weightKg: number
+  occurredAt: string
+  eventId: string
+  traceId: string
+}
+
+type BindMediaParams = {
+  tenantId: string
+  mediaObjectId: string
+  occurredAt: string
+  eventId: string
+  traceId: string
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
 
 export const pingDb = async () => {
-    await prisma.$queryRaw`SELECT 1`;
-};
+  await prisma.$queryRaw`SELECT 1`
+}
 
-export const createSession = async (data: any) => {
-    const { sessionId, eventId, tenantId, farmId, barnId, deviceId, stationId, batchId, startAt, traceId } = data;
+export const createSession = async (data: CreateSessionParams) => {
+  const {
+    sessionId,
+    eventId,
+    tenantId,
+    farmId,
+    barnId,
+    deviceId,
+    stationId,
+    batchId,
+    startAt,
+    traceId,
+  } = data
 
-    return await prisma.$transaction(async (tx) => {
-        // Idempotent upsert
-        const session = await tx.weightSession.upsert({
-            where: { sessionId },
-            create: {
-                sessionId,
-                tenantId,
-                farmId,
-                barnId,
-                deviceId,
-                stationId,
-                batchId,
-                status: 'created',
-                startAt: new Date(startAt),
-            },
-            update: {} // No-op if exists
-        });
+  return await prisma.$transaction(async (tx) => {
+    // Idempotent upsert
+    const session = await tx.weightSession.upsert({
+      where: { sessionId },
+      create: {
+        sessionId,
+        tenantId,
+        farmId,
+        barnId,
+        deviceId,
+        stationId,
+        batchId,
+        status: 'created',
+        startAt: new Date(startAt),
+      },
+      update: {}, // No-op if exists
+    })
 
-        // Reconcile pending media bindings
-        const unboundMedia = await tx.sessionMediaBinding.findMany({
-            where: { sessionId, isBound: false }
-        });
+    // Reconcile pending media bindings
+    const unboundMedia = await tx.sessionMediaBinding.findMany({
+      where: { sessionId, isBound: false },
+    })
 
-        if (unboundMedia.length > 0) {
-            await tx.sessionMediaBinding.updateMany({
-                where: { id: { in: unboundMedia.map(m => m.id) } },
-                data: { isBound: true }
-            });
+    if (unboundMedia.length > 0) {
+      await tx.sessionMediaBinding.updateMany({
+        where: { id: { in: unboundMedia.map((m) => m.id) } },
+        data: { isBound: true },
+      })
 
-            await tx.weightSession.update({
-                where: { sessionId },
-                data: { imageCount: { increment: unboundMedia.length } }
-            });
+      await tx.weightSession.update({
+        where: { sessionId },
+        data: { imageCount: { increment: unboundMedia.length } },
+      })
 
-            logger.info(`Reconciled ${unboundMedia.length} media bindings for session ${sessionId}`);
-        }
+      logger.info(
+        `Reconciled ${unboundMedia.length} media bindings for session ${sessionId}`
+      )
+    }
 
-        // Reconcile pending weight records if any (not strictly required but good for consistency)
-        const weights = await tx.sessionWeight.findMany({
-            where: { sessionId }
-        });
+    // Reconcile pending weight records if any (not strictly required but good for consistency)
+    const weights = await tx.sessionWeight.findMany({
+      where: { sessionId },
+    })
 
-        if (weights.length > 0 && !session.initialWeightKg) {
-            const firstWeight = weights.sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime())[0];
-            await tx.weightSession.update({
-                where: { sessionId },
-                data: { initialWeightKg: firstWeight.weightKg }
-            });
-        }
+    if (weights.length > 0 && !session.initialWeightKg) {
+      const firstWeight = weights.sort(
+        (a, b) => a.occurredAt.getTime() - b.occurredAt.getTime()
+      )[0]
+      await tx.weightSession.update({
+        where: { sessionId },
+        data: { initialWeightKg: firstWeight.weightKg },
+      })
+    }
 
-        // Emit sync_outbox event (idempotent by eventId).
-        try {
-            await tx.$executeRawUnsafe(
-                `
+    // Emit sync_outbox event (idempotent by eventId).
+    try {
+      await tx.$executeRawUnsafe(
+        `
                 INSERT INTO sync_outbox (
                     id, tenant_id, farm_id, barn_id, device_id, session_id,
                     event_type, occurred_at, trace_id, payload_json,
@@ -75,142 +123,150 @@ export const createSession = async (data: any) => {
                 )
                 ON CONFLICT (id) DO NOTHING
                 `,
-                eventId,
-                tenantId,
-                farmId,
-                barnId,
-                deviceId,
-                sessionId,
-                new Date(startAt),
-                traceId || null,
-                JSON.stringify({
-                    session_id: sessionId,
-                    tenant_id: tenantId,
-                    farm_id: farmId,
-                    barn_id: barnId,
-                    device_id: deviceId,
-                    station_id: stationId,
-                    batch_id: batchId,
-                    start_at: startAt
-                })
-            );
-        } catch (error: any) {
-            logger.error('Failed to write sync_outbox weighvision.session.created', {
-                error: error?.message ?? String(error),
-                eventId,
-                traceId
-            });
-        }
+        eventId,
+        tenantId,
+        farmId,
+        barnId,
+        deviceId,
+        sessionId,
+        new Date(startAt),
+        traceId || null,
+        JSON.stringify({
+          session_id: sessionId,
+          tenant_id: tenantId,
+          farm_id: farmId,
+          barn_id: barnId,
+          device_id: deviceId,
+          station_id: stationId,
+          batch_id: batchId,
+          start_at: startAt,
+        })
+      )
+    } catch (error: unknown) {
+      logger.error('Failed to write sync_outbox weighvision.session.created', {
+        error: errorMessage(error),
+        eventId,
+        traceId,
+      })
+    }
 
-        return session;
-    });
-};
+    return session
+  })
+}
 
 export const getSession = async (sessionId: string) => {
-    return await prisma.weightSession.findUnique({
+  return await prisma.weightSession.findUnique({
+    where: { sessionId },
+    include: {
+      weights: {
+        orderBy: { occurredAt: 'asc' },
+      },
+    },
+  })
+}
+
+export const bindWeight = async (sessionId: string, data: BindWeightParams) => {
+  const { tenantId, weightKg, occurredAt, eventId, traceId } = data
+
+  return await prisma.$transaction(async (tx) => {
+    // Create weight record (unique by tenantId + eventId handles idempotency)
+    const weight = await tx.sessionWeight.upsert({
+      where: { tenantId_eventId: { tenantId, eventId } },
+      create: {
+        sessionId,
+        tenantId,
+        weightKg,
+        occurredAt: new Date(occurredAt),
+        eventId,
+        traceId,
+      },
+      update: {},
+    })
+
+    // Update initial weight if first
+    const session = await tx.weightSession.findUnique({ where: { sessionId } })
+    if (session && !session.initialWeightKg) {
+      await tx.weightSession.update({
         where: { sessionId },
-        include: {
-            weights: {
-                orderBy: { occurredAt: 'asc' }
-            }
-        }
-    });
-};
+        data: { initialWeightKg: weightKg },
+      })
+    }
 
-export const bindWeight = async (sessionId: string, data: any) => {
-    const { tenantId, weightKg, occurredAt, eventId, traceId } = data;
+    return weight
+  })
+}
 
-    return await prisma.$transaction(async (tx) => {
-        // Create weight record (unique by tenantId + eventId handles idempotency)
-        const weight = await tx.sessionWeight.upsert({
-            where: { tenantId_eventId: { tenantId, eventId } },
-            create: {
-                sessionId,
-                tenantId,
-                weightKg,
-                occurredAt: new Date(occurredAt),
-                eventId,
-                traceId
-            },
-            update: {}
-        });
+export const bindMedia = async (sessionId: string, data: BindMediaParams) => {
+  const { tenantId, mediaObjectId, occurredAt, eventId, traceId } = data
 
-        // Update initial weight if first
-        const session = await tx.weightSession.findUnique({ where: { sessionId } });
-        if (session && !session.initialWeightKg) {
-            await tx.weightSession.update({
-                where: { sessionId },
-                data: { initialWeightKg: weightKg }
-            });
-        }
+  return await prisma.$transaction(async (tx) => {
+    // Create media binding
+    const binding = await tx.sessionMediaBinding.upsert({
+      where: { tenantId_eventId: { tenantId, eventId } },
+      create: {
+        sessionId,
+        tenantId,
+        mediaObjectId,
+        occurredAt: new Date(occurredAt),
+        eventId,
+        traceId,
+        isBound: false, // Will be updated if session exists
+      },
+      update: {},
+    })
 
-        return weight;
-    });
-};
+    // Check if session exists to update imageCount
+    const session = await tx.weightSession.findUnique({ where: { sessionId } })
+    if (session && !binding.isBound) {
+      await tx.sessionMediaBinding.update({
+        where: { id: binding.id },
+        data: { isBound: true },
+      })
 
-export const bindMedia = async (sessionId: string, data: any) => {
-    const { tenantId, mediaObjectId, occurredAt, eventId, traceId } = data;
+      await tx.weightSession.update({
+        where: { sessionId },
+        data: { imageCount: { increment: 1 } },
+      })
+    }
 
-    return await prisma.$transaction(async (tx) => {
-        // Create media binding
-        const binding = await tx.sessionMediaBinding.upsert({
-            where: { tenantId_eventId: { tenantId, eventId } },
-            create: {
-                sessionId,
-                tenantId,
-                mediaObjectId,
-                occurredAt: new Date(occurredAt),
-                eventId,
-                traceId,
-                isBound: false // Will be updated if session exists
-            },
-            update: {}
-        });
+    return binding
+  })
+}
 
-        // Check if session exists to update imageCount
-        const session = await tx.weightSession.findUnique({ where: { sessionId } });
-        if (session && !binding.isBound) {
-            await tx.sessionMediaBinding.update({
-                where: { id: binding.id },
-                data: { isBound: true }
-            });
+export const finalizeSession = async (
+  sessionId: string,
+  data: {
+    tenantId: string
+    eventId: string
+    occurredAt: string
+    traceId: string
+  }
+) => {
+  return await prisma.$transaction(async (tx) => {
+    const session = await tx.weightSession.findUnique({
+      where: { sessionId },
+      include: { weights: { orderBy: { occurredAt: 'desc' }, take: 1 } },
+    })
 
-            await tx.weightSession.update({
-                where: { sessionId },
-                data: { imageCount: { increment: 1 } }
-            });
-        }
+    if (!session) throw new Error('Session not found')
+    if (session.status === 'finalized') return session
 
-        return binding;
-    });
-};
+    const finalWeight = session.weights[0]?.weightKg || session.initialWeightKg
+    const endTime = new Date()
 
-export const finalizeSession = async (sessionId: string, data: { tenantId: string, eventId: string, occurredAt: string, traceId: string }) => {
-    return await prisma.$transaction(async (tx) => {
-        const session = await tx.weightSession.findUnique({
-            where: { sessionId },
-            include: { weights: { orderBy: { occurredAt: 'desc' }, take: 1 } }
-        });
+    const updatedSession = await tx.weightSession.update({
+      where: { sessionId },
+      data: {
+        status: 'finalized',
+        endAt: endTime,
+        finalWeightKg: finalWeight,
+      },
+    })
 
-        if (!session) throw new Error('Session not found');
-        if (session.status === 'finalized') return session;
-
-        const finalWeight = session.weights[0]?.weightKg || session.initialWeightKg;
-        const endTime = new Date();
-
-        const updatedSession = await tx.weightSession.update({
-            where: { sessionId },
-            data: {
-                status: 'finalized',
-                endAt: endTime,
-                finalWeightKg: finalWeight
-            }
-        });
-
-        // Emit sync_outbox finalized event (idempotent by eventId).
-        try {
-            await tx.$executeRawUnsafe(
-                `
+    // Emit sync_outbox finalized event (idempotent by eventId).
+    try {
+      await tx.$executeRawUnsafe(
+        `
                 INSERT INTO sync_outbox (
                     id, tenant_id, device_id, session_id,
                     event_type, occurred_at, trace_id, payload_json,
@@ -222,29 +278,95 @@ export const finalizeSession = async (sessionId: string, data: { tenantId: strin
                 )
                 ON CONFLICT (id) DO NOTHING
                 `,
-                data.eventId,
-                session.tenantId,
-                session.deviceId,
-                sessionId,
-                new Date(data.occurredAt),
-                data.traceId || null,
-                JSON.stringify({
-                    session_id: sessionId,
-                    tenant_id: session.tenantId,
-                    device_id: session.deviceId,
-                    final_weight_kg: finalWeight,
-                    image_count: updatedSession.imageCount,
-                    end_at: endTime.toISOString()
-                })
-            );
-        } catch (error: any) {
-            logger.error('Failed to write sync_outbox weighvision.session.finalized', {
-                error: error?.message ?? String(error),
-                eventId: data.eventId,
-                traceId: data.traceId
-            });
+        data.eventId,
+        session.tenantId,
+        session.deviceId,
+        sessionId,
+        new Date(data.occurredAt),
+        data.traceId || null,
+        JSON.stringify({
+          session_id: sessionId,
+          tenant_id: session.tenantId,
+          device_id: session.deviceId,
+          final_weight_kg: finalWeight,
+          image_count: updatedSession.imageCount,
+          end_at: endTime.toISOString(),
+        })
+      )
+    } catch (error: unknown) {
+      logger.error(
+        'Failed to write sync_outbox weighvision.session.finalized',
+        {
+          error: errorMessage(error),
+          eventId: data.eventId,
+          traceId: data.traceId,
         }
+      )
+    }
 
-        return updatedSession;
-    });
-};
+    return updatedSession
+  })
+}
+
+export const attach = async (
+  sessionId: string,
+  params: {
+    tenantId: string
+    traceId: string
+    mediaId?: string
+    inferenceResultId?: string
+    capturedAt?: string
+  }
+) => {
+  return await prisma.$transaction(async (tx) => {
+    const session = await tx.weightSession.findUnique({ where: { sessionId } })
+    if (!session) throw new Error('Session not found')
+    if (params.tenantId && session.tenantId !== params.tenantId)
+      throw new Error('TENANT_MISMATCH')
+
+    let mediaBinding: unknown = null
+    if (params.mediaId) {
+      const existing = await tx.sessionMediaBinding.findFirst({
+        where: { sessionId, mediaObjectId: params.mediaId },
+      })
+
+      mediaBinding = await tx.sessionMediaBinding.upsert({
+        where: {
+          sessionId_mediaObjectId: { sessionId, mediaObjectId: params.mediaId },
+        },
+        create: {
+          sessionId,
+          tenantId: session.tenantId,
+          mediaObjectId: params.mediaId,
+          occurredAt: params.capturedAt
+            ? new Date(params.capturedAt)
+            : new Date(),
+          eventId: `attach-${session.tenantId}-${params.mediaId}`,
+          traceId: params.traceId,
+          isBound: true,
+        },
+        update: { isBound: true },
+      })
+
+      if (!existing) {
+        await tx.weightSession.update({
+          where: { sessionId },
+          data: { imageCount: { increment: 1 } },
+        })
+      }
+    }
+
+    let updatedSession = session
+    if (params.inferenceResultId) {
+      updatedSession = await tx.weightSession.update({
+        where: { sessionId },
+        data: { inferenceResultId: params.inferenceResultId },
+      })
+    }
+
+    return {
+      session: updatedSession,
+      media_binding: mediaBinding,
+    }
+  })
+}

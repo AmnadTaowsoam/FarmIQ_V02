@@ -115,6 +115,36 @@ paths:
         '404':
           description: Not found
 
+  /v1/weighvision/sessions/{sessionId}/attach:
+    post:
+      summary: Attach media and/or inference result to a session (internal)
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: x-tenant-id
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Attach'
+      responses:
+        '200':
+          description: Attached
+        '400':
+          description: Invalid request
+        '403':
+          description: Tenant mismatch
+        '404':
+          description: Session not found
+
 components:
   schemas:
     CreateSession:
@@ -175,3 +205,10 @@ components:
         tenantId: { type: string }
         eventId: { type: string, description: "MQTT event_id (used as sync_outbox.id for idempotency)" }
         occurredAt: { type: string, format: date-time }
+
+    Attach:
+      type: object
+      properties:
+        media_id: { type: string }
+        inference_result_id: { type: string }
+        captured_at: { type: string, format: date-time }
