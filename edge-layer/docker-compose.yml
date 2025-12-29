@@ -281,7 +281,7 @@ services:
 
 networks:
   farmiq-net:
-    external: true
+    driver: bridge
 
 volumes:
   mqtt_data:

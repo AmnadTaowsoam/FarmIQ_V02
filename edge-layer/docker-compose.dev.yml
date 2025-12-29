@@ -47,6 +47,19 @@ services:
       start_period: 40s
       retries: 3
 
+  cloud-ingestion-mock:
+    build:
+      context: ./edge-cloud-ingestion-mock
+      dockerfile: Dockerfile.dev
+    container_name: farmiq-edge-cloud-ingestion-mock
+    networks:
+      - farmiq-net
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # ============================================
   # EDGE SERVICES
   # ============================================
@@ -137,10 +150,12 @@ services:
       - LOG_LEVEL=debug
       - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
       - MEDIA_ENDPOINT=${MEDIA_ENDPOINT:-http://minio:9000}
+      - MEDIA_PRESIGN_ENDPOINT=${MEDIA_PRESIGN_ENDPOINT:-http://localhost:9000}
       - MEDIA_ACCESS_KEY=${MEDIA_ACCESS_KEY:-minioadmin}
       - MEDIA_SECRET_KEY=${MEDIA_SECRET_KEY:-minioadmin}
       - MEDIA_REGION=${MEDIA_REGION:-us-east-1}
       - MEDIA_BUCKET=${MEDIA_BUCKET:-farmiq-media}
+      - MEDIA_BUCKET_AUTO_CREATE=true
     networks:
       - farmiq-net
 
@@ -170,7 +185,9 @@ services:
       - APP_PORT=3000
       - LOG_LEVEL=debug
       - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
-      - CLOUD_INGESTION_URL=http://host.docker.internal:5122/api/v1/edge/batch
+      - CLOUD_INGESTION_URL=${CLOUD_INGESTION_URL:-http://cloud-ingestion-mock:3000/api/v1/edge/batch}
+      - OUTBOX_MAX_ATTEMPTS=${OUTBOX_MAX_ATTEMPTS:-10}
+      - INTERNAL_ADMIN_ENABLED=${INTERNAL_ADMIN_ENABLED:-true}
     networks:
       - farmiq-net
 
