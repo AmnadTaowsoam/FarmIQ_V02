@@ -1824,3 +1824,14 @@ curl http://localhost:5123/api/health  # Telemetry Service
   - Evidence testing documented: publish/consume test, topology verification.
   - Created docs/progress/cloud-rabbitmq.md.
   - Updated STATUS.md checklist and Service List status to "done".
+
+### 2025-12-29 (Edge Contracts + Hardening)
+- **Edge contracts baseline (Codex)**:
+  - Created SSOT contracts module: `edge-layer/shared/contracts/` (MQTT envelope + header + payload schemas).
+  - Created gap report + execution log: `docs/progress/edge-contracts-and-hardening.md`.
+- **Edge hardening (Codex)**:
+  - Added `GET /api-docs/openapi.json` for Node edge services (Swagger UI keeps `/api-docs`).
+  - Fixed unsafe logging (no DB URL secrets; no downstream response body snippets).
+  - Aligned idempotency key: telemetry now uses ingress `event_id` as `sync_outbox.id`.
+  - WeighVision session contract now accepts string IDs (topic segments) and writes session events into `sync_outbox` (not local outbox).
+  - Sync forwarder adds request/trace headers middleware and supports `POST /api/v1/sync/dlq/redrive` aliasing.

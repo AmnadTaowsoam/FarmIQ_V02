@@ -179,7 +179,8 @@ All FarmIQ services must follow `shared/01-api-standards.md`:
   - `GET /api-docs/openapi.json` (or `openapi.yaml`)
   - `GET /api/v1/sync/state` (returns pending/claimed/dead/dlq counts + oldest pending age)
   - `POST /api/v1/sync/trigger` (admin/debug)
-  - `POST /api/v1/sync/dlq/redrive` (admin/debug; re-drive DLQ with reason)
+  - `POST /api/v1/sync/dlq/redrive` (admin/debug; preferred DLQ redrive path)
+  - `POST /api/v1/sync/redrive` (admin/debug; legacy alias of DLQ redrive)
 - **Data ownership**: `sync_outbox`, `sync_outbox_dlq`
 - **Implementation notes**: `boilerplates/Backend-node`
 
