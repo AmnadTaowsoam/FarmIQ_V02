@@ -133,12 +133,12 @@ Ownership guards:
 ## Edge offline behavior (cloud down)
 
 When cloud connectivity is down:
-- Edge continues to ingest MQTT and store locally (telemetry DB, session DB, PVC media).
+- Edge continues to ingest MQTT and store locally (telemetry DB, session DB, S3/MinIO media).
 - `sync_outbox` grows; `edge-sync-forwarder` retries with exponential backoff.
 
 Required alerts/telemetry (see Operational Readiness section below and `shared/02-observability-datadog.md`):
 - Outbox backlog size and oldest pending age.
-- Disk/PVC usage thresholds (media + DB volumes).
+- Disk usage thresholds (object storage + DB volumes).
 - Last successful sync timestamp (per edge cluster/tenant).
 
 ---
@@ -149,7 +149,7 @@ Required alerts/telemetry (see Operational Readiness section below and `shared/0
 
 All edge services MUST expose:
 - `GET /api/health` (liveness probe): Returns 200 if service process is alive. No dependency checks.
-- `GET /api/ready` (readiness probe): Returns 200 if service can serve traffic. MUST check DB connectivity and critical dependencies (e.g., media-store checks PVC mount, forwarder checks DB and cloud endpoint reachability).
+- `GET /api/ready` (readiness probe): Returns 200 if service can serve traffic. MUST check DB connectivity and critical dependencies (e.g., media-store checks S3/MinIO access, forwarder checks DB and cloud endpoint reachability).
 - `GET /api-docs` (OpenAPI documentation).
 
 ### Production Alert Thresholds
@@ -160,9 +160,9 @@ All edge services MUST expose:
 - Warning: `sync_outbox` pending rows > **1000** OR oldest pending age > **1 hour**.
 - Critical: `sync_outbox` pending rows > **10000** OR oldest pending age > **24 hours**.
 
-**PVC Usage**:
-- Warning: Media PVC usage > **75%** OR DB volume usage > **80%**.
-- Critical: Media PVC usage > **90%** OR DB volume usage > **95%**.
+**Storage Usage**:
+- Warning: Media object storage usage (e.g., MinIO disk) > **75%** OR DB volume usage > **80%**.
+- Critical: Media object storage usage (e.g., MinIO disk) > **90%** OR DB volume usage > **95%**.
 
 **Inference Queue** (if RabbitMQ enabled):
 - Warning: Queue depth > **1000 jobs** OR oldest job age > **30 minutes**.
@@ -187,7 +187,7 @@ All edge services MUST expose:
 - Target: Session finalize acknowledgement ≤ **3 seconds** (p95).
 
 **Data Loss**:
-- Target: **Zero** data loss during cloud connectivity outages up to **7 days** (buffered in outbox/PVC).
+- Target: **Zero** data loss during cloud connectivity outages up to **7 days** (buffered in outbox/object storage).
 - Measurement: Outbox replay success rate and sync deduplication metrics.
 
 ---
@@ -209,7 +209,7 @@ All edge services MUST expose:
 - DB owners (`edge-telemetry-timeseries`, `edge-weighvision-session`, `edge-media-store`): Scale carefully; prefer vertical scaling if DB becomes bottleneck.
 
 **PVC Sizing**:
-- Media PVC: Size based on retention policy (e.g., 30 days) × average daily image volume × 1.5 safety margin.
+- Media object storage (e.g., MinIO volume): Size based on retention policy (e.g., 30 days) × average daily image volume × 1.5 safety margin.
   - Example: 1000 images/day × 2MB × 30 days × 1.5 = **90 GB minimum**.
 - DB PVC: Size based on telemetry retention (e.g., 90 days) and outbox retention (30 days) with growth projections.
 
@@ -219,7 +219,7 @@ All edge services MUST expose:
 
 - All Node edge services should be based on `boilerplates/Backend-node`, using Express, Prisma, Winston JSON logging, and dd-trace.
 - The Python inference service should be based on `boilerplates/Backend-python`, using FastAPI and JSON logging.
-- No object storage and no external in-memory cache/session store are permitted; all durable storage must be via the DB and PVC filesystem only.  
+- No external in-memory cache/session store is permitted; durable media storage uses S3-compatible object storage, and structured data uses the DB (backed by PVs where applicable).  
 
 ## Links
 

@@ -62,11 +62,13 @@ Recommended DB: PostgreSQL (local to edge cluster or managed externally).
 
 ### `media_objects`
 
-- **Purpose**: Metadata for images persisted on PVC.
+- **Purpose**: Metadata for images stored in S3-compatible object storage.
 - **Key columns**:
   - `id (uuidv7, pk)` (media_id)
   - `tenant_id`, `farm_id`, `barn_id`, `device_id`, `session_id (nullable)`
-  - `path` (absolute or mount-relative filesystem path)
+  - `bucket` (S3 bucket name)
+  - `object_key` (S3 object key)
+  - `etag` (optional)
   - `mime_type`, `size_bytes`
   - `captured_at`
   - `created_at`
@@ -344,27 +346,27 @@ Retention policies are configurable via environment variables. Each service shou
 
 **Recovery Scenarios**:
 - **Single node failure**: Restore from most recent backup, replay WAL if available.
-- **Full cluster failure**: Restore DB from backup, restore media PVC from snapshot (if available), restart services.
+- **Full cluster failure**: Restore DB from backup, restore object storage (e.g., MinIO volume snapshot/replication) if available, restart services.
 
-### Media PVC Backup
+### Media Object Storage Backup
 
 **Snapshot Strategy**:
-- **Option A (Recommended)**: PVC volume snapshots (K8s-native) daily or on-demand before major operations.
+- **Option A (Recommended)**: Snapshot/backup the object storage backend (e.g., MinIO PV snapshots) daily or on-demand before major operations.
 - **Option B**: File-level backup to external storage (rsync, tar) if volume snapshots unavailable.
 
 **Retention**: **7-30 days** of snapshots (media has shorter retention than DB).
 
 **Restore Process**:
-1. Create new PVC from snapshot or restore files to new PVC mount.
-2. Verify `media_objects` table matches filesystem contents (run integrity check).
+1. Restore the object storage backend (e.g., MinIO volume) from snapshot/backup.
+2. Verify `media_objects` table matches object storage contents (run integrity check).
 3. Restart `edge-media-store` service.
 
 ### Multi-day Cloud Outage Recovery
 
 **What is Recoverable**:
 - **Telemetry data**: Fully recoverable (stored in edge DB, synced to cloud when connectivity restored).
-- **WeighVision sessions**: Fully recoverable (sessions in DB, images on PVC, synced to cloud).
-- **Media files**: Fully recoverable (on PVC, synced to cloud via outbox events).
+- **WeighVision sessions**: Fully recoverable (sessions in DB, images in object storage, synced to cloud).
+- **Media files**: Fully recoverable (in object storage, synced to cloud via outbox events).
 
 **Recovery Process**:
 1. When cloud connectivity restored, `edge-sync-forwarder` automatically resumes batching and sending events.
@@ -374,7 +376,7 @@ Retention policies are configurable via environment variables. Each service shou
 
 **Data Loss Scenarios**:
 - **Edge cluster destroyed without backup**: Data loss occurs (edge is not permanent storage; cloud is source of truth for long-term retention).
-- **PVC corruption**: Restore from snapshot if available; otherwise data loss for affected media files.
+- **Object storage corruption**: Restore from snapshot if available; otherwise data loss for affected media files.
 - **DB corruption**: Restore from backup; may lose data since last backup.
 
 ---
@@ -395,7 +397,7 @@ Retention policies are configurable via environment variables. Each service shou
 
 ### Safe Rollout Strategy
 
-1. **Pre-deployment**: Backup DB and PVC snapshots.
+1. **Pre-deployment**: Backup DB and object storage/DB volume snapshots.
 2. **Schema Migration**: Apply additive migrations (new columns, indexes) first.
 3. **Code Deployment**: Deploy new application code (blue/green or rolling update).
 4. **Verification**: Monitor health endpoints, error rates, and sync success.
@@ -413,5 +415,4 @@ Retention policies are configurable via environment variables. Each service shou
 
 - All services must use UUID v7 for high-write tables in line with GT&D standards.
 - Avoid storing sensitive PII in telemetry, media metadata, or logs.
-- Edge storage sizing must account for offline windows (e.g., worst-case days without cloud connectivity) and be reflected in Kubernetes PVC capacity planning.
-
+- Edge storage sizing must account for offline windows (e.g., worst-case days without cloud connectivity) and be reflected in Kubernetes capacity planning (DB PVs + object storage backend volumes).

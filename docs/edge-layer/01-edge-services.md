@@ -32,7 +32,7 @@ Edge still uses the **DB-based outbox** (`sync_outbox`) as the authoritative mec
 ## Ownership guards (non-negotiable)
 
 - **Session owner (Edge)**: `edge-weighvision-session`
-- **Media owner (Edge)**: `edge-media-store` (files on PVC)
+- **Media owner (Edge)**: `edge-media-store` (objects in S3-compatible storage)
 - **Inference owner (Edge)**: `edge-vision-inference` (results)
 - **Sync owner (Edge)**: `edge-sync-forwarder` ONLY (single path to cloud)
 
@@ -155,6 +155,7 @@ See `edge-layer/00-overview.md` "Security & Provisioning" section for:
   - `GET /api-docs/openapi.json` (or `openapi.yaml`)
   - `POST /api/v1/weighvision/sessions` (internal; created from MQTT events)
   - `GET /api/v1/weighvision/sessions/{sessionId}` (internal)
+  - `POST /api/v1/weighvision/sessions/{sessionId}/attach` (internal; bind media/inference)
   - `POST /api/v1/weighvision/sessions/{sessionId}/finalize` (internal)
 - **DB tables owned**:
   - `weight_sessions`
@@ -180,15 +181,16 @@ See `edge-layer/00-overview.md` "Security & Provisioning" section for:
   - `GET /api/ready` (checks S3 bucket configuration)
   - `GET /api-docs`
   - `GET /api-docs/openapi.json` (or `openapi.yaml`)
-  - `POST /api/v1/media/images/presign` (device-facing; authenticated)
+  - `POST /api/v1/media/images/presign` (device-facing; authenticated; does NOT emit `media.stored`)
     - Request body: `tenant_id`, `farm_id`, `barn_id`, `device_id`, `content_type`, `filename`
     - Response: `{ object_key: string, upload_url: string, expires_in: number, method: "PUT", headers: { "Content-Type": string } }`
     - Auth: Validates `x-tenant-id` header matches request body tenant_id (JWT/mTLS validation should be added for production)
   - `PUT {upload_url}` (device-facing; S3 presigned URL, no auth header needed)
     - Binary JPEG/PNG/WebP body
     - Rate limit: 10 MB per upload, 10 presign requests per device per minute (configurable via `MEDIA_MAX_UPLOAD_BYTES`)
-  - `GET /api/v1/media/objects/{objectId}` (internal; returns file bytes from S3)
-  - `GET /api/v1/media/objects/{objectId}/meta` (internal; returns metadata JSON)
+  - `POST /api/v1/media/images/complete` (device-facing; confirms upload; emits `media.stored`)
+  - `GET /api/v1/media/objects/{mediaId}` (internal; returns file bytes from S3; requires `x-tenant-id`)
+  - `GET /api/v1/media/objects/{mediaId}/meta` (internal; returns metadata JSON; requires `x-tenant-id`)
 - **Environment Variables**:
   - `MEDIA_BUCKET` (required): S3 bucket name
   - `MEDIA_ENDPOINT` (required): S3 endpoint URL (e.g., `http://minio:9000` for MinIO)
@@ -312,5 +314,4 @@ See `edge-layer/00-overview.md` "Security & Provisioning" section for:
   - Use Winston JSON logging to stdout (collected by Datadog agent).
   - Use `dd-trace` and propagate `x-request-id` and `x-trace-id`.
   - Serve APIs under `/api` with `GET /api/health` and `/api-docs`.
-- No external in-memory cache/session store and no object storage are permitted. Durable media storage is via PVC filesystem only.
-
+- No external in-memory cache/session store is permitted; durable media storage uses S3-compatible object storage, and structured data uses the DB (backed by PVs where applicable).

@@ -104,13 +104,14 @@ All FarmIQ services must follow `shared/01-api-standards.md`:
   - `GET /api-docs/openapi.json` (or `openapi.yaml`)
   - `POST /api/v1/weighvision/sessions` (internal; created from MQTT events)
   - `GET /api/v1/weighvision/sessions/{sessionId}` (internal)
+  - `POST /api/v1/weighvision/sessions/{sessionId}/attach` (internal; bind media/inference)
   - `POST /api/v1/weighvision/sessions/{sessionId}/finalize` (internal)
 - **Data ownership**: `weight_sessions`
 - **Implementation notes**: `boilerplates/Backend-node`
 
 ### `edge-media-store`
 
-- **Purpose**: Media owner (PVC filesystem + metadata).
+- **Purpose**: Media owner (S3-compatible object storage + metadata).
 - **Base path**: `/api`
 - **Auth**: Internal cluster auth for reads; presign requires device auth (x-tenant-id or token claims). Gateway does not proxy image bytes.
 - **/api-docs**: `GET /api-docs`
@@ -120,9 +121,10 @@ All FarmIQ services must follow `shared/01-api-standards.md`:
   - `GET /api-docs`
   - `GET /api-docs/openapi.json` (or `openapi.yaml`)
   - `POST /api/v1/media/images/presign` + `PUT {upload_url}` (presigned upload; **only device→edge HTTP calls**)
-  - `GET /api/v1/media/objects/{objectId}`
-  - `GET /api/v1/media/objects/{objectId}/meta`
-- **Data ownership**: `media_objects` + PVC `/data/media`
+  - `POST /api/v1/media/images/complete` (confirm upload via S3 HEAD; persists metadata; emits `media.stored`)
+  - `GET /api/v1/media/objects/{mediaId}` (internal; bytes; requires `x-tenant-id`)
+  - `GET /api/v1/media/objects/{mediaId}/meta` (internal; metadata; requires `x-tenant-id`)
+- **Data ownership**: `media_objects` + S3 bucket objects (MinIO/S3)
 - **Implementation notes**: `boilerplates/Backend-node`
 
 ### `edge-feed-intake`
@@ -215,7 +217,7 @@ All FarmIQ services must follow `shared/01-api-standards.md`:
   - `POST /api/v1/janitor/run`
   - `GET /api/v1/janitor/state`
   - `GET /metrics`
-- **Data ownership**: None (acts on PVC paths only).
+- **Data ownership**: None (acts on S3 objects via lifecycle/edge-media-store).
 - **Implementation notes**: `boilerplates/Backend-node`
 
 ### `edge-observability-agent`
@@ -593,7 +595,7 @@ All FarmIQ services must follow `shared/01-api-standards.md`:
 
 ### `cloud-media-store` (optional)
 
-- **Purpose**: Cloud PVC-based media retention and serving.
+- **Purpose**: Cloud S3-based media retention and serving.
 - **Base path**: `/api`
 - **Auth**: JWT + RBAC (strong access control).
 - **/api-docs**: `GET /api-docs`
@@ -605,7 +607,7 @@ All FarmIQ services must follow `shared/01-api-standards.md`:
   - `POST /api/v1/media/images` (if cloud stores images)
   - `GET /api/v1/media/objects/{objectId}`
   - `GET /api/v1/media/objects/{objectId}/meta`
-- **Data ownership**: `media_object_cloud` + PVC `/data/media`
+- **Data ownership**: `media_object_cloud` + S3 bucket objects
 - **Implementation notes**: `boilerplates/Backend-node` (recommended)
 
 ---

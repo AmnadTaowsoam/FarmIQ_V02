@@ -325,3 +325,24 @@ curl -fsS -X POST http://localhost:5105/api/v1/weighvision/sessions/s-123/finali
 curl -fsS http://localhost:5108/api/v1/sync/state
 curl -fsS -X POST http://localhost:5108/api/v1/sync/trigger
 ```
+
+---
+
+## Implemented (P1): Media → Inference → Session bind → Outbox
+
+### End-to-end happy path (dev)
+
+Assumptions:
+- `edge-media-store` is configured with MinIO (`MEDIA_ENDPOINT`, `MEDIA_BUCKET`, credentials).
+- `edge-sync-forwarder` created the `sync_outbox` table (producers only insert).
+- Optional: `TRIGGER_INFERENCE_ON_COMPLETE=true` on `edge-media-store` to auto-trigger inference.
+
+1) Presign → PUT upload
+
+```bash
+PRESIGN_JSON=$(curl -fsS -X POST http://localhost:5106/api/v1/media/images/presign \\
+  -H 'content-type: application/json' \\
+  -H 'x-tenant-id: t-001' \\
+  -H 'x-request-id: req-presign-1' \\
+  -H 'x-trace-id: trace-media-1' \\
+  -d '{\"tenant_id\":\"t-001\",\"farm_id\":\"f-001\",\"barn_id\":\"b-001\",\"device_id\":\"wv-001\",\"content_type\":\"image/jpeg\",\"filename\":\"frame.jpg\"}')\n+\n+UPLOAD_URL=$(echo \"$PRESIGN_JSON\" | jq -r .upload_url)\n+OBJECT_KEY=$(echo \"$PRESIGN_JSON\" | jq -r .object_key)\n+\n+curl -fsS -X PUT \"$UPLOAD_URL\" -H 'Content-Type: image/jpeg' --data-binary @./tests/fixtures/frame.jpg\n+```\n+\n+2) Complete upload (verifies via S3 HEAD, persists `media_objects`, emits `media.stored`)\n+\n+```bash\n+COMPLETE_JSON=$(curl -fsS -X POST http://localhost:5106/api/v1/media/images/complete \\\n+  -H 'content-type: application/json' \\\n+  -H 'x-tenant-id: t-001' \\\n+  -H 'x-request-id: req-complete-1' \\\n+  -H 'x-trace-id: trace-media-2' \\\n+  -d \"{\\\"tenant_id\\\":\\\"t-001\\\",\\\"farm_id\\\":\\\"f-001\\\",\\\"barn_id\\\":\\\"b-001\\\",\\\"device_id\\\":\\\"wv-001\\\",\\\"object_key\\\":\\\"$OBJECT_KEY\\\",\\\"mime_type\\\":\\\"image/jpeg\\\",\\\"session_id\\\":\\\"s-123\\\"}\")\n+\n+MEDIA_ID=$(echo \"$COMPLETE_JSON\" | jq -r .media_id)\n+EVENT_ID=$(echo \"$COMPLETE_JSON\" | jq -r .event_id)\n+echo \"media_id=$MEDIA_ID event_id=$EVENT_ID\"\n+```\n+\n+3) Inference job (manual trigger if not auto-triggered)\n+\n+```bash\n+curl -fsS -X POST http://localhost:8000/api/v1/inference/jobs \\\n+  -H 'content-type: application/json' \\\n+  -H 'x-tenant-id: t-001' \\\n+  -H 'x-request-id: req-infer-1' \\\n+  -H 'x-trace-id: trace-infer-1' \\\n+  -d \"{\\\"tenant_id\\\":\\\"t-001\\\",\\\"farm_id\\\":\\\"f-001\\\",\\\"barn_id\\\":\\\"b-001\\\",\\\"device_id\\\":\\\"wv-001\\\",\\\"session_id\\\":\\\"s-123\\\",\\\"media_id\\\":\\\"$MEDIA_ID\\\"}\"\n+```\n+\n+4) Session bind (if you want explicit attach, or for manual backfill)\n+\n+```bash\n+curl -fsS -X POST http://localhost:5105/api/v1/weighvision/sessions/s-123/attach \\\n+  -H 'content-type: application/json' \\\n+  -H 'x-tenant-id: t-001' \\\n+  -H 'x-request-id: req-attach-1' \\\n+  -H 'x-trace-id: trace-attach-1' \\\n+  -d \"{\\\"media_id\\\":\\\"$MEDIA_ID\\\"}\"\n+```\n+\n+5) Verify outbox backlog and trigger send\n+\n+```bash\n+curl -fsS http://localhost:5108/api/v1/sync/state\n+curl -fsS -X POST http://localhost:5108/api/v1/sync/trigger\n+```

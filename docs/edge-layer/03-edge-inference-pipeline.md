@@ -14,7 +14,7 @@ The edge inference pipeline connects these owners:
 - **Sync owner**: `edge-sync-forwarder`
 
 High-level flow:
-- Media stored on PVC → inference job queued → inference result persisted → session finalized → outbox event → synced to cloud.
+- Media stored in S3-compatible object storage → inference job queued → inference result persisted → session finalized → outbox event → synced to cloud.
 
 ---
 
@@ -53,6 +53,7 @@ flowchart LR
   1. Device calls `POST /api/v1/media/images/presign` on `edge-media-store` (authenticated via `x-tenant-id` header).
   2. `edge-media-store` returns S3 presigned `upload_url` and `object_key`.
   3. Device uploads binary image via `PUT {upload_url}` directly to S3.
+  4. Device confirms completion via `POST /api/v1/media/images/complete` (edge verifies via S3 HEAD, persists metadata, emits `media.stored`).
 - `edge-media-store`:
   - Stores the file in S3-compatible object storage (MinIO or AWS S3) at the object key.
   - Creates a `media_objects` row in DB with metadata.
@@ -153,7 +154,7 @@ Example job payload:
 ## Offline mode behavior
 
 When cloud connectivity is down:
-- Media continues to be stored on PVC.
+- Media continues to be stored in S3-compatible object storage.
 - Telemetry and session state continues to be stored in the edge DB.
 - Inference continues to run locally (using Edge RabbitMQ queues if enabled, or synchronous mode).
 - `edge-sync-forwarder` pauses cloud sync but continues retrying with backoff and retains events in `sync_outbox`.

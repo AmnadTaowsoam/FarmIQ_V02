@@ -12,7 +12,7 @@
 
 **Top 3 Issues**:
 1. **edge-telemetry-timeseries service is MISSING** — Referenced in docs and docker-compose but directory is empty (no implementation)
-2. **edge-media-store uses S3 presigner, but docs claim PVC filesystem** — Architecture mismatch needs resolution
+2. **edge-media-store uses S3 presigner (MinIO/S3), and docs now treat S3 as canonical** — Architecture mismatch needs resolution
 3. **edge-weighvision-session /ready endpoint path mismatch** — Docs say `/api/ready` but code has `/api/ready` (need verification)
 
 ---
@@ -43,8 +43,8 @@
 |---------|---------|---------|----------------|---------------------------|
 | DOC-001 | `00-overview.md` | Canonical services | Lists 7 services including edge-telemetry-timeseries | `edge-telemetry-timeseries/` directory with implementation |
 | DOC-002 | `01-edge-services.md` | edge-telemetry-timeseries | Service with APIs: POST/GET /api/v1/telemetry/readings, aggregates | Service implementation with these endpoints |
-| DOC-003 | `01-edge-services.md` | edge-media-store | Uses PVC filesystem for storage | Code should write to `/data/media` PVC mount |
-| DOC-004 | `01-edge-services.md` | edge-media-store | POST /api/v1/media/images/presign returns upload_url for PVC | Presign implementation that writes to PVC |
+| DOC-003 | `01-edge-services.md` | edge-media-store | Uses S3-compatible object storage for media | Code stores objects in MinIO/S3 and persists metadata in `media_objects` |
+| DOC-004 | `01-edge-services.md` | edge-media-store | `presign` returns S3 presigned URL; `complete` confirms upload | Presign must not emit `media.stored`; completion handshake must emit it |
 | DOC-005 | `00-overview.md` | Media upload | Devices bypass ingress-gateway, upload directly to media-store | ✅ Verified: ingress-gateway has no media proxy routes |
 | DOC-006 | `02-edge-storage-buffering.md` | sync_outbox schema | next_attempt_at, claimed_by, lease_expires_at columns | ✅ Verified: OutboxEntity has these fields |
 | DOC-007 | `02-edge-storage-buffering.md` | sync_outbox claim/lease | FOR UPDATE SKIP LOCKED implementation | ✅ Verified: outboxService.ts uses FOR UPDATE SKIP LOCKED |
@@ -60,8 +60,8 @@
 |---------|--------|----------|-------|
 | DOC-001 | **MISSING** | `edge-telemetry-timeseries/` directory is empty (no files) | Service referenced in docker-compose.yml:58-77 but no implementation exists |
 | DOC-002 | **MISSING** | No service code found | APIs `/api/v1/telemetry/readings`, `/api/v1/telemetry/aggregates` not implemented |
-| DOC-003 | **OUTDATED** | `edge-media-store/src/services/s3Presigner.ts` uses S3Client | Code uses S3 presigner, docs claim PVC filesystem. **CONTRADICTION** |
-| DOC-004 | **PARTIAL** | `edge-media-store/src/routes/mediaRoutes.ts` has presign endpoint | Endpoint exists but uses S3, not PVC. Response format differs from docs |
+| DOC-003 | **DONE** | `edge-media-store/src/services/s3Client.ts` uses S3Client | Docs align on S3-compatible media storage (MinIO/S3) |
+| DOC-004 | **DONE** | `edge-media-store/src/routes/mediaRoutes.ts` has `presign` + `complete` | Completion handshake verifies upload via S3 HEAD and emits `media.stored` |
 | DOC-005 | **DONE** | `edge-ingress-gateway/src/routes/` has no media proxy routes | Verified: ingress-gateway does NOT proxy media uploads |
 | DOC-006 | **DONE** | `edge-sync-forwarder/src/db/entities/OutboxEntity.ts` has all required fields | ✅ next_attempt_at, claimed_by, lease_expires_at, etc. all present |
 | DOC-007 | **DONE** | `edge-sync-forwarder/src/services/outboxService.ts:46-71` uses FOR UPDATE SKIP LOCKED | ✅ Proper CTE pattern with FOR UPDATE SKIP LOCKED implemented |
@@ -71,10 +71,9 @@
 
 **Additional Findings**:
 
-1. **edge-media-store architecture mismatch**:
-   - Code: Uses `@aws-sdk/client-s3` and `@aws-sdk/s3-request-presigner` (S3-compatible storage)
-   - Docs: Claims PVC filesystem at `/data/media/{tenant_id}/...`
-   - **Resolution needed**: Decide if code should be changed to PVC or docs updated to S3
+1. **edge-media-store media storage**:
+   - Code and docs treat S3-compatible storage (MinIO/S3) as canonical.
+   - Presign is decoupled from emit; `media.stored` is emitted only after upload completion is confirmed.
 
 2. **edge-telemetry-timeseries missing**:
    - Referenced in `docker-compose.yml:58-77` with build context
@@ -102,7 +101,7 @@
 | Presign endpoint exists | ✅ **DONE** | `edge-media-store/src/routes/mediaRoutes.ts:23` | None |
 | Upload URL format matches | ⚠️ **PARTIAL** | Code returns S3 presigned URL, docs expect PVC URL | Update docs OR code |
 
-**Recommendation**: **P0** — Update docs to reflect S3-compatible storage (MinIO or S3) OR refactor code to use PVC filesystem. Based on docker-compose volumes, PVC is intended but code uses S3.
+**Resolution**: Docs treat S3-compatible storage (MinIO/S3) as canonical; edge-media-store uses presign + upload completion handshake (no PVC media paths). Based on docker-compose volumes, PVC is intended but code uses S3.
 
 ### B) Outbox Forwarder Scaling
 
@@ -371,4 +370,3 @@ curl -X POST http://localhost:5106/api/v1/media/images/presign \
 **Nice to Have**: 2 (P2-1, P2-2)
 
 **Overall Status**: ⚠️ **PARTIAL** — Documentation is comprehensive but code has gaps (missing service) and contradictions (storage architecture). Once P0 issues are resolved, the edge layer will be production-ready.
-

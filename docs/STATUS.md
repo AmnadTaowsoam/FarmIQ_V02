@@ -1835,3 +1835,7 @@ curl http://localhost:5123/api/health  # Telemetry Service
   - Aligned idempotency key: telemetry now uses ingress `event_id` as `sync_outbox.id`.
   - WeighVision session contract now accepts string IDs (topic segments) and writes session events into `sync_outbox` (not local outbox).
   - Sync forwarder adds request/trace headers middleware and supports `POST /api/v1/sync/dlq/redrive` aliasing.
+- **Edge P1 media/inference/session (Codex)**:
+  - `edge-media-store` adds upload completion handshake (`POST /api/v1/media/images/complete`) and emits `media.stored` only after upload is confirmed.
+  - `edge-vision-inference` reads media via `edge-media-store` internal API and emits `inference.completed` to `sync_outbox`.
+  - `edge-weighvision-session` adds `POST /api/v1/weighvision/sessions/{sessionId}/attach` for binding (no extra outbox spam).
