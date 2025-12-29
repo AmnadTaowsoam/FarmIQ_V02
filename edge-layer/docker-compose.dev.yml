@@ -131,13 +131,11 @@ services:
     volumes:
       - ./edge-media-store/src:/app/src:ro
       - ./edge-media-store/package.json:/app/package.json:ro
-      - ../../data/edge-media:/data/media
     environment:
       - NODE_ENV=development
       - APP_PORT=3000
       - LOG_LEVEL=debug
       - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
-      - MEDIA_STORAGE_PATH=/data/media
       - MEDIA_ENDPOINT=${MEDIA_ENDPOINT:-http://minio:9000}
       - MEDIA_ACCESS_KEY=${MEDIA_ACCESS_KEY:-minioadmin}
       - MEDIA_SECRET_KEY=${MEDIA_SECRET_KEY:-minioadmin}
@@ -152,12 +150,11 @@ services:
       dockerfile: Dockerfile.dev
     volumes:
       - ./edge-vision-inference/app:/app/app:ro
-      - ../../data/edge-media:/data/media:ro
     environment:
       - LOG_LEVEL=DEBUG
       - PORT=8000
       - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
-      - MEDIA_STORAGE_PATH=/data/media
+      - MEDIA_STORE_URL=http://edge-media-store:3000
     networks:
       - farmiq-edge-net
 
