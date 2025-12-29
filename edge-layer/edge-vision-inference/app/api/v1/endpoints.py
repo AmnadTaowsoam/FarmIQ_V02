@@ -1,7 +1,7 @@
 """API endpoints for inference service."""
 from fastapi import APIRouter, HTTPException, Query, Request
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, AliasChoices
 import logging
 
 from app.db import InferenceDb
@@ -16,15 +16,16 @@ router = APIRouter()
 
 # Request/Response models
 class CreateJobRequest(BaseModel):
-    jobType: str
-    mediaId: str
-    filePath: str
-    sessionId: Optional[str] = None
-    tenantId: str
-    traceId: Optional[str] = None
-    farmId: Optional[str] = None
-    barnId: Optional[str] = None
-    deviceId: Optional[str] = None
+    # Accept both snake_case and camelCase for internal callers.
+    tenant_id: str = Field(validation_alias=AliasChoices("tenant_id", "tenantId"))
+    farm_id: Optional[str] = Field(default=None, validation_alias=AliasChoices("farm_id", "farmId"))
+    barn_id: Optional[str] = Field(default=None, validation_alias=AliasChoices("barn_id", "barnId"))
+    device_id: Optional[str] = Field(default=None, validation_alias=AliasChoices("device_id", "deviceId"))
+    session_id: Optional[str] = Field(default=None, validation_alias=AliasChoices("session_id", "sessionId"))
+    media_id: Optional[str] = Field(default=None, validation_alias=AliasChoices("media_id", "mediaId"))
+    object_key: Optional[str] = Field(default=None, validation_alias=AliasChoices("object_key", "objectKey"))
+    trace_id: Optional[str] = Field(default=None, validation_alias=AliasChoices("trace_id", "traceId"))
+    job_type: Optional[str] = Field(default="inference", validation_alias=AliasChoices("job_type", "jobType"))
 
 
 class JobResponse(BaseModel):
@@ -53,24 +54,27 @@ async def create_job(request: Request, job_request: CreateJobRequest):
         job_service: JobService = request.app.state.job_service
         
         # Validate required fields
-        if not job_request.tenantId:
-            raise HTTPException(status_code=400, detail="tenantId is required")
-        
-        if not job_request.filePath:
-            raise HTTPException(status_code=400, detail="filePath is required")
+        if not job_request.tenant_id:
+            raise HTTPException(status_code=400, detail="tenant_id is required")
+        if not job_request.media_id and not job_request.object_key:
+            raise HTTPException(status_code=400, detail="media_id or object_key is required")
+
+        tenant_header = request.headers.get("x-tenant-id")
+        if tenant_header and tenant_header != job_request.tenant_id:
+            raise HTTPException(status_code=403, detail="x-tenant-id does not match tenant_id")
         
         # Get trace_id from request headers or use provided
-        trace_id = job_request.traceId or request.headers.get("x-trace-id") or Config.new_id()
+        trace_id = job_request.trace_id or request.headers.get("x-trace-id") or Config.new_id()
         
         # Create job
         job = await job_service.create_job(
-            tenant_id=job_request.tenantId,
-            farm_id=job_request.farmId or "",
-            barn_id=job_request.barnId or "",
-            device_id=job_request.deviceId or "",
-            media_id=job_request.mediaId,
-            file_path=job_request.filePath,
-            session_id=job_request.sessionId,
+            tenant_id=job_request.tenant_id,
+            farm_id=job_request.farm_id or "",
+            barn_id=job_request.barn_id or "",
+            device_id=job_request.device_id or "",
+            media_id=job_request.media_id,
+            object_key=job_request.object_key,
+            session_id=job_request.session_id,
             trace_id=trace_id
         )
         
@@ -81,7 +85,7 @@ async def create_job(request: Request, job_request: CreateJobRequest):
             updated_at=job["updated_at"]
         )
     except Exception as e:
-        logger.error(f"Failed to create job: {e}", exc_info=True)
+        logger.error("Failed to create job", extra={"error": str(e)}, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -134,4 +138,3 @@ async def get_models(request: Request):
     except Exception as e:
         logger.error(f"Failed to get models: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
-

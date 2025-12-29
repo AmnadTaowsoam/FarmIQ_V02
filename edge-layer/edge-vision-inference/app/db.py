@@ -41,6 +41,7 @@ class InferenceDb:
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS inference_results (
                     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    event_id UUID,
                     tenant_id VARCHAR(255) NOT NULL,
                     farm_id VARCHAR(255) NOT NULL,
                     barn_id VARCHAR(255) NOT NULL,
@@ -56,6 +57,11 @@ class InferenceDb:
                     metadata JSONB
                 )
             """)
+
+            await conn.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_inference_results_tenant_event
+                ON inference_results(tenant_id, event_id)
+            """)
             
             # Create indexes
             await conn.execute("""
@@ -66,37 +72,6 @@ class InferenceDb:
             await conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_inference_results_tenant_device_occurred 
                 ON inference_results(tenant_id, device_id, occurred_at DESC)
-            """)
-            
-            # Create outbox table (if not exists - shared with other services)
-            await conn.execute("""
-                CREATE TABLE IF NOT EXISTS sync_outbox (
-                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                    tenant_id VARCHAR(255) NOT NULL,
-                    farm_id VARCHAR(255),
-                    barn_id VARCHAR(255),
-                    device_id VARCHAR(255),
-                    session_id VARCHAR(255),
-                    event_type VARCHAR(255) NOT NULL,
-                    occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                    trace_id VARCHAR(255),
-                    payload_json JSONB NOT NULL,
-                    status VARCHAR(50) NOT NULL DEFAULT 'pending',
-                    attempt_count INTEGER NOT NULL DEFAULT 0,
-                    last_attempt_at TIMESTAMPTZ,
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                    CONSTRAINT unique_tenant_event UNIQUE (tenant_id, id)
-                )
-            """)
-            
-            await conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_sync_outbox_status_attempt 
-                ON sync_outbox(status, last_attempt_at ASC)
-            """)
-            
-            await conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_sync_outbox_tenant_occurred 
-                ON sync_outbox(tenant_id, occurred_at DESC)
             """)
             
             logger.info("Database schema ensured")
@@ -113,6 +88,7 @@ class InferenceDb:
     
     async def create_inference_result(
         self,
+        result_id: str,
         tenant_id: str,
         farm_id: str,
         barn_id: str,
@@ -126,15 +102,19 @@ class InferenceDb:
     ) -> str:
         """Create inference result and return ID."""
         async with self.pool.acquire() as conn:
-            result_id = await conn.fetchval("""
+            inserted = await conn.fetchval("""
                 INSERT INTO inference_results (
-                    tenant_id, farm_id, barn_id, device_id, session_id, media_id,
+                    id, event_id, tenant_id, farm_id, barn_id, device_id, session_id, media_id,
                     predicted_weight_kg, confidence, model_version, metadata
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                ) VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                ON CONFLICT (id) DO NOTHING
                 RETURNING id
-            """, tenant_id, farm_id, barn_id, device_id, session_id, media_id,
+            """, result_id, result_id, tenant_id, farm_id, barn_id, device_id, session_id, media_id,
                 predicted_weight_kg, confidence, model_version, metadata)
-            return str(result_id)
+            if inserted:
+                return str(inserted)
+            existing = await conn.fetchval("SELECT id FROM inference_results WHERE id = $1::uuid", result_id)
+            return str(existing)
     
     async def get_inference_result(self, result_id: str) -> Optional[Dict[str, Any]]:
         """Get inference result by ID."""
@@ -161,6 +141,7 @@ class InferenceDb:
     
     async def create_outbox_event(
         self,
+        event_id: str,
         tenant_id: str,
         event_type: str,
         payload: Dict[str, Any],
@@ -173,13 +154,12 @@ class InferenceDb:
         """Create outbox event."""
         import json
         async with self.pool.acquire() as conn:
-            event_id = await conn.fetchval("""
+            await conn.execute("""
                 INSERT INTO sync_outbox (
-                    tenant_id, farm_id, barn_id, device_id, session_id,
+                    id, tenant_id, farm_id, barn_id, device_id, session_id,
                     event_type, payload_json, trace_id
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                RETURNING id
-            """, tenant_id, farm_id, barn_id, device_id, session_id,
+                ) VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9)
+                ON CONFLICT (id) DO NOTHING
+            """, event_id, tenant_id, farm_id, barn_id, device_id, session_id,
                 event_type, json.dumps(payload), trace_id)
             return str(event_id)
-

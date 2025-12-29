@@ -22,8 +22,11 @@ class Config:
         "postgresql://farmiq:farmiq_dev@postgres:5432/farmiq"
     )
     
-    # Media Storage (PVC path)
-    MEDIA_STORAGE_PATH: str = os.getenv("MEDIA_STORAGE_PATH", "/data/media")
+    # Media store (S3 via edge-media-store)
+    MEDIA_STORE_URL: str = os.getenv(
+        "MEDIA_STORE_URL",
+        "http://edge-media-store:3000"
+    )
     
     # Model Configuration
     MODEL_PATH: str = os.getenv("MODEL_PATH", "")

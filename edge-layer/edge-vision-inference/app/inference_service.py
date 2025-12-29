@@ -49,7 +49,7 @@ class InferenceService:
         # 3. Run inference
         # 4. Post-process results
         
-        logger.info(f"Running inference on {image_path} (stub mode)")
+        logger.info(f"Running inference (stub mode) model_version={self.model_version}")
         
         # Stub output - deterministic based on file size and name
         file_size = image_file.stat().st_size
@@ -69,7 +69,7 @@ class InferenceService:
             }
         }
         
-        logger.info(f"Inference completed: {result}")
+        logger.info(f"Inference completed model_version={self.model_version}")
         return result
     
     def get_model_info(self) -> Dict[str, Any]:
@@ -81,4 +81,3 @@ class InferenceService:
             "nms_threshold": self.config.NMS_THRESHOLD,
             "status": "ready" if self.config.MODEL_PATH else "stub_mode"
         }
-
