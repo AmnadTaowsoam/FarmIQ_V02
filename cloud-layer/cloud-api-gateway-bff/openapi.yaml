@@ -800,6 +800,47 @@ paths:
           description: Audit event
         '404':
           description: Audit event not found
+  /api/v1/devices:
+    post:
+      summary: Create device
+      tags: [Registry]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - tenantId
+                - deviceType
+              properties:
+                tenantId:
+                  type: string
+                farmId:
+                  type: string
+                barnId:
+                  type: string
+                batchId:
+                  type: string
+                deviceType:
+                  type: string
+                serialNo:
+                  type: string
+                status:
+                  type: string
+                metadata:
+                  type: object
+      responses:
+        '201':
+          description: Device created
+        '400':
+          description: Validation error
+        '409':
+          description: Conflict
+        '502':
+          description: Downstream service error
 
 components:
   securitySchemes:

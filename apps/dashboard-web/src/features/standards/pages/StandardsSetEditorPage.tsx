@@ -1,8 +1,29 @@
 import React, { useMemo, useState } from 'react';
-import { Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Stack, Switch, TextField, Typography } from '@mui/material';
+import {
+  Box,
+  Button,
+  Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  Stack,
+  Switch,
+  Tab,
+  Tabs,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  TextField,
+  Tooltip,
+  Typography,
+} from '@mui/material';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Save, ArrowLeft, Edit } from 'lucide-react';
+import { Save, ArrowLeft, Edit, Eye } from 'lucide-react';
 import { PageHeader } from '../../../components/layout/PageHeader';
 import { PremiumCard } from '../../../components/common/PremiumCard';
 import ApiErrorState from '../../../components/error/ApiErrorState';
@@ -35,6 +56,74 @@ export const StandardsSetEditorPage: React.FC = () => {
   const [editOpen, setEditOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState<any>(null);
   const [payloadText, setPayloadText] = useState('');
+  const [payloadMode, setPayloadMode] = useState<'view' | 'edit'>('view');
+  const [payloadView, setPayloadView] = useState<'table' | 'json'>('table');
+
+  const prettyPayload = (value: unknown) => {
+    try {
+      return JSON.stringify(value ?? {}, null, 2);
+    } catch {
+      return '{}';
+    }
+  };
+
+  const payloadFieldLabels: Record<string, string> = {
+    body_weight_g: 'Body Weight (g)',
+    daily_gain_g: 'Daily Gain (g)',
+    avg_daily_gain_g: 'Avg Daily Gain (g)',
+    daily_feed_intake_g: 'Daily Feed Intake (g)',
+    cum_feed_intake_g: 'Cumulative Feed Intake (g)',
+    fcr: 'FCR',
+    cum_fcr: 'Cumulative FCR',
+  };
+
+  const payloadFieldOrder = [
+    'body_weight_g',
+    'daily_gain_g',
+    'avg_daily_gain_g',
+    'daily_feed_intake_g',
+    'cum_feed_intake_g',
+    'fcr',
+    'cum_fcr',
+  ];
+
+  const formatPayloadValue = (value: unknown) => {
+    if (value === null || value === undefined) return '—';
+    if (typeof value === 'number') return Number.isFinite(value) ? String(value) : '—';
+    if (typeof value === 'string') return value.length ? value : '—';
+    if (typeof value === 'boolean') return value ? 'true' : 'false';
+    return prettyPayload(value);
+  };
+
+  const getPayloadEntries = (value: unknown) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const record = value as Record<string, unknown>;
+    const keys = Object.keys(record);
+    const ordered = [
+      ...payloadFieldOrder.filter((k) => keys.includes(k)),
+      ...keys.filter((k) => !payloadFieldOrder.includes(k)).sort(),
+    ];
+
+    return ordered.map((key) => ({
+      key,
+      label: payloadFieldLabels[key] || key,
+      value: record[key],
+    }));
+  };
+
+  const getPayloadField = (row: any, key: string): unknown => {
+    const payload = row?.payloadJson;
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+    return (payload as Record<string, unknown>)[key];
+  };
+
+  const openPayload = (row: any, mode: 'view' | 'edit') => {
+    setSelectedRow(row);
+    setPayloadText(prettyPayload(row?.payloadJson));
+    setPayloadMode(mode);
+    setPayloadView('table');
+    setEditOpen(true);
+  };
 
   const columns: GridColDef[] = useMemo(
     () => [
@@ -43,11 +132,63 @@ export const StandardsSetEditorPage: React.FC = () => {
       { field: 'dimTo', headerName: 'To', width: 100 },
       { field: 'phase', headerName: 'Phase', width: 160 },
       {
+        field: 'body_weight_g',
+        headerName: 'Body Weight (g)',
+        width: 150,
+        valueGetter: (_value, row) => formatPayloadValue(getPayloadField(row, 'body_weight_g')),
+      },
+      {
+        field: 'daily_gain_g',
+        headerName: 'Daily Gain (g)',
+        width: 150,
+        valueGetter: (_value, row) => formatPayloadValue(getPayloadField(row, 'daily_gain_g')),
+      },
+      {
+        field: 'avg_daily_gain_g',
+        headerName: 'Avg Daily Gain (g)',
+        width: 170,
+        valueGetter: (_value, row) => formatPayloadValue(getPayloadField(row, 'avg_daily_gain_g')),
+      },
+      {
+        field: 'daily_feed_intake_g',
+        headerName: 'Daily Feed Intake (g)',
+        width: 190,
+        valueGetter: (_value, row) => formatPayloadValue(getPayloadField(row, 'daily_feed_intake_g')),
+      },
+      {
+        field: 'cum_feed_intake_g',
+        headerName: 'Cumulative Feed Intake (g)',
+        width: 230,
+        valueGetter: (_value, row) => formatPayloadValue(getPayloadField(row, 'cum_feed_intake_g')),
+      },
+      {
+        field: 'fcr',
+        headerName: 'FCR',
+        width: 90,
+        valueGetter: (_value, row) => formatPayloadValue(getPayloadField(row, 'fcr')),
+      },
+      {
+        field: 'cum_fcr',
+        headerName: 'Cumulative FCR',
+        width: 150,
+        valueGetter: (_value, row) => formatPayloadValue(getPayloadField(row, 'cum_fcr')),
+      },
+      {
         field: 'payloadJson',
         headerName: 'Payload',
-        flex: 1,
-        minWidth: 280,
-        valueGetter: (value) => JSON.stringify(value),
+        width: 90,
+        sortable: false,
+        renderCell: (params) => {
+          return (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Tooltip title="View payload">
+                <IconButton size="small" onClick={() => openPayload(params.row, 'view')}>
+                  <Eye size={16} />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          );
+        },
       },
       { field: 'isInterpolated', headerName: 'Interpolated', width: 120, type: 'boolean' },
       {
@@ -61,9 +202,7 @@ export const StandardsSetEditorPage: React.FC = () => {
               size="small"
               startIcon={<Edit size={16} />}
               onClick={() => {
-                setSelectedRow(params.row);
-                setPayloadText(JSON.stringify(params.row.payloadJson ?? {}, null, 2));
-                setEditOpen(true);
+                openPayload(params.row, 'edit');
               }}
             >
               Edit
@@ -220,6 +359,13 @@ export const StandardsSetEditorPage: React.FC = () => {
                   loading={rowsLoading}
                   getRowId={(r) => r.id}
                   disableRowSelectionOnClick
+                  getRowHeight={() => 'auto'}
+                  sx={{
+                    '& .MuiDataGrid-cell': {
+                      py: 1,
+                      alignItems: 'flex-start',
+                    },
+                  }}
                 />
               </Box>
             )}
@@ -228,23 +374,104 @@ export const StandardsSetEditorPage: React.FC = () => {
       </PremiumCard>
 
       <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Edit Row Payload</DialogTitle>
+        <DialogTitle>{payloadMode === 'edit' ? 'Edit Row Payload' : 'Row Payload'}</DialogTitle>
         <DialogContent>
-          <TextField
-            fullWidth
-            multiline
-            minRows={10}
-            label="payloadJson"
-            value={payloadText}
-            onChange={(e) => setPayloadText(e.target.value)}
-            sx={{ mt: 1 }}
-          />
+          {payloadMode === 'edit' ? (
+            <TextField
+              fullWidth
+              multiline
+              minRows={12}
+              label="payloadJson"
+              value={payloadText}
+              onChange={(e) => setPayloadText(e.target.value)}
+              sx={{ mt: 1 }}
+              inputProps={{
+                style: {
+                  fontFamily:
+                    'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                  fontSize: 12,
+                },
+              }}
+            />
+          ) : (
+            <Box
+              sx={{
+                mt: 1,
+                p: 2,
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 1,
+                bgcolor: 'background.default',
+                maxHeight: '60vh',
+                overflow: 'auto',
+              }}
+            >
+              <Tabs
+                value={payloadView}
+                onChange={(_e, v) => setPayloadView(v)}
+                sx={{ mb: 2, minHeight: 36 }}
+              >
+                <Tab value="table" label="Table" sx={{ minHeight: 36 }} />
+                <Tab value="json" label="JSON" sx={{ minHeight: 36 }} />
+              </Tabs>
+
+              {payloadView === 'table' ? (
+                (() => {
+                  const entries = getPayloadEntries(selectedRow?.payloadJson);
+                  if (!entries) {
+                    return (
+                      <Typography variant="body2" color="text.secondary">
+                        Payload is not a flat object. Switch to JSON view.
+                      </Typography>
+                    );
+                  }
+
+                  return (
+                    <Table size="small" sx={{ '& td, & th': { borderColor: 'divider' } }}>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 700, width: 240 }}>Field</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Value</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {entries.map((e) => (
+                          <TableRow key={e.key}>
+                            <TableCell sx={{ fontWeight: 600 }}>{e.label}</TableCell>
+                            <TableCell sx={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace' }}>
+                              {formatPayloadValue(e.value)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  );
+                })()
+              ) : (
+                <Typography
+                  component="pre"
+                  sx={{
+                    m: 0,
+                    fontFamily:
+                      'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                    fontSize: 12,
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                  }}
+                >
+                  {payloadText}
+                </Typography>
+              )}
+            </Box>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setEditOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleSaveRow} disabled={upsertRowsMutation.isPending}>
-            Save
-          </Button>
+          {payloadMode === 'edit' && (
+            <Button variant="contained" onClick={handleSaveRow} disabled={upsertRowsMutation.isPending}>
+              Save
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
     </Box>

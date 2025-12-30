@@ -73,6 +73,22 @@ export const handlers = [
             ]
         });
     }),
+    http.post(`${API_BASE_URL}/registry/devices`, async ({ request }) => {
+        await delay(800);
+        const body = await request.json() as any;
+        return HttpResponse.json({
+            data: {
+                id: `d${Date.now()}`,
+                device_id: `d${Date.now()}`,
+                name: body.serialNo || 'New Device',
+                type: body.deviceType,
+                status: 'active',
+                health: 100,
+                last_seen: new Date().toISOString(),
+                location: 'Barn A' // Default for mock
+            }
+        });
+    }),
 
     // Telemetry
     http.get(`${API_BASE_URL}/telemetry/readings`, () => {

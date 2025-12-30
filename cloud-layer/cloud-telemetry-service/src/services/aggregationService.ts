@@ -35,37 +35,37 @@ export async function computeAggregates(params: {
         throw new Error(`Unsupported bucket size: ${params.bucketSize}`)
     }
 
-    // Build WHERE clause
-    const whereConditions: string[] = [
-      `tenant_id = '${params.tenantId}'`,
-      `occurred_at >= '${params.from.toISOString()}'`,
-      `occurred_at <= '${params.to.toISOString()}'`,
+    const whereConditions: Prisma.Sql[] = [
+      Prisma.sql`"tenantId" = ${params.tenantId}`,
+      Prisma.sql`"occurredAt" >= ${params.from}`,
+      Prisma.sql`"occurredAt" <= ${params.to}`,
     ]
 
-    if (params.farmId) whereConditions.push(`farm_id = '${params.farmId}'`)
-    if (params.barnId) whereConditions.push(`barn_id = '${params.barnId}'`)
-    if (params.deviceId) whereConditions.push(`device_id = '${params.deviceId}'`)
-    if (params.metric) whereConditions.push(`metric = '${params.metric}'`)
+    if (params.farmId) whereConditions.push(Prisma.sql`"farmId" = ${params.farmId}`)
+    if (params.barnId) whereConditions.push(Prisma.sql`"barnId" = ${params.barnId}`)
+    if (params.deviceId) whereConditions.push(Prisma.sql`"deviceId" = ${params.deviceId}`)
+    if (params.metric) whereConditions.push(Prisma.sql`metric = ${params.metric}`)
 
-    const whereClause = whereConditions.join(' AND ')
+    const whereClause = Prisma.join(whereConditions, ' AND ')
+    const intervalSql = Prisma.raw(`'${interval}'::interval`)
 
     // Use raw SQL for time-bucketing aggregation
     const query = Prisma.sql`
       SELECT
-        tenant_id,
-        COALESCE(farm_id, '') as farm_id,
-        COALESCE(barn_id, '') as barn_id,
-        device_id,
+        "tenantId" as tenant_id,
+        COALESCE("farmId", '') as farm_id,
+        COALESCE("barnId", '') as barn_id,
+        "deviceId" as device_id,
         metric,
-        date_bin(${interval}::interval, occurred_at, '2000-01-01'::timestamp) as bucket_start,
+        date_bin(${intervalSql}, "occurredAt", '2000-01-01'::timestamp) as bucket_start,
         ${params.bucketSize} as bucket_size,
         AVG(value) as avg_value,
         MIN(value) as min_value,
         MAX(value) as max_value,
         COUNT(*)::int as count
-      FROM telemetry_raw
-      WHERE ${Prisma.raw(whereClause)}
-      GROUP BY tenant_id, farm_id, barn_id, device_id, metric, bucket_start
+      FROM "telemetry_raw"
+      WHERE ${whereClause}
+      GROUP BY "tenantId", "farmId", "barnId", "deviceId", metric, bucket_start
       ORDER BY bucket_start DESC
     `
 
@@ -113,6 +113,8 @@ export async function upsertAggregate(data: {
       where: {
         tenantId_farmId_barnId_deviceId_metric_bucketStart_bucketSize: {
           tenantId: data.tenantId,
+          // Prisma's compound-unique input does not accept nulls here, so normalize to empty string.
+          // This matches the aggregation query which COALESCEs farmId/barnId to ''.
           farmId: data.farmId || '',
           barnId: data.barnId || '',
           deviceId: data.deviceId,
@@ -130,8 +132,8 @@ export async function upsertAggregate(data: {
       create: {
         id: newUuidV7(),
         tenantId: data.tenantId,
-        farmId: data.farmId || null,
-        barnId: data.barnId || null,
+        farmId: data.farmId || '',
+        barnId: data.barnId || '',
         deviceId: data.deviceId,
         metric: data.metric,
         bucketStart: data.bucketStart,
@@ -188,4 +190,3 @@ export async function getAggregates(params: {
     throw error
   }
 }
-

@@ -14,6 +14,7 @@ import { useActiveContext } from '../../../contexts/ActiveContext';
 import { queryKeys, DEFAULT_STALE_TIME } from '../../../services/queryKeys';
 import type { components } from '@farmiq/api-client';
 import { useNavigate } from 'react-router-dom';
+import { ProvisionDeviceDialog } from '../components/ProvisionDeviceDialog';
 
 type Device = components['schemas']['Device'];
 
@@ -72,6 +73,8 @@ export const DevicesPage: React.FC = () => {
         },
     ];
 
+    const [provisionDialogOpen, setProvisionDialogOpen] = React.useState(false);
+
     if (loading) {
         return (
             <Box>
@@ -107,7 +110,12 @@ export const DevicesPage: React.FC = () => {
                 title="Device Registry" 
                 subtitle="Manage and monitor all provisioned IoT hardware across your infrastructure"
                 actions={[
-                    { label: 'Provision Device', variant: 'contained', startIcon: <Server size={18} />, onClick: () => {} }
+                    { 
+                        label: 'Provision Device', 
+                        variant: 'contained', 
+                        startIcon: <Server size={18} />, 
+                        onClick: () => setProvisionDialogOpen(true) 
+                    }
                 ]}
             />
             {devices.length === 0 ? (
@@ -122,10 +130,15 @@ export const DevicesPage: React.FC = () => {
                         columns={columns}
                         data={devices}
                         rowKey="device_id"
-                        onRowClick={(row) => navigate(`/devices/${row.device_id}`)}
+                        onRowClick={(row: any) => navigate(`/devices/${row.device_id}`)}
                     />
                 </PremiumCard>
             )}
+
+            <ProvisionDeviceDialog 
+                open={provisionDialogOpen} 
+                onClose={() => setProvisionDialogOpen(false)} 
+            />
         </Box>
     );
 };

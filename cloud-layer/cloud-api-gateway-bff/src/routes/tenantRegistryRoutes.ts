@@ -9,6 +9,7 @@ import {
   getBarnsHandler,
   getBatchesHandler,
   getDevicesHandler,
+  createDeviceHandler,
   getStationsHandler,
 } from '../controllers/tenantRegistryController'
 
@@ -36,6 +37,7 @@ router.get('/batches', getBatchesHandler)
 
 // Devices
 router.get('/devices', getDevicesHandler)
+router.post('/devices', createDeviceHandler)
 
 // Stations
 router.get('/stations', getStationsHandler)

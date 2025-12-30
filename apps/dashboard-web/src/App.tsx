@@ -77,6 +77,7 @@ import { AnomaliesPage } from './features/ai/pages/AnomaliesPage';
 import { RecommendationsPage } from './features/ai/pages/RecommendationsPage';
 import { ScenarioPlannerPage } from './features/ai/pages/ScenarioPlannerPage';
 import { AiOverviewPage } from './features/ai/pages/AiOverviewPage';
+import { AiInsightsLandingPage } from './features/ai/pages/AiInsightsLandingPage';
 import { InsightsFeedPage } from './features/ai/pages/InsightsFeedPage';
 import { InsightDetailPage } from './features/ai/pages/InsightDetailPage';
 import { ModelRegistryPage } from './features/ai/pages/ModelRegistryPage';
@@ -251,6 +252,7 @@ export const App: React.FC = () => {
 
                 {/* AI & Ops */}
                 <Route path="ai/overview" element={<ContextGuard requireTenant><AiOverviewPage /></ContextGuard>} />
+                <Route path="ai/insights" element={<ContextGuard requireTenant><AiInsightsLandingPage /></ContextGuard>} />
                 <Route path="ai/anomalies" element={<ContextGuard requireTenant><AnomaliesPage /></ContextGuard>} />
                 <Route path="ai/recommendations" element={<ContextGuard requireTenant><RecommendationsPage /></ContextGuard>} />
                 <Route path="ai/insights-feed" element={<ContextGuard requireTenant><InsightsFeedPage /></ContextGuard>} />

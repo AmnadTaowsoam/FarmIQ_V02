@@ -36,25 +36,49 @@ export const RecommendationsPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
+  // Temporary Mock Data
+  const MOCK_RECOMMENDATIONS: Recommendation[] = [
+    {
+      recommendation_id: '1',
+      title: 'Optimize Fan Speed in Barn 2',
+      description: 'Humidity levels are rising. increasing fan speed by 15% will stabilize the environment.',
+      category: 'environment',
+      confidence: 0.92,
+      impact: 'high',
+      status: 'new',
+      created_at: new Date().toISOString()
+    },
+    {
+      recommendation_id: '2',
+      title: 'Adjust Feed Mix Ratio',
+      description: 'Protein intake is slightly below target. Adjust soybean meal ratio to 22% for the next batch.',
+      category: 'feeding',
+      confidence: 0.85,
+      impact: 'medium',
+      status: 'new',
+      created_at: new Date().toISOString()
+    },
+    {
+      recommendation_id: '3',
+      title: 'Schedule Preventive Maintenance',
+      description: 'Sensor #402 is showing erratic behavior implying potential calibration drift.',
+      category: 'health',
+      confidence: 0.78,
+      impact: 'low',
+      status: 'new',
+      created_at: new Date().toISOString()
+    }
+  ];
+
   useEffect(() => {
     const fetchRecommendations = async () => {
-      if (!tenantId) return;
+      // Simulate API call
       setLoading(true);
-      try {
-        const response = await api.analyticsRecommendationsList({
-          tenant_id: tenantId,
-          farm_id: farmId || undefined,
-          barn_id: barnId || undefined,
-          page: 1,
-          limit: 100,
-        });
-        setItems(response.data || []);
-        setError(null);
-      } catch (err) {
-        setError(err as Error);
-      } finally {
-        setLoading(false);
-      }
+      setTimeout(() => {
+         setItems(MOCK_RECOMMENDATIONS);
+         setLoading(false);
+         setError(null);
+      }, 800);
     };
 
     fetchRecommendations();

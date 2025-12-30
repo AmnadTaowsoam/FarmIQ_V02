@@ -11,46 +11,96 @@ import { LoadingCard } from '../../../components/LoadingCard';
 import { EmptyState } from '../../../components/EmptyState';
 import { Thermometer, Droplets, Cloud, Wind, Download } from 'lucide-react';
 import { queryKeys, DEFAULT_STALE_TIME } from '../../../services/queryKeys';
-import type { components } from '@farmiq/api-client';
-
-type TelemetryReading = components['schemas']['TelemetryReading'];
 
 export const TelemetryPage: React.FC = () => {
     const theme = useTheme();
     const { tenantId, farmId, barnId, timeRange } = useActiveContext();
-    const { data: readings = [], isLoading: loading, error } = useQuery<TelemetryReading[]>({
-        queryKey: queryKeys.telemetry.readings({
+    const preferredBucket = useMemo(() => {
+        const durationMs = timeRange.end.getTime() - timeRange.start.getTime();
+        const durationDays = durationMs / (24 * 60 * 60 * 1000);
+        if (durationDays <= 2) return '5m';
+        if (durationDays <= 30) return '1h';
+        return '1d';
+    }, [timeRange.end, timeRange.start]);
+
+    const { data: rawReadings = [], isLoading: loading, error } = useQuery<any[]>({
+        queryKey: queryKeys.telemetry.aggregates({
             farmId: farmId || undefined,
             barnId: barnId || undefined,
             startTime: timeRange.start.toISOString(),
             endTime: timeRange.end.toISOString(),
+            interval: preferredBucket,
         }),
         queryFn: async () => {
             if (!tenantId) return [];
-            const response = await apiClient.get<{ data: { readings: TelemetryReading[] } }>('/api/v1/telemetry/readings', {
-                params: {
-                    tenantId,
-                    farmId: farmId || undefined,
-                    barnId: barnId || undefined,
-                    from: timeRange.start.toISOString(),
-                    to: timeRange.end.toISOString(),
-                    limit: 500,
-                },
-            });
-            const payload = unwrapApiResponse<any>(response);
-            if (Array.isArray(payload)) return payload as TelemetryReading[];
-            return (payload?.readings as TelemetryReading[] | undefined) || [];
+
+            const candidateBuckets = Array.from(
+                new Set<string>([preferredBucket, '5m', '1h', '1d'])
+            );
+
+            for (const bucket of candidateBuckets) {
+                const response = await apiClient.get<any>('/api/v1/telemetry/aggregates', {
+                    params: {
+                        tenantId,
+                        farmId: farmId || undefined,
+                        barnId: barnId || undefined,
+                        from: timeRange.start.toISOString(),
+                        to: timeRange.end.toISOString(),
+                        bucket,
+                    },
+                });
+                const payload = unwrapApiResponse<any>(response);
+                const rows = Array.isArray(payload) ? payload : (payload?.aggregates as any[] | undefined) || [];
+                if (rows.length > 0) return rows;
+            }
+
+            return [];
         },
         enabled: !!tenantId,
         staleTime: DEFAULT_STALE_TIME,
-        initialData: []
+        placeholderData: []
     });
 
+    const normalizedReadings = useMemo(() => {
+        return (rawReadings || []).map((row: any) => {
+            const metricType = row.metric_type || row.metric || row.metricType || '';
+            const metricValue =
+                row.metric_value ??
+                row.avgValue ??
+                row.avg_value ??
+                row.value ??
+                row.metricValue ??
+                0;
+            const timestamp =
+                row.timestamp ||
+                row.bucketStart ||
+                row.bucket_start ||
+                row.occurredAt ||
+                row.occurred_at ||
+                row.createdAt ||
+                '';
+
+            const parsedValue =
+                typeof metricValue === 'number'
+                    ? metricValue
+                    : typeof metricValue === 'string'
+                        ? Number.parseFloat(metricValue)
+                        : 0;
+
+            return {
+                ...row,
+                metric_type: metricType,
+                metric_value: Number.isFinite(parsedValue) ? parsedValue : 0,
+                timestamp,
+            };
+        });
+    }, [rawReadings]);
+
     const stats = useMemo(() => {
-        if (!readings.length) return { temp: 0, humidity: 0, co2: 0 };
-        const temps = readings.filter(r => r.metric_type === 'temperature').map(r => r.metric_value || 0);
-        const hums = readings.filter(r => r.metric_type === 'humidity').map(r => r.metric_value || 0);
-        const co2s = readings.filter(r => r.metric_type === 'co2').map(r => r.metric_value || 0);
+        if (!normalizedReadings.length) return { temp: 0, humidity: 0, co2: 0 };
+        const temps = normalizedReadings.filter(r => r.metric_type === 'temperature').map(r => r.metric_value || 0);
+        const hums = normalizedReadings.filter(r => r.metric_type === 'humidity').map(r => r.metric_value || 0);
+        const co2s = normalizedReadings.filter(r => r.metric_type === 'co2').map(r => r.metric_value || 0);
         
         const avg = (arr: number[]) => arr.length ? (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1) : 0;
         return {
@@ -58,16 +108,21 @@ export const TelemetryPage: React.FC = () => {
             humidity: avg(hums),
             co2: avg(co2s)
         };
-    }, [readings]);
+    }, [normalizedReadings]);
 
     const chartData = useMemo(() => {
-        return readings.map((r) => ({
-            timestamp: r.timestamp || '',
-            temperature: r.metric_type === 'temperature' ? (r.metric_value ?? 0) : 0,
-            humidity: r.metric_type === 'humidity' ? (r.metric_value ?? 0) : 0,
-            co2: r.metric_type === 'co2' ? (r.metric_value ?? 0) : 0,
-        }));
-    }, [readings]);
+        const byTs = new Map<string, any>();
+        for (const r of normalizedReadings) {
+            const ts = String(r.timestamp || '');
+            if (!ts) continue;
+            const point = byTs.get(ts) || { timestamp: ts, temperature: 0, humidity: 0, co2: 0 };
+            if (r.metric_type === 'temperature') point.temperature = r.metric_value ?? 0;
+            if (r.metric_type === 'humidity') point.humidity = r.metric_value ?? 0;
+            if (r.metric_type === 'co2') point.co2 = r.metric_value ?? 0;
+            byTs.set(ts, point);
+        }
+        return Array.from(byTs.values()).sort((a, b) => String(a.timestamp).localeCompare(String(b.timestamp)));
+    }, [normalizedReadings]);
 
     if (error) {
         const isServerError = (error as any)?.response?.status >= 500;
@@ -86,7 +141,7 @@ export const TelemetryPage: React.FC = () => {
         );
     }
     
-    if (loading && readings.length === 0) {
+    if (loading && rawReadings.length === 0) {
         return (
             <Box>
                 <PageHeader 
@@ -158,7 +213,7 @@ export const TelemetryPage: React.FC = () => {
                 </Grid>
             </Grid>
             
-            {readings.length === 0 && !loading ? (
+            {normalizedReadings.length === 0 && !loading ? (
                 <EmptyState 
                     title="No telemetry data yet" 
                     description="Select a barn or device to begin collecting telemetry." 

@@ -169,6 +169,7 @@ export const api = {
             httpClient.get<ApiResponse<any[]>>(REGISTRY_ENDPOINTS.DEVICES, { params }),
         get: (id: string, params?: { tenantId?: string }) =>
             httpClient.get<ApiResponse<any>>(REGISTRY_ENDPOINTS.DEVICE_BY_ID(id), { params }),
+        create: (data: any) => httpClient.post<ApiResponse<any>>(REGISTRY_ENDPOINTS.DEVICES, data),
     },
 
     // ==================== Dashboard ====================

@@ -14,6 +14,11 @@ import type { components } from '@farmiq/api-client';
 
 type AnalyticsResponse = components['schemas']['WeighvisionAnalyticsResponse'];
 
+function formatNumber(value: unknown, fractionDigits = 2): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '—';
+  return value.toFixed(fractionDigits);
+}
+
 export const AnalyticsPage: React.FC = () => {
   const theme = useTheme();
   const { tenantId, farmId, barnId, timeRange } = useActiveContext();
@@ -73,9 +78,9 @@ export const AnalyticsPage: React.FC = () => {
   const stats = (data?.statistics || {}) as Record<string, number>;
 
   const statItems = [
-    { label: 'Avg Weight', value: stats.current_avg_weight_kg ? `${stats.current_avg_weight_kg} kg` : '74.2 kg', icon: <Scale size={24} />, color: 'primary.main', trend: '+2.1%' },
-    { label: 'Uniformity', value: stats.uniformity_percent ? `${stats.uniformity_percent}%` : '92.5%', icon: <Target size={24} />, color: 'success.main', trend: '+0.4%' },
-    { label: 'Variation (CV)', value: stats.cv ? `${stats.cv}` : '4.2', icon: <Zap size={24} />, color: 'info.main', trend: '-0.1%' },
+    { label: 'Avg Weight', value: `${formatNumber(stats.current_avg_weight_kg)} kg`, icon: <Scale size={24} />, color: 'primary.main', trend: '+2.1%' },
+    { label: 'Uniformity', value: `${formatNumber(stats.uniformity_percent)}%`, icon: <Target size={24} />, color: 'success.main', trend: '+0.4%' },
+    { label: 'Variation (CV)', value: `${formatNumber(stats.cv)}`, icon: <Zap size={24} />, color: 'info.main', trend: '-0.1%' },
   ];
 
   return (

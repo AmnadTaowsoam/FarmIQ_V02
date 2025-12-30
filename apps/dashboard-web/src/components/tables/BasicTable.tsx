@@ -90,7 +90,13 @@ export function BasicTable<T>({
                 </TableHead>
                 <TableBody>
                     {rows.map((row, index) => {
-                        const key = rowKey ? String(row[rowKey]) : (row as any).id || index;
+                        const explicitKey = rowKey ? (row as any)?.[rowKey as any] : undefined;
+                        const key =
+                            explicitKey != null && String(explicitKey).length > 0
+                                ? String(explicitKey)
+                                : (row as any)?.id != null
+                                    ? String((row as any).id)
+                                    : String(index);
                         return (
                             <TableRow 
                                 hover 
@@ -105,7 +111,7 @@ export function BasicTable<T>({
                                     const value = row[column.id];
                                     return (
                                         <TableCell key={String(column.id)} align={column.align || 'left'}>
-                                            {column.format ? column.format(value, row) : value}
+                                            {column.format ? column.format(value, row) : (value ?? '—')}
                                         </TableCell>
                                     );
                                 })}

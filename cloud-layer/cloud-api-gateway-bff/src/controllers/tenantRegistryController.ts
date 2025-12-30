@@ -495,3 +495,50 @@ export async function getStationsHandler(req: Request, res: Response): Promise<v
     })
   }
 }
+
+/**
+ * POST /api/v1/devices
+ */
+export async function createDeviceHandler(req: Request, res: Response): Promise<void> {
+  const startTime = Date.now()
+  const tenantId = getTenantIdFromRequest(res, req.body.tenantId as string)
+
+  if (!tenantId) {
+    res.status(400).json({
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'tenantId is required',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+    return
+  }
+
+  try {
+    const body = { ...req.body, tenantId }
+    const result = await tenantRegistryServiceClient.createDevice({
+      body,
+      headers: buildDownstreamHeaders(req, res),
+    })
+
+    const duration = Date.now() - startTime
+    logger.info('Create device request completed', {
+      route: '/api/v1/devices',
+      downstreamService: 'tenant-registry',
+      duration_ms: duration,
+      status_code: result.status,
+      requestId: res.locals.requestId,
+    })
+
+    handleDownstreamResponse(result, res)
+  } catch (error) {
+    logger.error('Error in createDeviceHandler', error)
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to create device',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+  }
+}
