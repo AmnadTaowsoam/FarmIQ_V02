@@ -104,10 +104,31 @@ paths:
       responses:
         '200':
           description: List of audit events
+  /api/v1/audit/events/{id}:
+    get:
+      summary: Get audit event by ID
+      tags: [Audit]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: tenant_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Audit event
+        '404':
+          description: Audit event not found
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-

@@ -49,3 +49,20 @@ export async function queryAuditEvents(params: {
   return result.ok ? result.data : { data: [], meta: { page: 1, limit: 25, total: 0, hasNext: false } }
 }
 
+export async function getAuditEventById(params: {
+  tenantId: string
+  id: string
+  headers: Record<string, string>
+}) {
+  const bases = getServiceBaseUrls()
+  const queryParams = new URLSearchParams({
+    tenant_id: params.tenantId,
+  })
+
+  const result = await callDownstreamJson<any>(
+    `${bases.auditLogBaseUrl}/api/v1/audit/events/${params.id}?${queryParams.toString()}`,
+    { headers: params.headers }
+  )
+
+  return result.ok ? result.data : null
+}

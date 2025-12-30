@@ -1,7 +1,7 @@
 import { Request, Response } from 'express'
 import { logger } from '../utils/logger'
 import { getTenantIdFromRequest } from '../utils/tenantScope'
-import { createAuditEvent, queryAuditEvents, AuditEventInput } from '../services/auditService'
+import { createAuditEvent, queryAuditEvents, getAuditEventById, AuditEventInput } from '../services/auditService'
 
 /**
  * Create audit event
@@ -104,3 +104,48 @@ export async function queryAuditEventsHandler(
   }
 }
 
+/**
+ * Get audit event by ID
+ * GET /api/v1/audit/events/:id
+ */
+export async function getAuditEventByIdHandler(
+  req: Request,
+  res: Response
+): Promise<void> {
+  try {
+    const tenantId = getTenantIdFromRequest(res, req.query.tenant_id as string)
+    if (!tenantId) {
+      res.status(400).json({
+        error: {
+          code: 'MISSING_TENANT_ID',
+          message: 'tenant_id is required',
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+      return
+    }
+
+    const event = await getAuditEventById({ tenantId, id: req.params.id })
+    if (!event) {
+      res.status(404).json({
+        error: {
+          code: 'NOT_FOUND',
+          message: 'Audit event not found',
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+      return
+    }
+
+    res.status(200).json({ data: event })
+  } catch (error) {
+    logger.error('Error in getAuditEventByIdHandler', error)
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to fetch audit event',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+  }
+}

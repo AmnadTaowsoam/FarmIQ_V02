@@ -69,7 +69,7 @@ export const fetchNotificationsInbox = async (
     return retryWithBackoff(async () => {
         const tenantId = getTenantId() || undefined;
         const response = await apiClient.get<NotificationInboxResponse>(
-            '/api/v1/notifications/inbox',
+            '/api/v1/dashboard/notifications/inbox',
             { params: { ...filters, tenantId } }
         );
         return response.data;
@@ -85,7 +85,7 @@ export const fetchNotificationsHistory = async (
     return retryWithBackoff(async () => {
         const tenantId = getTenantId() || undefined;
         const response = await apiClient.get<NotificationHistoryResponse>(
-            '/api/v1/notifications/history',
+            '/api/v1/dashboard/notifications/history',
             { params: { ...filters, tenantId } }
         );
         return response.data;
@@ -98,7 +98,7 @@ export const fetchNotificationsHistory = async (
 export const fetchUnreadCount = async (): Promise<number> => {
     try {
         const response = await apiClient.get<{ unread_count: number }>(
-            '/api/v1/notifications/unread-count'
+            '/api/v1/dashboard/notifications/unread-count'
         );
         return response.data.unread_count;
     } catch (error) {

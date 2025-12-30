@@ -1,5 +1,13 @@
 import { PrismaClient, Prisma } from '@prisma/client'
 
+const SEED_IDS = {
+  TENANT_1: '00000000-0000-4000-8000-000000000001',
+  TENANT_2: '00000000-0000-4000-8000-000000000002',
+  FARM_1A: '00000000-0000-4000-8000-000000000101',
+  FARM_2A: '00000000-0000-4000-8000-000000000201',
+  BARN_1A_1: '00000000-0000-4000-8000-000000001101',
+} as const
+
 const prisma = new PrismaClient()
 
 async function main() {
@@ -31,12 +39,12 @@ async function main() {
     requestId?: string | null
   }> = [
     {
-      tenantId: 'tenant-001',
+      tenantId: SEED_IDS.TENANT_1,
       actorId: 'user-001',
       actorRole: 'tenant_admin',
       action: 'create',
       resourceType: 'farm',
-      resourceId: 'farm-001',
+      resourceId: SEED_IDS.FARM_1A,
       summary: 'Created new farm: Farm Alpha',
       metadataJson: {
         farm_name: 'Farm Alpha',
@@ -46,7 +54,7 @@ async function main() {
       requestId: 'req-001',
     },
     {
-      tenantId: 'tenant-001',
+      tenantId: SEED_IDS.TENANT_1,
       actorId: 'user-001',
       actorRole: 'tenant_admin',
       action: 'update',
@@ -61,22 +69,22 @@ async function main() {
       requestId: 'req-002',
     },
     {
-      tenantId: 'tenant-001',
+      tenantId: SEED_IDS.TENANT_1,
       actorId: 'user-002',
       actorRole: 'farm_manager',
       action: 'create',
       resourceType: 'barn',
-      resourceId: 'barn-001',
+      resourceId: SEED_IDS.BARN_1A_1,
       summary: 'Created new barn: Barn A',
       metadataJson: {
         barn_name: 'Barn A',
-        farm_id: 'farm-001',
+        farm_id: SEED_IDS.FARM_1A,
         capacity: 5000,
       },
       requestId: 'req-003',
     },
     {
-      tenantId: 'tenant-001',
+      tenantId: SEED_IDS.TENANT_1,
       actorId: 'user-003',
       actorRole: 'operator',
       action: 'view',
@@ -84,13 +92,13 @@ async function main() {
       resourceId: null,
       summary: 'Viewed telemetry data for barn-001',
       metadataJson: {
-        barn_id: 'barn-001',
+        barn_id: SEED_IDS.BARN_1A_1,
         date_range: '2025-01-01 to 2025-01-20',
       },
       requestId: 'req-004',
     },
     {
-      tenantId: 'tenant-001',
+      tenantId: SEED_IDS.TENANT_1,
       actorId: 'user-001',
       actorRole: 'tenant_admin',
       action: 'delete',
@@ -104,12 +112,12 @@ async function main() {
       requestId: 'req-005',
     },
     {
-      tenantId: 'tenant-002',
+      tenantId: SEED_IDS.TENANT_2,
       actorId: 'user-004',
       actorRole: 'tenant_admin',
       action: 'create',
       resourceType: 'farm',
-      resourceId: 'farm-002',
+      resourceId: SEED_IDS.FARM_2A,
       summary: 'Created new farm: Farm Beta',
       metadataJson: {
         farm_name: 'Farm Beta',
@@ -119,7 +127,7 @@ async function main() {
       requestId: 'req-006',
     },
     {
-      tenantId: 'tenant-001',
+      tenantId: SEED_IDS.TENANT_1,
       actorId: 'system',
       actorRole: 'system',
       action: 'create',
@@ -135,7 +143,7 @@ async function main() {
       requestId: 'req-007',
     },
     {
-      tenantId: 'tenant-001',
+      tenantId: SEED_IDS.TENANT_1,
       actorId: 'user-002',
       actorRole: 'farm_manager',
       action: 'acknowledge',
@@ -149,7 +157,7 @@ async function main() {
       requestId: 'req-008',
     },
     {
-      tenantId: 'tenant-001',
+      tenantId: SEED_IDS.TENANT_1,
       actorId: 'user-001',
       actorRole: 'tenant_admin',
       action: 'update',
@@ -165,7 +173,7 @@ async function main() {
       requestId: 'req-009',
     },
     {
-      tenantId: 'tenant-002',
+      tenantId: SEED_IDS.TENANT_2,
       actorId: 'user-005',
       actorRole: 'operator',
       action: 'view',
@@ -185,7 +193,7 @@ async function main() {
   // Generate additional events up to SEED_COUNT
   const actions = ['create', 'update', 'delete', 'view', 'acknowledge']
   const resourceTypes = ['farm', 'barn', 'batch', 'threshold', 'target_curve', 'telemetry', 'alert', 'audit']
-  const tenantIds = ['tenant-001', 'tenant-002']
+  const tenantIds = [SEED_IDS.TENANT_1, SEED_IDS.TENANT_2]
   const actorRoles = ['tenant_admin', 'farm_manager', 'operator', 'viewer', 'system']
 
   for (let i = 10; i < auditCount; i++) {
@@ -229,4 +237,3 @@ main()
   .finally(async () => {
     await prisma.$disconnect()
   })
-

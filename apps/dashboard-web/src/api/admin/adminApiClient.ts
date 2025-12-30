@@ -51,7 +51,7 @@ class AdminApiClient {
 
         // Request interceptor for auth token
         this.client.interceptors.request.use((config) => {
-            const token = localStorage.getItem('accessToken');
+            const token = this.getAccessTokenFromStorage();
             if (token) {
                 config.headers.Authorization = `Bearer ${token}`;
             }
@@ -80,12 +80,52 @@ class AdminApiClient {
         };
     }
 
+    private getAccessTokenFromStorage(): string | null {
+        const tokenPair =
+            sessionStorage.getItem('farmiq_auth_token') ||
+            localStorage.getItem('farmiq_auth_token');
+        if (tokenPair) {
+            try {
+                const parsed = JSON.parse(tokenPair);
+                if (parsed?.accessToken) {
+                    return parsed.accessToken;
+                }
+            } catch {
+                // Ignore malformed token payloads
+            }
+        }
+
+        return localStorage.getItem('accessToken');
+    }
+
     private generateRequestId(): string {
         return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     }
 
     private async delay(ms: number = 300): Promise<void> {
         return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    private mapAuditEventToEntry(event: any): MockAuditEntry {
+        const metadata = event?.metadataJson || {};
+        const statusRaw = String(metadata.status || metadata.outcome || 'success').toLowerCase();
+        const status = statusRaw === 'failure' || statusRaw === 'error' ? 'failure' : 'success';
+
+        return {
+            id: event.id,
+            timestamp: event.createdAt,
+            userId: event.actorId,
+            userName: metadata.actor_name || event.actorId,
+            action: event.action && event.resourceType ? `${event.action}.${event.resourceType}` : event.action,
+            resource: event.resourceType,
+            resourceId: event.resourceId,
+            tenantId: event.tenantId,
+            tenantName: metadata.tenant_name || event.tenantId,
+            ipAddress: metadata.ipAddress || metadata.ip_address || '—',
+            userAgent: metadata.userAgent || metadata.user_agent || '—',
+            status,
+            details: metadata,
+        };
     }
 
     // ============================================================================
@@ -333,7 +373,69 @@ class AdminApiClient {
             return user;
         }
 
-        const response = await this.client.get(`/api/admin/users/${id}`);
+        const response = await this.client.get(`/admin/users/${id}`);
+        return response.data;
+    }
+
+    async createUser(data: Partial<MockUser> & { password?: string; roles?: string[]; tenantId?: string | null }): Promise<MockUser> {
+        if (USE_MOCKS) {
+            await this.delay();
+            const newUser: MockUser = {
+                id: `user_${Date.now()}`,
+                email: data.email || 'new.user@farmiq.com',
+                name: data.name || 'New User',
+                roles: data.roles || ['viewer'],
+                status: 'active',
+                tenantId: data.tenantId || '',
+                tenantName: data.tenantId || 'Tenant 1',
+                lastLogin: null,
+                createdAt: new Date().toISOString(),
+            };
+            this.mockData.users.unshift(newUser);
+            return newUser;
+        }
+
+        const response = await this.client.post('/admin/users', data);
+        return response.data;
+    }
+
+    async updateUser(id: string, data: Partial<MockUser> & { password?: string; roles?: string[]; tenantId?: string | null }): Promise<MockUser> {
+        if (USE_MOCKS) {
+            await this.delay();
+            const index = this.mockData.users.findIndex((user) => user.id === id);
+            if (index === -1) throw new Error('User not found');
+            this.mockData.users[index] = {
+                ...this.mockData.users[index],
+                ...data,
+            };
+            return this.mockData.users[index];
+        }
+
+        const response = await this.client.patch(`/admin/users/${id}`, data);
+        return response.data;
+    }
+
+    async deleteUser(id: string): Promise<void> {
+        if (USE_MOCKS) {
+            await this.delay();
+            this.mockData.users = this.mockData.users.filter((user) => user.id !== id);
+            return;
+        }
+
+        await this.client.delete(`/admin/users/${id}`);
+    }
+
+    async getRoles(): Promise<{ data: Array<{ id: string; name: string; userCount: number }>; total: number }> {
+        if (USE_MOCKS) {
+            await this.delay();
+            const roles = ['platform_admin', 'tenant_admin', 'farm_manager', 'house_operator', 'viewer'];
+            return {
+                data: roles.map((name, idx) => ({ id: String(idx + 1), name, userCount: 0 })),
+                total: roles.length,
+            };
+        }
+
+        const response = await this.client.get('/admin/roles');
         return response.data;
     }
 
@@ -414,7 +516,6 @@ class AdminApiClient {
         startDate?: string;
         endDate?: string;
     } = {}): Promise<PaginatedResponse<MockAuditEntry>> {
-        // TODO: Replace with real API endpoint: GET /api/v1/admin/audit-log
         if (USE_MOCKS) {
             await this.delay();
 
@@ -442,11 +543,40 @@ class AdminApiClient {
             return paginateData(filtered, params.page || 0, params.pageSize || 25);
         }
 
-        const response = await this.client.get('/admin/audit-log', { params });
-        return response.data;
+        const queryParams: Record<string, string | number | undefined> = {
+            tenant_id: params.tenantId,
+            actor: params.userId,
+            action: params.action,
+            resource_type: params.resource,
+            from: params.startDate,
+            to: params.endDate,
+            page: typeof params.page === 'number' ? params.page + 1 : undefined,
+            limit: params.pageSize,
+        };
+
+        const response = await this.client.get('/audit/events', { params: queryParams });
+        const payload = response.data as {
+            data?: any[];
+            meta?: { page?: number; limit?: number; total?: number };
+        };
+        const events = payload?.data || [];
+        const meta = payload?.meta || {};
+        const pageSize = meta.limit || params.pageSize || 25;
+        const page = (meta.page ? meta.page - 1 : params.page) || 0;
+        const total = meta.total || events.length;
+
+        const data = events.map((event) => this.mapAuditEventToEntry(event));
+
+        return {
+            data,
+            total,
+            page,
+            pageSize,
+            totalPages: Math.ceil(total / pageSize),
+        };
     }
 
-    async getAuditEntryById(id: string): Promise<MockAuditEntry> {
+    async getAuditEntryById(id: string, tenantId?: string): Promise<MockAuditEntry> {
         // TODO: Replace with real API endpoint: GET /api/v1/admin/audit-log/:id
         if (USE_MOCKS) {
             await this.delay();
@@ -455,8 +585,14 @@ class AdminApiClient {
             return entry;
         }
 
-        const response = await this.client.get(`/admin/audit-log/${id}`);
-        return response.data;
+        const response = await this.client.get(`/audit/events/${id}`, {
+            params: tenantId ? { tenant_id: tenantId } : undefined,
+        });
+        const payload = response.data as { data?: any };
+        if (!payload?.data) {
+            throw new Error('Audit entry not found');
+        }
+        return this.mapAuditEventToEntry(payload.data);
     }
 }
 

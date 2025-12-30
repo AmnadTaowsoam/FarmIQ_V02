@@ -702,6 +702,105 @@ paths:
         '502':
           description: Downstream service error
 
+  /api/v1/ops/health:
+    get:
+      summary: Get system health status
+      tags: [Ops]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: tenantId
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: Ops health response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpsHealthResponse'
+        '400':
+          description: Validation error
+        '502':
+          description: Downstream service error
+
+  /api/v1/audit/events:
+    get:
+      summary: Query audit events
+      tags: [Audit]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: tenant_id
+          schema:
+            type: string
+          required: true
+        - in: query
+          name: actor
+          schema:
+            type: string
+        - in: query
+          name: action
+          schema:
+            type: string
+        - in: query
+          name: resource_type
+          schema:
+            type: string
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 25
+      responses:
+        '200':
+          description: List of audit events
+        '400':
+          description: Validation error
+        '502':
+          description: Downstream service error
+
+  /api/v1/audit/events/{id}:
+    get:
+      summary: Get audit event by ID
+      tags: [Audit]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: tenant_id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Audit event
+        '404':
+          description: Audit event not found
+
 components:
   securitySchemes:
     bearerAuth:
@@ -771,3 +870,55 @@ components:
             type: object
         analyticsAvailable:
           type: boolean
+
+    OpsHealthResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            tenant_id:
+              type: string
+            generated_at:
+              type: string
+              format: date-time
+            system_metrics:
+              $ref: '#/components/schemas/OpsSystemMetrics'
+            services:
+              type: array
+              items:
+                $ref: '#/components/schemas/OpsHealthService'
+
+    OpsSystemMetrics:
+      type: object
+      properties:
+        cpu_usage_percent:
+          type: number
+          nullable: true
+        memory_usage_percent:
+          type: number
+          nullable: true
+        disk_usage_percent:
+          type: number
+          nullable: true
+        network_in_mbps:
+          type: number
+          nullable: true
+        network_out_mbps:
+          type: number
+          nullable: true
+
+    OpsHealthService:
+      type: object
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+          enum: [healthy, degraded, critical, unknown]
+        response_time_ms:
+          type: number
+          nullable: true
+        uptime_percent:
+          type: number
+          nullable: true

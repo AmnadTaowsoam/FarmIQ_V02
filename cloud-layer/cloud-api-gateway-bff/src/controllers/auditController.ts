@@ -1,6 +1,6 @@
 import { Request, Response } from 'express'
 import { logger } from '../utils/logger'
-import { queryAuditEvents } from '../services/auditService'
+import { queryAuditEvents, getAuditEventById } from '../services/auditService'
 
 export async function queryAuditEventsHandler(req: Request, res: Response): Promise<void> {
   try {
@@ -46,3 +46,51 @@ export async function queryAuditEventsHandler(req: Request, res: Response): Prom
   }
 }
 
+export async function getAuditEventByIdHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const tenantId = res.locals.tenantId || (req.query.tenant_id as string)
+    if (!tenantId) {
+      res.status(400).json({
+        error: {
+          code: 'MISSING_TENANT_ID',
+          message: 'tenant_id is required',
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+      return
+    }
+
+    const headers = {
+      authorization: req.headers.authorization || '',
+      'x-request-id': res.locals.requestId || '',
+    }
+
+    const data = await getAuditEventById({
+      tenantId,
+      id: req.params.id,
+      headers,
+    })
+
+    if (!data) {
+      res.status(404).json({
+        error: {
+          code: 'NOT_FOUND',
+          message: 'Audit event not found',
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+      return
+    }
+
+    res.status(200).json(data)
+  } catch (error) {
+    logger.error('Error in getAuditEventByIdHandler', error)
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to fetch audit event',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+  }
+}

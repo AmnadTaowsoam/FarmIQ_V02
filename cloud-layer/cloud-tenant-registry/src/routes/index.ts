@@ -8,6 +8,7 @@ import stationRoutes from './stationRoutes'
 import topologyRoutes from './topologyRoutes'
 import sensorRoutes from './sensorRoutes'
 import adminTenantRoutes from './adminTenantRoutes'
+import adminDeviceRoutes from './adminDeviceRoutes'
 
 /**
  * Setup all routes for cloud-tenant-registry service
@@ -18,6 +19,7 @@ export function setupRoutes(app: Express) {
   // Business routes under /api/v1
   app.use('/api/v1/tenants', tenantRoutes)
   app.use('/api/v1/admin', adminTenantRoutes)
+  app.use('/api/v1/admin', adminDeviceRoutes)
   app.use('/api/v1/farms', farmRoutes)
   app.use('/api/v1/barns', barnRoutes)
   app.use('/api/v1/batches', batchRoutes)

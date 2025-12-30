@@ -146,6 +146,82 @@ export async function getAdminTenantsHandler(req: Request, res: Response): Promi
 }
 
 /**
+ * GET /api/v1/admin/devices
+ */
+export async function getAdminDevicesHandler(req: Request, res: Response): Promise<void> {
+  const startTime = Date.now()
+
+  const query: Record<string, string> = {}
+  Object.keys(req.query).forEach((key) => {
+    if (req.query[key]) {
+      query[key] = req.query[key] as string
+    }
+  })
+
+  try {
+    const result = await tenantRegistryServiceClient.getAdminDevices({
+      query,
+      headers: buildDownstreamHeaders(req, res),
+    })
+
+    const duration = Date.now() - startTime
+    logger.info('Get admin devices request completed', {
+      route: '/api/v1/admin/devices',
+      downstreamService: 'tenant-registry',
+      duration_ms: duration,
+      status_code: result.status,
+      requestId: res.locals.requestId,
+    })
+
+    handleDownstreamResponse(result, res)
+  } catch (error) {
+    logger.error('Error in getAdminDevicesHandler', error)
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to fetch admin devices',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+  }
+}
+
+/**
+ * GET /api/v1/admin/devices/:id
+ */
+export async function getAdminDeviceByIdHandler(req: Request, res: Response): Promise<void> {
+  const startTime = Date.now()
+  const { id } = req.params
+
+  try {
+    const result = await tenantRegistryServiceClient.getAdminDeviceById({
+      id,
+      headers: buildDownstreamHeaders(req, res),
+    })
+
+    const duration = Date.now() - startTime
+    logger.info('Get admin device request completed', {
+      route: '/api/v1/admin/devices/:id',
+      downstreamService: 'tenant-registry',
+      duration_ms: duration,
+      status_code: result.status,
+      requestId: res.locals.requestId,
+    })
+
+    handleDownstreamResponse(result, res)
+  } catch (error) {
+    logger.error('Error in getAdminDeviceByIdHandler', error)
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to fetch admin device',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+  }
+}
+
+/**
  * GET /api/v1/farms
  */
 export async function getFarmsHandler(req: Request, res: Response): Promise<void> {

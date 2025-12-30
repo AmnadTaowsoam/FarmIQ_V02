@@ -1,9 +1,64 @@
 import { Request, Response } from 'express'
+import os from 'node:os'
 import { getTenantIdFromRequest } from '../utils/tenantScope'
 import { logger } from '../utils/logger'
 import { createTelemetryServiceClient } from '../services/telemetryService'
+import { callDownstreamJson, getServiceBaseUrls } from '../services/dashboardService'
 
 const telemetryService = createTelemetryServiceClient()
+
+type HealthStatus = 'healthy' | 'degraded' | 'critical' | 'unknown'
+
+type ServiceHealth = {
+  name: string
+  status: HealthStatus
+  response_time_ms: number | null
+  uptime_percent?: number | null
+}
+
+function mapStatusFromHttp(status: number): HealthStatus {
+  if (status >= 500) return 'critical'
+  if (status >= 400) return 'degraded'
+  return 'healthy'
+}
+
+async function probeHealth(name: string, url: string): Promise<ServiceHealth> {
+  const start = Date.now()
+  const result = await callDownstreamJson(url, { method: 'GET', headers: {} })
+  const duration = Date.now() - start
+  if (!result.ok) {
+    return {
+      name,
+      status: mapStatusFromHttp(result.status),
+      response_time_ms: duration,
+      uptime_percent: null,
+    }
+  }
+
+  return {
+    name,
+    status: 'healthy',
+    response_time_ms: duration,
+    uptime_percent: null,
+  }
+}
+
+function buildSystemMetrics() {
+  const totalMem = os.totalmem()
+  const freeMem = os.freemem()
+  const memPercent = totalMem ? ((1 - freeMem / totalMem) * 100) : null
+  const cpuCount = os.cpus().length || 1
+  const cpuLoad = os.loadavg()[0]
+  const cpuPercent = cpuLoad ? Math.min(100, Math.max(0, (cpuLoad / cpuCount) * 100)) : null
+
+  return {
+    cpu_usage_percent: cpuPercent,
+    memory_usage_percent: memPercent,
+    disk_usage_percent: null,
+    network_in_mbps: null,
+    network_out_mbps: null,
+  }
+}
 
 export async function getSyncStatus(req: Request, res: Response) {
   const tenantId = getTenantIdFromRequest(res, req.query.tenantId as string)
@@ -37,15 +92,35 @@ export async function getOpsHealth(req: Request, res: Response) {
     })
   }
 
-  // Simple MVP: treat BFF itself as healthy; downstream health checks can be added later.
+  const bases = getServiceBaseUrls()
+  const targets: Array<{ name: string; url: string }> = [
+    { name: 'cloud-tenant-registry', url: `${bases.registryBaseUrl}/api/health` },
+    { name: 'cloud-identity-access', url: `${bases.identityBaseUrl}/api/health` },
+    { name: 'cloud-telemetry-service', url: `${bases.telemetryBaseUrl}/api/health` },
+    { name: 'cloud-analytics-service', url: `${bases.analyticsBaseUrl}/api/health` },
+    { name: 'cloud-notification-service', url: `${bases.notificationBaseUrl}/api/health` },
+    { name: 'cloud-feed-service', url: `${bases.feedServiceUrl}/api/health` },
+    { name: 'cloud-barn-records-service', url: `${bases.barnRecordsServiceUrl}/api/health` },
+    { name: 'cloud-reporting-export-service', url: `${bases.reportingExportBaseUrl}/api/health` },
+    { name: 'cloud-audit-log-service', url: `${bases.auditLogBaseUrl}/api/health` },
+    { name: 'cloud-standards-service', url: `${bases.standardsBaseUrl}/api/health` },
+    { name: 'cloud-weighvision-readmodel', url: `${bases.weighvisionReadModelBaseUrl}/api/health` },
+  ]
+
+  const services = await Promise.all(targets.map((target) => probeHealth(target.name, target.url)))
+  services.unshift({
+    name: 'cloud-api-gateway-bff',
+    status: 'healthy',
+    response_time_ms: 0,
+    uptime_percent: null,
+  })
+
   return res.json({
     data: {
       tenant_id: tenantId,
-      services: [
-        { name: 'cloud-api-gateway-bff', status: 'healthy' },
-        { name: 'cloud-telemetry-service', status: 'unknown' },
-        { name: 'cloud-analytics-service', status: 'unknown' },
-      ],
+      generated_at: new Date().toISOString(),
+      system_metrics: buildSystemMetrics(),
+      services,
     },
   })
 }

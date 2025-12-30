@@ -8,6 +8,7 @@ import { AdminDataTable, FilterOption } from '../../../components/admin/AdminDat
 import { StatusPill } from '../../../components/admin/StatusPill';
 import { useAuditLog } from '../../../api/admin/adminQueries';
 import { formatDistanceToNow } from 'date-fns';
+import { useActiveContext } from '../../../contexts/ActiveContext';
 
 export const AdminAuditPage: React.FC = () => {
   const navigate = useNavigate();
@@ -15,6 +16,7 @@ export const AdminAuditPage: React.FC = () => {
   const [pageSize, setPageSize] = useState(25);
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState<FilterOption[]>([]);
+  const { tenantId } = useActiveContext();
 
   const filterParams = filters.reduce((acc, filter) => {
     acc[filter.key] = filter.value;
@@ -25,6 +27,7 @@ export const AdminAuditPage: React.FC = () => {
     page,
     pageSize,
     search,
+    tenantId: tenantId || undefined,
     ...filterParams,
   });
 

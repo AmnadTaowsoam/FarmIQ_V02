@@ -1,6 +1,5 @@
 
 import { apiClient } from '../api/client';
-import { getBFFBaseURL } from '../api/client';
 
 export interface TokenPair {
   accessToken: string;
@@ -116,7 +115,7 @@ class AuthService {
     const normalizedEmail = email === 'admin' ? 'admin@farmiq.com' : email;
     const isMockEmail = ['admin@farmiq.com', 'admin@farmiq.com'].includes(normalizedEmail);
     const isMockPassword = password === 'password' || password === 'password123';
-    if (isMockEmail && isMockPassword) {
+    if (import.meta.env.VITE_MOCK_MODE === 'true' && isMockEmail && isMockPassword) {
       const mockUser: UserProfile = {
         id: '1',
         email: normalizedEmail,
@@ -143,18 +142,15 @@ class AuthService {
     }
 
     try {
-      // TODO: Replace with actual BFF endpoint when available
-      // POST /api/v1/auth/login
       const response = await apiClient.post<{
-        accessToken: string;
-        refreshToken: string;
-        user: UserProfile;
-      }>(`${getBFFBaseURL()}/v1/auth/login`, {
+        access_token: string;
+        refresh_token: string;
+      }>('/api/v1/auth/login', {
         email,
         password,
       });
 
-      const { accessToken, refreshToken, user } = response.data;
+      const { access_token: accessToken, refresh_token: refreshToken } = response.data;
 
       // Decode token to get expiry
       const expiresAt = this.decodeTokenExpiry(accessToken);
@@ -164,12 +160,24 @@ class AuthService {
         refreshToken,
         expiresAt,
       };
-      this.userProfile = user;
+      this.userProfile = null;
 
       this.saveToStorage();
       this.resetSessionTimeout();
 
-      return { user, tokenPair: this.tokenPair };
+      const meResponse = await apiClient.get<UserProfile>('/api/v1/auth/me');
+      const normalizedRoles = Array.isArray((meResponse.data as any).roles)
+        ? (meResponse.data as any).roles
+            .map((role: any) => (typeof role === 'string' ? role : role?.name))
+            .filter(Boolean)
+        : [];
+      this.userProfile = {
+        ...meResponse.data,
+        roles: normalizedRoles,
+      };
+      this.saveToStorage();
+
+      return { user: this.userProfile, tokenPair: this.tokenPair };
     } catch (error: any) {
       const authError: AuthError = {
         code: error.response?.data?.error?.code || 'LOGIN_FAILED',
@@ -192,7 +200,7 @@ class AuthService {
     }
 
     try {
-      await apiClient.post(`${getBFFBaseURL()}/v1/auth/change-password`, {
+      await apiClient.post('/api/v1/auth/change-password', {
         currentPassword,
         newPassword,
       });
@@ -210,7 +218,7 @@ class AuthService {
     }
 
     try {
-      await apiClient.post(`${getBFFBaseURL()}/v1/auth/reset-password`, {
+      await apiClient.post('/api/v1/auth/reset-password', {
         email,
       });
     } catch (error: any) {
@@ -226,7 +234,7 @@ class AuthService {
       // TODO: Call logout endpoint if available
       // POST /api/v1/auth/logout
       if (this.tokenPair?.accessToken) {
-        await apiClient.post(`${getBFFBaseURL()}/v1/auth/logout`, {}, {
+        await apiClient.post('/api/v1/auth/logout', {}, {
           headers: {
             Authorization: `Bearer ${this.tokenPair.accessToken}`,
           },
@@ -276,16 +284,14 @@ class AuthService {
 
     this.refreshPromise = (async () => {
       try {
-        // TODO: Replace with actual BFF endpoint when available
-        // POST /api/v1/auth/refresh
         const response = await apiClient.post<{
-          accessToken: string;
-          refreshToken: string;
-        }>(`${getBFFBaseURL()}/v1/auth/refresh`, {
-          refreshToken: this.tokenPair!.refreshToken,
+          access_token: string;
+        }>('/api/v1/auth/refresh', {
+          refresh_token: this.tokenPair!.refreshToken,
         });
 
-        const { accessToken, refreshToken } = response.data;
+        const accessToken = response.data.access_token;
+        const refreshToken = this.tokenPair!.refreshToken;
         const expiresAt = this.decodeTokenExpiry(accessToken);
 
         this.tokenPair = {

@@ -152,6 +152,51 @@ export function useUser(id: string, options?: UseQueryOptions<MockUser>) {
     });
 }
 
+export function useCreateUser() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (data: Partial<MockUser> & { password?: string; roles?: string[]; tenantId?: string | null }) =>
+            adminApiClient.createUser(data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: adminQueryKeys.users() });
+        },
+    });
+}
+
+export function useUpdateUser() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, data }: { id: string; data: Partial<MockUser> & { password?: string; roles?: string[]; tenantId?: string | null } }) =>
+            adminApiClient.updateUser(id, data),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDetail(variables.id) });
+            queryClient.invalidateQueries({ queryKey: adminQueryKeys.users() });
+        },
+    });
+}
+
+export function useDeleteUser() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (id: string) => adminApiClient.deleteUser(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: adminQueryKeys.users() });
+        },
+    });
+}
+
+export function useAdminRoles() {
+    return useQuery({
+        queryKey: [...adminQueryKeys.users(), 'roles'],
+        queryFn: () => adminApiClient.getRoles(),
+        staleTime: 60 * 1000,
+        retry: 2,
+    });
+}
+
 // ============================================================================
 // Device Queries
 // ============================================================================
@@ -208,11 +253,11 @@ export function useAuditLog(params?: {
     });
 }
 
-export function useAuditEntry(id: string, options?: UseQueryOptions<MockAuditEntry>) {
+export function useAuditEntry(id: string, params?: { tenantId?: string }, options?: UseQueryOptions<MockAuditEntry>) {
     return useQuery({
         queryKey: adminQueryKeys.auditDetail(id),
-        queryFn: () => adminApiClient.getAuditEntryById(id),
-        enabled: !!id,
+        queryFn: () => adminApiClient.getAuditEntryById(id, params?.tenantId),
+        enabled: !!id && (params?.tenantId !== undefined || params === undefined),
         staleTime: 60 * 1000,
         retry: 2,
         ...options,

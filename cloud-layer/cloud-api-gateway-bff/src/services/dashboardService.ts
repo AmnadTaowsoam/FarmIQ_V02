@@ -92,7 +92,7 @@ export function getServiceBaseUrls(): ServiceBaseUrls {
 }
 
 export interface DownstreamOptions {
-  method?: 'GET' | 'POST' | 'PUT' | 'PATCH'
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   headers: Record<string, string>
   body?: unknown
 }
@@ -466,5 +466,4 @@ export async function fetchAlerts(params: {
     analyticsAvailable: analytics.ok,
   }
 }
-
 

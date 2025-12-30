@@ -10,6 +10,14 @@ export interface TenantRegistryServiceClient {
     query: Record<string, string>
     headers: Record<string, string>
   }): Promise<{ ok: boolean; status: number; data?: unknown }>
+  getAdminDevices(params: {
+    query: Record<string, string>
+    headers: Record<string, string>
+  }): Promise<{ ok: boolean; status: number; data?: unknown }>
+  getAdminDeviceById(params: {
+    id: string
+    headers: Record<string, string>
+  }): Promise<{ ok: boolean; status: number; data?: unknown }>
 
   getFarms(params: {
     query: Record<string, string>
@@ -113,6 +121,27 @@ export const tenantRegistryServiceClient: TenantRegistryServiceClient = {
     const queryString = buildQueryString(params.query)
     const url = `${registryBaseUrl}/api/v1/admin/tenants${queryString}`
     logger.info('Calling tenant-registry: GET /api/v1/admin/tenants')
+    return callDownstreamJson(url, {
+      method: 'GET',
+      headers: params.headers,
+    })
+  },
+
+  async getAdminDevices(params) {
+    const { registryBaseUrl } = getServiceBaseUrls()
+    const queryString = buildQueryString(params.query)
+    const url = `${registryBaseUrl}/api/v1/admin/devices${queryString}`
+    logger.info('Calling tenant-registry: GET /api/v1/admin/devices')
+    return callDownstreamJson(url, {
+      method: 'GET',
+      headers: params.headers,
+    })
+  },
+
+  async getAdminDeviceById(params) {
+    const { registryBaseUrl } = getServiceBaseUrls()
+    const url = `${registryBaseUrl}/api/v1/admin/devices/${params.id}`
+    logger.info('Calling tenant-registry: GET /api/v1/admin/devices/:id', { id: params.id })
     return callDownstreamJson(url, {
       method: 'GET',
       headers: params.headers,

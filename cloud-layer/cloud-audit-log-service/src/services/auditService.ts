@@ -99,3 +99,16 @@ export async function queryAuditEvents(query: AuditEventQuery) {
   }
 }
 
+export async function getAuditEventById(params: { tenantId: string; id: string }) {
+  try {
+    return await prisma.auditEvent.findFirst({
+      where: {
+        id: params.id,
+        tenantId: params.tenantId,
+      },
+    })
+  } catch (error) {
+    logger.error('Error fetching audit event by id', error)
+    throw error
+  }
+}

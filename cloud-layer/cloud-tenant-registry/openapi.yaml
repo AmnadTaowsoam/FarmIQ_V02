@@ -154,6 +154,82 @@ paths:
                     type: integer
                   totalPages:
                     type: integer
+  /v1/admin/devices:
+    get:
+      summary: Get admin devices list
+      tags: [Admin]
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: tenantId
+          in: query
+          schema:
+            type: string
+        - name: farmId
+          in: query
+          schema:
+            type: string
+        - name: barnId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated devices
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminDevice'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  pageSize:
+                    type: integer
+                  totalPages:
+                    type: integer
+  /v1/admin/devices/{id}:
+    get:
+      summary: Get admin device by ID
+      tags: [Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Device details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminDevice'
+        '404':
+          description: Device not found
   /v1/farms:
     get:
       summary: Get all farms for tenant
@@ -514,6 +590,45 @@ components:
           type: integer
         sensorCalibrationCount:
           type: integer
+    AdminDevice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+        tenantId:
+          type: string
+          format: uuid
+        tenantName:
+          type: string
+          nullable: true
+        farmId:
+          type: string
+          format: uuid
+          nullable: true
+        farmName:
+          type: string
+          nullable: true
+        barnId:
+          type: string
+          format: uuid
+          nullable: true
+        barnName:
+          type: string
+          nullable: true
+        lastSeen:
+          type: string
+          format: date-time
+        firmwareVersion:
+          type: string
+        ipAddress:
+          type: string
     Farm:
       type: object
       properties:

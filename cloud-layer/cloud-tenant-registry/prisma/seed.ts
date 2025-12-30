@@ -241,6 +241,7 @@ async function main() {
     const barnIndex = i % barns.length
     const barn = barns[barnIndex]
     const farm = farms.find((f) => f.id === barn.farmId)!
+    const deviceName = `${isSensor ? 'SENSOR' : 'WEIGH'}-${String(i + 1).padStart(4, '0')}`
 
     devices.push({
       id: deviceId,
@@ -252,6 +253,11 @@ async function main() {
       serialNo: `SN-${(i + 1).toString().padStart(5, '0')}`,
       status: i < deviceCount * 0.9 ? 'active' : 'maintenance',
       metadata: {
+        name: deviceName,
+        type: isSensor ? 'sensor' : 'camera',
+        ipAddress: `192.168.${(barnIndex % 10) + 10}.${(i % 200) + 20}`,
+        firmwareVersion: `v1.${(i % 10) + 1}.${(i % 5) + 1}`,
+        lastSeen: new Date(Date.now() - (i * 15 * 60 * 1000)).toISOString(),
         firmware_version: '1.2.3',
         model: isSensor ? 'SG-2024' : 'WV-2024',
       },

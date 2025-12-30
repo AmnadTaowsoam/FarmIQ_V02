@@ -2,6 +2,7 @@ import express from 'express'
 import {
   createAuditEventHandler,
   queryAuditEventsHandler,
+  getAuditEventByIdHandler,
 } from '../controllers/auditController'
 import { jwtAuthMiddleware } from '../middlewares/authMiddleware'
 import { internalAuthMiddleware } from '../middlewares/authMiddleware'
@@ -94,6 +95,6 @@ const router = express.Router()
  */
 router.post('/events', internalAuthMiddleware, createAuditEventHandler)
 router.get('/events', jwtAuthMiddleware, queryAuditEventsHandler)
+router.get('/events/:id', jwtAuthMiddleware, getAuditEventByIdHandler)
 
 export default router
-

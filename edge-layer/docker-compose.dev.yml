@@ -11,7 +11,7 @@ services:
     image: postgres:16-alpine
     container_name: farmiq-edge-postgres
     ports:
-      - "5141:5432"  # Different port from cloud (5140)
+      - "5141:5432" # Different port from cloud (5140)
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-farmiq}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-farmiq_dev}
@@ -21,7 +21,7 @@ services:
     networks:
       - farmiq-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-farmiq}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-farmiq}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -30,8 +30,8 @@ services:
     image: minio/minio:latest
     container_name: farmiq-edge-minio
     ports:
-      - "9000:9000"  # MinIO API
-      - "9001:9001"  # MinIO Console
+      - "9000:9000" # MinIO API
+      - "9001:9001" # MinIO Console
     environment:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin}
@@ -41,7 +41,7 @@ services:
     networks:
       - farmiq-net
     healthcheck:
-      test: ["CMD", "stat", "/data"]
+      test: [ "CMD", "stat", "/data" ]
       interval: 30s
       timeout: 20s
       start_period: 40s
@@ -55,10 +55,30 @@ services:
     networks:
       - farmiq-net
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # ============================================
+  # EDGE OPS UI
+  # ============================================
+  edge-ops-web:
+    build:
+      context: ./edge-ops-web
+      dockerfile: Dockerfile
+    container_name: farmiq-edge-ops-web
+    ports:
+      - "5110:80"
+    networks:
+      - farmiq-net
+    depends_on:
+      - edge-ingress-gateway
+      - edge-observability-agent
+      - edge-sync-forwarder
+      - edge-telemetry-timeseries
+      - edge-weighvision-session
+      - edge-media-store
 
   # ============================================
   # EDGE SERVICES
@@ -76,7 +96,7 @@ services:
     networks:
       - farmiq-net
     healthcheck:
-      test: ["CMD", "mosquitto_sub", "-h", "localhost", "-t", "$$SYS/health", "-C", "1"]
+      test: [ "CMD", "mosquitto_sub", "-h", "localhost", "-t", "$$SYS/health", "-C", "1" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -87,6 +107,9 @@ services:
     volumes:
       - ./edge-ingress-gateway/src:/app/src:ro
       - ./edge-ingress-gateway/package.json:/app/package.json:ro
+    ports:
+      - "5103:3000"
+      - "5112:3000" # Keep old mapping just in case
     environment:
       - NODE_ENV=development
       - APP_PORT=3000
@@ -111,6 +134,8 @@ services:
       - ./edge-telemetry-timeseries/prisma:/app/prisma:ro
       - ./edge-telemetry-timeseries/tsconfig.json:/app/tsconfig.json:ro
       - ./edge-telemetry-timeseries/tsconfig.prisma.json:/app/tsconfig.prisma.json:ro
+    ports:
+      - "5104:3000"
     environment:
       - NODE_ENV=development
       - APP_PORT=3000
@@ -129,6 +154,8 @@ services:
       - ./edge-weighvision-session/prisma:/app/prisma:ro
       - ./edge-weighvision-session/tsconfig.json:/app/tsconfig.json:ro
       - ./edge-weighvision-session/tsconfig.prisma.json:/app/tsconfig.prisma.json:ro
+    ports:
+      - "5105:3000"
     environment:
       - NODE_ENV=development
       - APP_PORT=3000
@@ -144,6 +171,8 @@ services:
     volumes:
       - ./edge-media-store/src:/app/src:ro
       - ./edge-media-store/package.json:/app/package.json:ro
+    ports:
+      - "5106:3000"
     environment:
       - NODE_ENV=development
       - APP_PORT=3000
@@ -165,6 +194,8 @@ services:
       dockerfile: Dockerfile.dev
     volumes:
       - ./edge-vision-inference/app:/app/app:ro
+    ports:
+      - "5107:8000"
     environment:
       - LOG_LEVEL=DEBUG
       - PORT=8000
@@ -180,6 +211,8 @@ services:
     volumes:
       - ./edge-sync-forwarder/src:/app/src:ro
       - ./edge-sync-forwarder/package.json:/app/package.json:ro
+    ports:
+      - "5108:3000"
     environment:
       - NODE_ENV=development
       - APP_PORT=3000
@@ -224,6 +257,8 @@ services:
       - ./edge-retention-janitor/src:/app/src:ro
       - ./edge-retention-janitor/package.json:/app/package.json:ro
       - ../../data/edge-media:/data/media
+    ports:
+      - "5113:3000"
     environment:
       - NODE_ENV=development
       - APP_PORT=3000
@@ -244,6 +279,8 @@ services:
       - ./edge-observability-agent/src:/app/src:ro
       - ./edge-observability-agent/package.json:/app/package.json:ro
       - ../../data/edge-media:/data
+    ports:
+      - "5111:3000"
     environment:
       - NODE_ENV=development
       - APP_PORT=3000

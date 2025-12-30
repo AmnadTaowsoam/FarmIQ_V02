@@ -14,6 +14,8 @@ import standardsRoutes from './standardsRoutes'
 import telemetryRoutes from './telemetryRoutes'
 import notificationRoutes from './notificationRoutes'
 import dashboardNotificationRoutes from './dashboardNotificationRoutes'
+import identityRoutes from './identityRoutes'
+import authProxyRoutes from './authProxyRoutes'
 
 /**
  *
@@ -22,6 +24,9 @@ import dashboardNotificationRoutes from './dashboardNotificationRoutes'
 export function setupRoutes(app: Express): void {
   // Dashboard notification routes (must be registered before /api/v1/dashboard)
   app.use('/api/v1/dashboard/notifications', dashboardNotificationRoutes)
+
+  // Auth proxy routes (identity access)
+  app.use('/api/v1', authProxyRoutes)
 
   // BFF dashboard routes
   app.use('/api/v1/dashboard', dashboardRoutes)
@@ -40,6 +45,9 @@ export function setupRoutes(app: Express): void {
 
   // Tenant registry service proxy routes
   app.use('/api/v1', tenantRegistryRoutes)
+
+  // Identity access admin proxy routes
+  app.use('/api/v1', identityRoutes)
 
   // Sensor module proxy routes (part of tenant-registry)
   app.use('/api/v1', sensorsRoutes)

@@ -51,6 +51,7 @@ import { AdminUsersPage } from './features/admin/pages/AdminUsersPage';
 import { AdminTenantsPage } from './features/admin/pages/AdminTenantsPage';
 import { AdminDevicesPage } from './features/admin/pages/AdminDevicesPage';
 import { AdminAuditPage } from './features/admin/pages/AdminAuditPage';
+import { AuditDetailPage } from './features/admin/pages/AuditDetailPage';
 import { AdminOverviewPage } from './features/admin/pages/AdminOverviewPage';
 import { TenantDetailPage } from './features/admin/pages/TenantDetailPage';
 import { SystemHealthPage } from './features/admin/pages/SystemHealthPage';
@@ -381,6 +382,11 @@ export const App: React.FC = () => {
                 <Route path="admin/audit-log" element={
                      <RoleGuard allowedRoles={['platform_admin', 'tenant_admin']}>
                          <AdminAuditPage />
+                     </RoleGuard>
+                } />
+                <Route path="admin/audit-log/:auditId" element={
+                     <RoleGuard allowedRoles={['platform_admin', 'tenant_admin']}>
+                         <AuditDetailPage />
                      </RoleGuard>
                 } />
                 

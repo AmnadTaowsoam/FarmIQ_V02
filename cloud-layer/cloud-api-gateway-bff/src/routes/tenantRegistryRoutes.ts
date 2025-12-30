@@ -3,6 +3,8 @@ import { jwtAuthMiddleware, requireRole } from '../middlewares/authMiddleware'
 import {
   getTenantsHandler,
   getAdminTenantsHandler,
+  getAdminDevicesHandler,
+  getAdminDeviceByIdHandler,
   getFarmsHandler,
   getBarnsHandler,
   getBatchesHandler,
@@ -20,6 +22,8 @@ router.use(jwtAuthMiddleware)
  */
 router.get('/tenants', getTenantsHandler)
 router.get('/admin/tenants', requireRole('platform_admin'), getAdminTenantsHandler)
+router.get('/admin/devices', requireRole('platform_admin'), getAdminDevicesHandler)
+router.get('/admin/devices/:id', requireRole('platform_admin'), getAdminDeviceByIdHandler)
 
 // Farms
 router.get('/farms', getFarmsHandler)

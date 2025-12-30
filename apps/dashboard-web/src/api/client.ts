@@ -19,13 +19,21 @@ export const isMockMode = () => MOCK_MODE;
 
 // Request Interceptor: Auth & Tracing
 apiClient.interceptors.request.use(async (config) => {
+    const url = config.url || '';
+    const isAuthEndpoint =
+        url.includes('/api/v1/auth/login') ||
+        url.includes('/api/v1/auth/refresh') ||
+        url.includes('/api/v1/auth/logout');
+
     // 1. Inject Auth Token (with auto-refresh)
     try {
-        // Dynamic import to avoid circular dependency
-        const { authService } = await import('../services/AuthService');
-        const token = await authService.ensureValidToken();
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
+        if (!isAuthEndpoint) {
+            // Dynamic import to avoid circular dependency
+            const { authService } = await import('../services/AuthService');
+            const token = await authService.ensureValidToken();
+            if (token) {
+                config.headers.Authorization = `Bearer ${token}`;
+            }
         }
     } catch (error) {
         // Token refresh failed - will be handled by response interceptor

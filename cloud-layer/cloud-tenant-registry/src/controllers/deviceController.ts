@@ -2,6 +2,8 @@ import { Request, Response } from 'express'
 import {
   getDevicesByTenant,
   getDeviceById,
+  getAdminDevices,
+  getAdminDeviceById,
   createDevice,
   updateDevice,
   deleteDevice,
@@ -41,6 +43,44 @@ export async function getDevices(req: Request, res: Response) {
 }
 
 /**
+ * Get admin devices list with pagination
+ */
+export async function getAdminDevicesHandler(req: Request, res: Response) {
+  try {
+    const page = Number.parseInt((req.query.page as string) || '0', 10)
+    const pageSize = Number.parseInt((req.query.pageSize as string) || '25', 10)
+    const search = (req.query.search as string) || undefined
+    const status = (req.query.status as string) || undefined
+    const type = (req.query.type as string) || undefined
+    const tenantId = (req.query.tenantId as string) || undefined
+    const farmId = (req.query.farmId as string) || undefined
+    const barnId = (req.query.barnId as string) || undefined
+
+    const result = await getAdminDevices({
+      page: Number.isNaN(page) ? 0 : page,
+      pageSize: Number.isNaN(pageSize) ? 25 : pageSize,
+      search,
+      status,
+      type,
+      tenantId,
+      farmId,
+      barnId,
+    })
+
+    res.json(result)
+  } catch (error) {
+    logger.error('Error in getAdminDevicesHandler:', error)
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to fetch admin devices',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+  }
+}
+
+/**
  * Get device by ID
  */
 export async function getDevice(req: Request, res: Response) {
@@ -73,6 +113,35 @@ export async function getDevice(req: Request, res: Response) {
       error: {
         code: 'INTERNAL_ERROR',
         message: 'Failed to fetch device',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+  }
+}
+
+/**
+ * Get admin device by ID
+ */
+export async function getAdminDeviceByIdHandler(req: Request, res: Response) {
+  try {
+    const { id } = req.params
+    const device = await getAdminDeviceById(id)
+    if (!device) {
+      return res.status(404).json({
+        error: {
+          code: 'NOT_FOUND',
+          message: `Device with id ${id} not found`,
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+    }
+    res.json(device)
+  } catch (error) {
+    logger.error('Error in getAdminDeviceByIdHandler:', error)
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to fetch admin device',
         traceId: res.locals.traceId || 'unknown',
       },
     })
@@ -196,4 +265,3 @@ export async function deleteDeviceHandler(req: Request, res: Response) {
     })
   }
 }
-
