@@ -227,16 +227,19 @@ export class TelemetryService {
     return aggregates
   }
 
-  async getMetrics() {
+  async getMetrics(tenantId?: string) {
+    const whereTenant = tenantId ? { tenantId } : undefined
+
     const [totalReadings, totalAggregates] = await Promise.all([
-      this.prisma.telemetryRaw.count(),
-      this.prisma.telemetryAgg.count(),
+      this.prisma.telemetryRaw.count({ where: whereTenant }),
+      this.prisma.telemetryAgg.count({ where: whereTenant }),
     ])
 
     // Calculate ingestion rate (last minute)
     const oneMinuteAgo = new Date(Date.now() - 60000)
     const recentReadings = await this.prisma.telemetryRaw.count({
       where: {
+        ...(whereTenant ?? {}),
         ingestedAt: {
           gte: oneMinuteAgo,
         },
@@ -248,6 +251,16 @@ export class TelemetryService {
       totalReadings,
       totalAggregates,
     }
+  }
+
+  async getLastReading(tenantId: string): Promise<{ occurredAt: Date } | null> {
+    const row = await this.prisma.telemetryRaw.findFirst({
+      where: { tenantId },
+      orderBy: { occurredAt: 'desc' },
+      select: { occurredAt: true },
+    })
+
+    return row ?? null
   }
 
   async ingestEvents(events: TelemetryEvent[]): Promise<number> {

@@ -1,5 +1,3 @@
-version: '3.8'
-
 # Development overrides for edge services
 # Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 
@@ -41,143 +39,82 @@ services:
     networks:
       - farmiq-net
     healthcheck:
-      test: [ "CMD", "stat", "/data" ]
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
       interval: 30s
       timeout: 20s
       start_period: 40s
       retries: 3
 
-  cloud-ingestion-mock:
+  # ============================================
+  # EDGE SERVICE OVERRIDES
+  # ============================================
+  edge-cloud-ingestion-mock:
     build:
       context: ./edge-cloud-ingestion-mock
       dockerfile: Dockerfile.dev
-    container_name: farmiq-edge-cloud-ingestion-mock
-    networks:
-      - farmiq-net
-    healthcheck:
-      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
-  # ============================================
-  # EDGE OPS UI
-  # ============================================
-  edge-ops-web:
-    build:
-      context: ./edge-ops-web
-      dockerfile: Dockerfile
-    container_name: farmiq-edge-ops-web
-    ports:
-      - "5110:80"
-    networks:
-      - farmiq-net
-    depends_on:
-      - edge-ingress-gateway
-      - edge-observability-agent
-      - edge-sync-forwarder
-      - edge-telemetry-timeseries
-      - edge-weighvision-session
-      - edge-media-store
-
-  # ============================================
-  # EDGE SERVICES
-  # ============================================
   edge-mqtt-broker:
     build:
       context: ./edge-mqtt-broker
       dockerfile: Dockerfile.dev
-    ports:
-      - "5100:1883"
-    volumes:
-      - ./edge-mqtt-broker/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
-      - edge_mqtt_data:/mosquitto/data
-      - edge_mqtt_log:/mosquitto/log
-    networks:
-      - farmiq-net
-    healthcheck:
-      test: [ "CMD", "mosquitto_sub", "-h", "localhost", "-t", "$$SYS/health", "-C", "1" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+
   edge-ingress-gateway:
     build:
       context: ./edge-ingress-gateway
       dockerfile: Dockerfile.dev
     volumes:
-      - ./edge-ingress-gateway/src:/app/src:ro
-      - ./edge-ingress-gateway/package.json:/app/package.json:ro
-    ports:
-      - "5103:3000"
-      - "5112:3000" # Keep old mapping just in case
+      - ./edge-ingress-gateway/src:/usr/src/app/src:ro
+      - ./edge-ingress-gateway/prisma:/usr/src/app/prisma:ro
+      - ./edge-ingress-gateway/package.json:/usr/src/app/package.json:ro
+      - ./edge-ingress-gateway/tsconfig.json:/usr/src/app/tsconfig.json:ro
+      - ./edge-ingress-gateway/openapi.yaml:/usr/src/app/openapi.yaml:ro
     environment:
       - NODE_ENV=development
-      - APP_PORT=3000
       - LOG_LEVEL=debug
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
-      - MQTT_BROKER_URL=mqtt://edge-mqtt-broker:1883
-      - EDGE_TELEMETRY_TIMESERIES_URL=http://edge-telemetry-timeseries:3000
-      - EDGE_WEIGHVISION_SESSION_URL=http://edge-weighvision-session:3000
-      - DOWNSTREAM_TIMEOUT_MS=5000
-      - DEDUPE_TTL_MS=259200000
-      - DEDUPE_CLEANUP_INTERVAL_MS=60000
-    networks:
-      - farmiq-net
 
   edge-telemetry-timeseries:
     build:
       context: ./edge-telemetry-timeseries
       dockerfile: Dockerfile.dev
     volumes:
-      - ./edge-telemetry-timeseries/src:/app/src:ro
-      - ./edge-telemetry-timeseries/package.json:/app/package.json:ro
-      - ./edge-telemetry-timeseries/prisma:/app/prisma:ro
-      - ./edge-telemetry-timeseries/tsconfig.json:/app/tsconfig.json:ro
-      - ./edge-telemetry-timeseries/tsconfig.prisma.json:/app/tsconfig.prisma.json:ro
-    ports:
-      - "5104:3000"
+      - ./edge-telemetry-timeseries/src:/usr/src/app/src:ro
+      - ./edge-telemetry-timeseries/prisma:/usr/src/app/prisma:ro
+      - ./edge-telemetry-timeseries/package.json:/usr/src/app/package.json:ro
+      - ./edge-telemetry-timeseries/tsconfig.json:/usr/src/app/tsconfig.json:ro
+      - ./edge-telemetry-timeseries/tsconfig.prisma.json:/usr/src/app/tsconfig.prisma.json:ro
+      - ./edge-telemetry-timeseries/openapi.yaml:/usr/src/app/openapi.yaml:ro
     environment:
       - NODE_ENV=development
-      - APP_PORT=3000
       - LOG_LEVEL=debug
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
-    networks:
-      - farmiq-net
 
   edge-weighvision-session:
     build:
       context: ./edge-weighvision-session
       dockerfile: Dockerfile.dev
     volumes:
-      - ./edge-weighvision-session/src:/app/src:ro
-      - ./edge-weighvision-session/package.json:/app/package.json:ro
-      - ./edge-weighvision-session/prisma:/app/prisma:ro
-      - ./edge-weighvision-session/tsconfig.json:/app/tsconfig.json:ro
-      - ./edge-weighvision-session/tsconfig.prisma.json:/app/tsconfig.prisma.json:ro
-    ports:
-      - "5105:3000"
+      - ./edge-weighvision-session/src:/usr/src/app/src:ro
+      - ./edge-weighvision-session/prisma:/usr/src/app/prisma:ro
+      - ./edge-weighvision-session/package.json:/usr/src/app/package.json:ro
+      - ./edge-weighvision-session/tsconfig.json:/usr/src/app/tsconfig.json:ro
+      - ./edge-weighvision-session/tsconfig.prisma.json:/usr/src/app/tsconfig.prisma.json:ro
+      - ./edge-weighvision-session/openapi.yaml:/usr/src/app/openapi.yaml:ro
     environment:
       - NODE_ENV=development
-      - APP_PORT=3000
       - LOG_LEVEL=debug
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
-    networks:
-      - farmiq-net
 
   edge-media-store:
     build:
       context: ./edge-media-store
       dockerfile: Dockerfile.dev
     volumes:
-      - ./edge-media-store/src:/app/src:ro
-      - ./edge-media-store/package.json:/app/package.json:ro
-    ports:
-      - "5106:3000"
+      - ./edge-media-store/src:/usr/src/app/src:ro
+      - ./edge-media-store/prisma:/usr/src/app/prisma:ro
+      - ./edge-media-store/package.json:/usr/src/app/package.json:ro
+      - ./edge-media-store/tsconfig.json:/usr/src/app/tsconfig.json:ro
+      - ./edge-media-store/openapi.yaml:/usr/src/app/openapi.yaml:ro
     environment:
       - NODE_ENV=development
-      - APP_PORT=3000
       - LOG_LEVEL=debug
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
       - MEDIA_ENDPOINT=${MEDIA_ENDPOINT:-http://minio:9000}
       - MEDIA_PRESIGN_ENDPOINT=${MEDIA_PRESIGN_ENDPOINT:-http://localhost:9000}
       - MEDIA_ACCESS_KEY=${MEDIA_ACCESS_KEY:-minioadmin}
@@ -185,8 +122,6 @@ services:
       - MEDIA_REGION=${MEDIA_REGION:-us-east-1}
       - MEDIA_BUCKET=${MEDIA_BUCKET:-farmiq-media}
       - MEDIA_BUCKET_AUTO_CREATE=true
-    networks:
-      - farmiq-net
 
   edge-vision-inference:
     build:
@@ -194,107 +129,99 @@ services:
       dockerfile: Dockerfile.dev
     volumes:
       - ./edge-vision-inference/app:/app/app:ro
-    ports:
-      - "5107:8000"
     environment:
       - LOG_LEVEL=DEBUG
-      - PORT=8000
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
       - MEDIA_STORE_URL=http://edge-media-store:3000
-    networks:
-      - farmiq-net
 
   edge-sync-forwarder:
     build:
       context: ./edge-sync-forwarder
       dockerfile: Dockerfile.dev
     volumes:
-      - ./edge-sync-forwarder/src:/app/src:ro
-      - ./edge-sync-forwarder/package.json:/app/package.json:ro
-    ports:
-      - "5108:3000"
+      - ./edge-sync-forwarder/src:/usr/src/app/src:ro
+      - ./edge-sync-forwarder/package.json:/usr/src/app/package.json:ro
+      - ./edge-sync-forwarder/tsconfig.json:/usr/src/app/tsconfig.json:ro
+      - ./edge-sync-forwarder/openapi.yaml:/usr/src/app/openapi.yaml:ro
     environment:
       - NODE_ENV=development
-      - APP_PORT=3000
       - LOG_LEVEL=debug
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
-      - CLOUD_INGESTION_URL=${CLOUD_INGESTION_URL:-http://cloud-ingestion-mock:3000/api/v1/edge/batch}
+      - CLOUD_INGESTION_URL=${CLOUD_INGESTION_URL:-http://edge-cloud-ingestion-mock:3000/api/v1/edge/batch}
       - CLOUD_INGESTION_URL_REQUIRED=${CLOUD_INGESTION_URL_REQUIRED:-false}
       - CLOUD_AUTH_MODE=${CLOUD_AUTH_MODE:-none}
       - CLOUD_API_KEY=${CLOUD_API_KEY:-}
       - CLOUD_HMAC_SECRET=${CLOUD_HMAC_SECRET:-}
       - OUTBOX_MAX_ATTEMPTS=${OUTBOX_MAX_ATTEMPTS:-10}
       - INTERNAL_ADMIN_ENABLED=${INTERNAL_ADMIN_ENABLED:-true}
-    networks:
-      - farmiq-net
-
-  edge-policy-sync:
-    build:
-      context: ./edge-policy-sync
-      dockerfile: Dockerfile.dev
-    volumes:
-      - ./edge-policy-sync/src:/app/src:ro
-      - ./edge-policy-sync/package.json:/app/package.json:ro
-    environment:
-      - NODE_ENV=development
-      - APP_PORT=3000
-      - LOG_LEVEL=debug
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
-      - BFF_BASE_URL=http://host.docker.internal:5125
-      - EDGE_CLOUD_TOKEN=${EDGE_CLOUD_TOKEN:-}
-      - POLICY_SYNC_INTERVAL_SECONDS=60
-      - POLICY_SYNC_BACKOFF_CAP_SECONDS=600
-      - POLICY_SYNC_TIMEOUT_SECONDS=10
-      - EDGE_CONTEXTS=${EDGE_CONTEXTS:-[]}
-    networks:
-      - farmiq-net
-
-  edge-retention-janitor:
-    build:
-      context: ./edge-retention-janitor
-      dockerfile: Dockerfile.dev
-    volumes:
-      - ./edge-retention-janitor/src:/app/src:ro
-      - ./edge-retention-janitor/package.json:/app/package.json:ro
-      - ../../data/edge-media:/data/media
-    ports:
-      - "5113:3000"
-    environment:
-      - NODE_ENV=development
-      - APP_PORT=3000
-      - LOG_LEVEL=debug
-      - MEDIA_BASE_PATH=/data/media
-      - MEDIA_RETENTION_DAYS=7
-      - MIN_FREE_DISK_GB=5
-      - JANITOR_INTERVAL_SECONDS=21600
-      - JANITOR_DRY_RUN=true
-    networks:
-      - farmiq-net
 
   edge-observability-agent:
     build:
       context: ./edge-observability-agent
       dockerfile: Dockerfile.dev
     volumes:
-      - ./edge-observability-agent/src:/app/src:ro
-      - ./edge-observability-agent/package.json:/app/package.json:ro
-      - ../../data/edge-media:/data
-    ports:
-      - "5111:3000"
+      - ./edge-observability-agent/src:/usr/src/app/src:ro
+      - ./edge-observability-agent/package.json:/usr/src/app/package.json:ro
+      - ./edge-observability-agent/tsconfig.json:/usr/src/app/tsconfig.json:ro
+      - ./edge-observability-agent/openapi.yaml:/usr/src/app/openapi.yaml:ro
     environment:
       - NODE_ENV=development
-      - APP_PORT=3000
       - LOG_LEVEL=debug
-      - OBS_POLL_INTERVAL_SECONDS=30
-      - DISK_PATH=/data
-      - EDGE_INGRESS_URL=http://edge-ingress-gateway:3000
-      - EDGE_TELEMETRY_URL=http://edge-telemetry-timeseries:3000
-      - EDGE_WEIGHVISION_URL=http://edge-weighvision-session:3000
-      - EDGE_VISION_URL=http://edge-vision-inference:8000
-      - EDGE_MEDIA_URL=http://edge-media-store:3000
-      - EDGE_SYNC_URL=http://edge-sync-forwarder:3000
+
+  edge-policy-sync:
+    build:
+      context: ./edge-policy-sync
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./edge-policy-sync/src:/usr/src/app/src:ro
+      - ./edge-policy-sync/package.json:/usr/src/app/package.json:ro
+      - ./edge-policy-sync/tsconfig.json:/usr/src/app/tsconfig.json:ro
+      - ./edge-policy-sync/openapi.yaml:/usr/src/app/openapi.yaml:ro
+    environment:
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+      - BFF_BASE_URL=http://host.docker.internal:5125
+
+  edge-retention-janitor:
+    build:
+      context: ./edge-retention-janitor
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./edge-retention-janitor/src:/usr/src/app/src:ro
+      - ./edge-retention-janitor/prisma:/usr/src/app/prisma:ro
+      - ./edge-retention-janitor/package.json:/usr/src/app/package.json:ro
+      - ./edge-retention-janitor/tsconfig.json:/usr/src/app/tsconfig.json:ro
+      - ./edge-retention-janitor/openapi.yaml:/usr/src/app/openapi.yaml:ro
+    environment:
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+
+  edge-ops-web:
+    build:
+      context: ./edge-ops-web
+      dockerfile: Dockerfile
+    container_name: farmiq-edge-ops-web
+    ports:
+      - "5113:80"
+    environment:
+      - VITE_TENANT_ID=${VITE_TENANT_ID:-t-001}
+      - VITE_CONNECTION_PROFILE=${VITE_CONNECTION_PROFILE:-local}
+      - VITE_EDGE_HOST=${VITE_EDGE_HOST:-192.168.1.50}
+      - VITE_AUTH_MODE=${VITE_AUTH_MODE:-none}
+      - VITE_API_KEY=${VITE_API_KEY:-}
+      - VITE_HMAC_SECRET=${VITE_HMAC_SECRET:-}
+      - VITE_INGRESS_GATEWAY_URL=${VITE_INGRESS_GATEWAY_URL:-http://edge-ingress-gateway:3000}
+      - VITE_TELEMETRY_URL=${VITE_TELEMETRY_URL:-http://edge-telemetry-timeseries:3000}
+      - VITE_WEIGHVISION_URL=${VITE_WEIGHVISION_URL:-http://edge-weighvision-session:3000}
+      - VITE_MEDIA_URL=${VITE_MEDIA_URL:-http://edge-media-store:3000}
+      - VITE_VISION_URL=${VITE_VISION_URL:-http://edge-vision-inference:8000}
+      - VITE_SYNC_URL=${VITE_SYNC_URL:-http://edge-sync-forwarder:3000}
+      - VITE_OBSERVABILITY_URL=${VITE_OBSERVABILITY_URL:-http://edge-observability-agent:3000}
+      - VITE_POLICY_SYNC_URL=${VITE_POLICY_SYNC_URL:-http://edge-policy-sync:3000}
+      - VITE_FEED_INTAKE_URL=${VITE_FEED_INTAKE_URL:-http://edge-feed-intake:5109}
     networks:
       - farmiq-net
+    # Dev override: avoid pulling/building the whole stack when running
+    # `docker compose ... up --build edge-ops-web` in restricted-network environments.
+    depends_on: []
 
 networks:
   farmiq-net:

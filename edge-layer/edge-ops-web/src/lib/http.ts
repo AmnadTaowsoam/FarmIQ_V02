@@ -62,7 +62,12 @@ export const http = {
         } = options;
 
         // 1. Construct URL with Search Params
-        const urlObj = new URL(url);
+        // Support both absolute URLs (http://...) and relative URLs (/svc/...)
+        const baseOrigin =
+            (typeof window !== 'undefined' && window.location?.origin) ||
+            (typeof globalThis !== 'undefined' && (globalThis as any).location?.origin) ||
+            'http://localhost';
+        const urlObj = new URL(url, baseOrigin);
         if (searchParams) {
             Object.entries(searchParams).forEach(([key, val]) => {
                 if (val !== undefined) {
@@ -98,23 +103,27 @@ export const http = {
             });
 
             // 4. Handle Response
+            const bodyText = response.status === 204 ? '' : await response.text();
+
             if (!response.ok) {
-                let errorBody: HttpErrorDetails | string;
-                try {
-                    errorBody = await response.json();
-                } catch {
-                    errorBody = response.statusText;
+                let errorBody: HttpErrorDetails | string = response.statusText;
+                if (bodyText) {
+                    try {
+                        errorBody = JSON.parse(bodyText);
+                    } catch {
+                        errorBody = bodyText;
+                    }
                 }
                 throw new HttpError(response.status, errorBody, traceId);
             }
 
-            // 5. Parse JSON Safely
-            // Handle 204 No Content
-            if (response.status === 204) {
-                return {} as T;
+            // 5. Parse response safely (JSON preferred, but allow text/plain for health checks)
+            if (!bodyText) return {} as T;
+            try {
+                return JSON.parse(bodyText) as T;
+            } catch {
+                return bodyText as unknown as T;
             }
-
-            return await response.json();
         } catch (error: any) {
             if (error.name === 'AbortError') {
                 throw new HttpError(408, { code: 'TIMEOUT', message: `Request timed out after ${timeoutMs}ms` });

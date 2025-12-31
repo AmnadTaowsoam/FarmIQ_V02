@@ -18,11 +18,12 @@
         "migrate:up": "npx prisma migrate dev --name init",
         "prisma:generate": "npx prisma generate",
         "migrate:undo": "npx prisma migrate reset --force",
-        "db:migrate": "npx prisma migrate deploy",
-        "db:seed": "prisma db seed",
-        "coverage": "npx nyc report --reporter=html && npx opener coverage/index.html",
-        "generate-api-types": "openapi-typescript openapi.yaml -o src/api-types.ts"
-    },
+    "db:migrate": "ts-node src/db/migrate.ts",
+    "db:seed": "prisma db seed",
+    "seed": "prisma db seed",
+    "coverage": "npx nyc report --reporter=html && npx opener coverage/index.html",
+    "generate-api-types": "openapi-typescript openapi.yaml -o src/api-types.ts"
+  },
     "keywords": [],
     "author": "",
     "license": "SEE LICENSE IN LICENSE.md",
@@ -66,4 +67,3 @@
         "seed": "npx ts-node --project tsconfig.prisma.json --transpile-only prisma/seed.ts"
     }
 }
-

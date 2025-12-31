@@ -8,6 +8,9 @@ export function createTelemetryRoutes(controller: TelemetryController): Router {
   router.get('/health', controller.getHealth)
   router.get('/ready', controller.getReady)
 
+  // Stats endpoint
+  router.get('/v1/telemetry/stats', controller.getStats)
+
   // Telemetry endpoints
   router.post('/v1/telemetry/readings', controller.ingestReadings)
   router.get('/v1/telemetry/readings', controller.queryReadings)

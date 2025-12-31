@@ -128,6 +128,31 @@ async def get_results(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/stats", tags=["Inference"])
+async def get_stats(request: Request):
+    """Get inference statistics."""
+    try:
+        job_service: JobService = request.app.state.job_service
+        db: InferenceDb = request.app.state.db
+        
+        tenant_header = request.headers.get("x-tenant-id")
+        
+        # Get total results count
+        total_count = await db.get_inference_results_count(tenant_header)
+        
+        # Get last result timestamp
+        last_result = await db.get_last_inference_result_timestamp(tenant_header)
+        
+        return {
+            "total_results": total_count,
+            "last_result_at": last_result,
+            "tenant_id": tenant_header
+        }
+    except Exception as e:
+        logger.error(f"Failed to get stats: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/models", tags=["Inference"])
 async def get_models(request: Request):
     """Get available models information."""

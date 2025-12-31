@@ -6,14 +6,27 @@
 
 ---
 
+## Update (2025-12-31): Local compose readiness
+
+Since the original audit:
+- `edge-telemetry-timeseries` is implemented and runs in docker-compose (health/ready + telemetry APIs).
+- `edge-ops-web` is added as the FE/ops entrypoint and proxies real internal APIs via `/svc/*`.
+- `edge-feed-intake` is dockerized and runs against Postgres (DB-backed service).
+- `edge-vision-inference` compose healthcheck is fixed (uses `curl`).
+- Local setup + reproducible evidence is documented in:
+  - `docs/edge-layer/04-local-compose-setup.md`
+  - `docs/edge-layer/05-evidence-local-compose.md`
+
 ## ARE WE DOC-COMPLETE?
 
-**NO** — Documentation is mostly complete but has critical gaps and contradictions.
+**YES (for local compose FE/ops usage)** — Documentation matches runnable local compose stack and includes reproducible evidence.
+
+**PARTIAL (for production hardening)** — Remaining gaps are mostly security/ops hardening items (MQTT TLS, optional RabbitMQ mode, retention policy knobs, etc.).
 
 **Top 3 Issues**:
-1. **edge-telemetry-timeseries service is MISSING** — Referenced in docs and docker-compose but directory is empty (no implementation)
-2. **edge-media-store uses S3 presigner (MinIO/S3), and docs now treat S3 as canonical** — Architecture mismatch needs resolution
-3. **edge-weighvision-session /ready endpoint path mismatch** — Docs say `/api/ready` but code has `/api/ready` (need verification)
+1. **edge-vision-inference “RabbitMQ optional Mode A” is not implemented** — Code supports Mode B (sync HTTP POST) only.
+2. **MQTT TLS/auth is not configured in local broker config** — `mosquitto.conf` is dev-only.
+3. **MQTT broker healthcheck can be flaky locally** — Compose may show unhealthy while MQTT traffic still works.
 
 ---
 
@@ -23,11 +36,16 @@
 |------------|------|-------|------|-------------|--------------|-----------------|-----|-----|-------|
 | edge-mqtt-broker | `edge-mqtt-broker/` | 1883 (5100) | Mosquitto | ✅ Yes | Native healthcheck | ❌ No | ❌ No | ✅ MQTT | Config only (mosquitto.conf, aclfile.example) |
 | edge-ingress-gateway | `edge-ingress-gateway/` | 3000 (5103) | Node.js/Express | ✅ Yes | ✅ `/api/health`, `/api/ready` | ✅ `/api-docs` | ✅ Prisma | ✅ MQTT client | Full implementation, MQTT consumer, dedupe store |
-| edge-telemetry-timeseries | `edge-telemetry-timeseries/` | 3000 (5104) | **MISSING** | ⚠️ Dockerfile ref in compose | ❌ N/A | ❌ N/A | ❌ N/A | ❌ N/A | **Directory exists but empty** |
+| edge-telemetry-timeseries | `edge-telemetry-timeseries/` | 3000 (5104) | Node.js/Express | ✅ Yes | ✅ `/api/health`, `/api/ready` | ✅ `/api-docs` | ✅ Prisma | ❌ No | DB-backed telemetry APIs (readings/metrics) |
 | edge-weighvision-session | `edge-weighvision-session/` | 3000 (5105) | Node.js/Express | ✅ Yes | ✅ `/api/health`, `/api/ready` | ✅ `/api-docs` | ✅ Prisma | ❌ No | Full implementation |
 | edge-media-store | `edge-media-store/` | 3000 (5106) | Node.js/Express | ✅ Yes | ✅ `/api/health`, `/api/ready` | ✅ `/api-docs` | ⚠️ **Uses S3** | ❌ No | **Uses S3 presigner, NOT PVC** |
 | edge-vision-inference | `edge-vision-inference/` | 8000 (5107) | Python/FastAPI | ✅ Yes | ✅ `/api/health`, `/api/ready` | ✅ `/api-docs` | ✅ DB (asyncpg) | ⚠️ Optional RabbitMQ | Full implementation |
 | edge-sync-forwarder | `edge-sync-forwarder/` | 3000 (5108) | Node.js/Express | ✅ Yes | ✅ `/api/health`, `/api/ready` | ✅ `/api-docs` | ✅ TypeORM | ❌ No | Full implementation with FOR UPDATE SKIP LOCKED |
+| edge-policy-sync | `edge-policy-sync/` | 3000 (5109) | Node.js/Express | ✅ Yes | ✅ `/api/health`, `/api/ready` | ✅ `/api-docs` | ✅ DB | ❌ No | Policy cache and periodic sync |
+| edge-observability-agent | `edge-observability-agent/` | 3000 (5111) | Node.js/Express | ✅ Yes | ✅ `/api/health`, `/api/ready` | ✅ `/api-docs` | ❌ No | ❌ No | Aggregated edge status for ops UI |
+| edge-retention-janitor | `edge-retention-janitor/` | 3000 (5115/5114) | Node.js/Express | ✅ Yes | ✅ `/api/health`, `/api/ready` | ✅ `/api-docs` | ✅ DB | ❌ No | Retention cleanup jobs |
+| edge-feed-intake | `edge-feed-intake/` | 5109 (5112) | Node.js/Express | ✅ Yes | ✅ `/api/health`, `/api/ready` | ✅ `/api-docs` | ✅ Prisma | ❌ No | DB-backed feed intake (local) |
+| edge-ops-web | `edge-ops-web/` | 80 (5110/5113) | React + Node proxy | ✅ Yes | N/A | N/A | ❌ No | ❌ No | UI + `/svc/*` proxy to internal services |
 
 **Evidence**:
 - Docker-compose: `edge-layer/docker-compose.yml` (ports, healthchecks)
@@ -58,8 +76,8 @@
 
 | ClaimID | Status | Evidence | Notes |
 |---------|--------|----------|-------|
-| DOC-001 | **MISSING** | `edge-telemetry-timeseries/` directory is empty (no files) | Service referenced in docker-compose.yml:58-77 but no implementation exists |
-| DOC-002 | **MISSING** | No service code found | APIs `/api/v1/telemetry/readings`, `/api/v1/telemetry/aggregates` not implemented |
+| DOC-001 | **DONE** | `edge-layer/edge-telemetry-timeseries/` exists and builds in compose | Service is implemented and runnable locally |
+| DOC-002 | **DONE** | `/api/v1/telemetry/readings`, `/api/v1/telemetry/aggregates`, `/api/v1/telemetry/metrics` | APIs are implemented and reachable via local compose |
 | DOC-003 | **DONE** | `edge-media-store/src/services/s3Client.ts` uses S3Client | Docs align on S3-compatible media storage (MinIO/S3) |
 | DOC-004 | **DONE** | `edge-media-store/src/routes/mediaRoutes.ts` has `presign` + `complete` | Completion handshake verifies upload via S3 HEAD and emits `media.stored` |
 | DOC-005 | **DONE** | `edge-ingress-gateway/src/routes/` has no media proxy routes | Verified: ingress-gateway does NOT proxy media uploads |
@@ -223,15 +241,8 @@
 ### P1 (Should Do)
 
 #### P1-1: Document Retention Configuration
-- **Issue**: Retention policies mentioned in docs but no config vars documented
-- **Files to change**:
-  - `docs/edge-layer/02-edge-storage-buffering.md` — Add "Configuration" section with env vars
-- **Content to add**:
-  - `TELEMETRY_RAW_RETENTION_DAYS` (default: 90)
-  - `TELEMETRY_AGG_RETENTION_DAYS` (default: 365)
-  - `MEDIA_RETENTION_DAYS` (default: 90)
-  - `OUTBOX_RETENTION_DAYS` (default: 30)
-- **Acceptance criteria**: Docs include configurable retention period env vars
+- ✅ **DONE**: `docs/edge-layer/02-edge-storage-buffering.md` documents retention defaults + env vars:
+  - `TELEMETRY_RAW_RETENTION_DAYS`, `TELEMETRY_AGG_RETENTION_DAYS`, `MEDIA_RETENTION_DAYS`, `OUTBOX_RETENTION_DAYS`
 
 #### P1-2: Verify MQTT Broker TLS Configuration ⚠️ **NOT CONFIGURED**
 - **Issue**: Docs require TLS but mosquitto.conf is dev-only (no TLS)
@@ -283,7 +294,7 @@ docker compose ps  # All services should be "Up"
 ### Verify Health Endpoints
 ```bash
 curl http://localhost:5103/api/health  # ingress-gateway
-curl http://localhost:5104/api/health  # telemetry-timeseries (will fail if P0-2 not done)
+curl http://localhost:5104/api/health  # telemetry-timeseries
 curl http://localhost:5105/api/health  # weighvision-session
 curl http://localhost:5106/api/health  # media-store
 curl http://localhost:5107/api/health  # vision-inference
@@ -330,22 +341,8 @@ curl -X POST http://localhost:5106/api/v1/media/images/presign \
 ## Execution Checklist
 
 ### P0 Tasks (Blocking)
-- [ ] **P0-1**: Update docs to reflect S3-compatible storage for edge-media-store
-  - [ ] Update `docs/edge-layer/01-edge-services.md`
-  - [ ] Update `docs/edge-layer/00-overview.md`
-  - [ ] Update `docs/edge-layer/02-edge-storage-buffering.md`
-  - [ ] Verify no PVC filesystem references remain
-- [ ] **P0-2**: Implement edge-telemetry-timeseries service
-  - [ ] Create service structure (index.ts, routes, services)
-  - [ ] Implement Prisma schema for telemetry_raw and telemetry_agg
-  - [ ] Implement POST /api/v1/telemetry/readings
-  - [ ] Implement GET /api/v1/telemetry/readings
-  - [ ] Implement GET /api/v1/telemetry/aggregates
-  - [ ] Implement GET /api/v1/telemetry/metrics
-  - [ ] Add health/ready endpoints
-  - [ ] Add OpenAPI spec
-  - [ ] Test with docker-compose
-  - [ ] Verify outbox events emitted
+- [x] **P0-1**: Update docs to reflect S3-compatible storage for edge-media-store
+- [x] **P0-2**: Implement edge-telemetry-timeseries service
 - [ ] **P0-3**: Verify edge-vision-inference RabbitMQ optionality
   - [ ] Check job_service.py supports both modes
   - [ ] Verify HTTP POST endpoint exists
@@ -365,8 +362,8 @@ curl -X POST http://localhost:5106/api/v1/media/images/presign \
 
 ## Summary
 
-**Critical Issues**: 3 (P0-1, P0-2, P0-3)  
+**Critical Issues**: 1 (P0-3)  
 **Should Fix**: 3 (P1-1, P1-2, P1-3)  
 **Nice to Have**: 2 (P2-1, P2-2)
 
-**Overall Status**: ⚠️ **PARTIAL** — Documentation is comprehensive but code has gaps (missing service) and contradictions (storage architecture). Once P0 issues are resolved, the edge layer will be production-ready.
+**Overall Status**: ✅ **READY (Local Compose)** — FE/ops stack runs locally with reproducible evidence. Production hardening items remain (see P0-3 and P1 list).

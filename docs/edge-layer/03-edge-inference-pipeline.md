@@ -1,7 +1,7 @@
 Purpose: Describe the end-to-end WeighVision inference pipeline on the edge, including offline behavior and failure handling.  
 Scope: Pipeline steps from media storage to inference and session finalization, with latency targets and retry strategy.  
 Owner: FarmIQ Edge Team  
-Last updated: 2025-12-20  
+Last updated: 2025-12-31  
 
 ---
 
@@ -216,4 +216,3 @@ Targets are implementation-dependent but typical goals:
 - Keep Edge RabbitMQ usage (when implemented) focused on internal async tasks (like inference), while cloud sync remains outbox-driven for auditability and deterministic retries.
 - All services must emit structured JSON logs and include `trace_id`/`x-request-id` to enable Datadog correlation.
 - **RabbitMQ Mode Selection (Future)**: When Mode A is implemented, configure via environment variable (e.g., `EDGE_RABBITMQ_ENABLED=true/false`). Default to RabbitMQ mode for production, synchronous mode for development.
-

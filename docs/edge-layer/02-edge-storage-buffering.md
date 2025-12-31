@@ -1,7 +1,7 @@
 Purpose: Define the edge persistence model for buffering telemetry, sessions, media, inference results, and sync state.  
 Scope: Edge DB tables, PVC path conventions, retention/cleanup jobs, and outbox state machine for offline-first operation.  
 Owner: FarmIQ Edge Team  
-Last updated: 2025-12-20  
+Last updated: 2025-12-31  
 
 ---
 
@@ -26,7 +26,7 @@ Recommended DB: PostgreSQL (local to edge cluster or managed externally).
 
 - **Purpose**: Store raw, device-level telemetry samples.
 - **Key columns**:
-  - `id (uuidv7, pk)`
+  - `id (uuid, pk)`
   - `tenant_id`, `farm_id`, `barn_id`, `device_id`
   - `occurred_at (timestamptz)`
   - `metric_type`, `metric_value`, `unit`
@@ -39,7 +39,7 @@ Recommended DB: PostgreSQL (local to edge cluster or managed externally).
 
 - **Purpose**: Store aggregates for faster queries and reduced cloud sync volume.
 - **Key columns**:
-  - `id (uuidv7, pk)`
+  - `id (uuid, pk)`
   - `tenant_id`, `device_id`
   - `window` (e.g., `1m`, `1h`, `1d`)
   - `bucket_start_at`, `bucket_end_at`
@@ -51,7 +51,7 @@ Recommended DB: PostgreSQL (local to edge cluster or managed externally).
 
 - **Purpose**: Session owner table for WeighVision session lifecycle.
 - **Key columns**:
-  - `id (uuidv7, pk)` (session_id)
+  - `id (uuid, pk)` (session_id)
   - `tenant_id`, `farm_id`, `barn_id`, `device_id`, `batch_id (nullable)`
   - `status` (created, finalized, cancelled)
   - `start_at`, `end_at`
@@ -64,7 +64,7 @@ Recommended DB: PostgreSQL (local to edge cluster or managed externally).
 
 - **Purpose**: Metadata for images stored in S3-compatible object storage.
 - **Key columns**:
-  - `id (uuidv7, pk)` (media_id)
+  - `id (uuid, pk)` (media_id)
   - `tenant_id`, `farm_id`, `barn_id`, `device_id`, `session_id (nullable)`
   - `bucket` (S3 bucket name)
   - `object_key` (S3 object key)
@@ -80,7 +80,7 @@ Recommended DB: PostgreSQL (local to edge cluster or managed externally).
 
 - **Purpose**: Store inference outputs produced by `edge-vision-inference`.
 - **Key columns**:
-  - `id (uuidv7, pk)` (inference_result_id)
+  - `id (uuid, pk)` (inference_result_id)
   - `tenant_id`, `farm_id`, `barn_id`, `device_id`, `session_id (nullable)`
   - `media_id (nullable)` (if result is per-frame)
   - `predicted_weight_kg`, `predicted_size` (optional)
@@ -95,7 +95,7 @@ Recommended DB: PostgreSQL (local to edge cluster or managed externally).
 - **Purpose**: Append-only durable event log for cloud synchronization. Supports horizontal scaling of `edge-sync-forwarder` via claim/lease mechanism with retry scheduling and DLQ.
 - **Ownership**: Written by each edge service for its domain; consumed by `edge-sync-forwarder`.
 - **Key columns**:
-  - `id (uuidv7, pk)` (event_id; used as cloud idempotency key with tenant_id)
+  - `id (uuid, pk)` (event_id; used as cloud idempotency key with tenant_id)
   - `tenant_id`, `farm_id`, `barn_id`, `device_id`, `session_id (nullable)`
   - `event_type`
   - `occurred_at` (timestamptz, nullable)

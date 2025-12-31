@@ -1,4 +1,4 @@
-import { PrismaClient, Prisma, Decimal } from '@prisma/client'
+import { PrismaClient, Prisma } from '@prisma/client'
 import { logger } from '../utils/logger'
 import { writeToSyncOutbox } from '../utils/syncOutbox'
 
@@ -127,7 +127,7 @@ export class FeedIntakeService {
           source: input.source,
           feedFormulaId: input.feedFormulaId || null,
           feedLotId: input.feedLotId || null,
-          quantityKg: new Decimal(input.quantityKg),
+          quantityKg: new Prisma.Decimal(input.quantityKg),
           occurredAt: input.occurredAt,
           eventId: input.eventId || null,
           externalRef: input.externalRef || null,
@@ -229,4 +229,3 @@ export class FeedIntakeService {
     }
   }
 }
-

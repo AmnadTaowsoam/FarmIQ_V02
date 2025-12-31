@@ -9,6 +9,8 @@
     "start": "nyc ts-node src/index.ts",
     "build": "tsc && npm run copy-openapi",
     "copy-openapi": "cp openapi.yaml dist/",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "seed": "tsx src/seed.ts",
     "serve": "node dist/src/index.js"
   },
   "dependencies": {
@@ -38,6 +40,7 @@
     "nodemon": "^3.0.1",
     "prisma": "^5.16.1",
     "ts-node": "^10.9.2",
+    "tsx": "^4.20.5",
     "typescript": "^5.4.5"
   }
 }

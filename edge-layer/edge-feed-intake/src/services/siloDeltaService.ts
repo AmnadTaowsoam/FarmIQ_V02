@@ -1,7 +1,7 @@
 import { logger } from '../utils/logger'
 import { FeedIntakeService } from './feedIntakeService'
-import { PrismaClient, Prisma, Decimal } from '@prisma/client'
-import { v7 as uuidv7 } from 'uuid'
+import { PrismaClient, Prisma } from '@prisma/client'
+import { v4 as uuidv4 } from 'uuid'
 
 /**
  * SILO delta computation service (Mode B)
@@ -64,7 +64,7 @@ export class SiloDeltaService {
 
           // 3. Create intake record if delta exceeds threshold
           if (deltaKg >= this.DELTA_THRESHOLD_KG) {
-            const eventId = uuidv7()
+            const eventId = uuidv4()
             await this.feedIntakeService.createFeedIntakeRecord({
               tenantId: params.tenantId,
               farmId: params.farmId || null,
@@ -120,11 +120,11 @@ export class SiloDeltaService {
         create: {
           tenantId: params.tenantId,
           deviceId: params.deviceId,
-          weightKg: new Decimal(params.currentWeightKg),
+          weightKg: new Prisma.Decimal(params.currentWeightKg),
           recordedAt: params.occurredAt,
         },
         update: {
-          weightKg: new Decimal(params.currentWeightKg),
+          weightKg: new Prisma.Decimal(params.currentWeightKg),
           recordedAt: params.occurredAt,
         },
       })
@@ -250,11 +250,12 @@ export class SiloDeltaService {
             envelope.payload.value ||
             envelope.payload.weight
 
-          if (!tenantId || !barnId || typeof weightValue !== 'number') {
+          if (!tenantId || !barnId || !deviceId || typeof weightValue !== 'number') {
             logger.warn('Missing required fields in silo.weight message', {
               topic,
               tenantId,
               barnId,
+              deviceId,
               hasWeight: typeof weightValue === 'number',
             })
             return
@@ -271,7 +272,7 @@ export class SiloDeltaService {
             tenantId,
             farmId: farmId || null,
             barnId,
-            deviceId: deviceId || null,
+            deviceId,
             currentWeightKg: weightValue,
             occurredAt: new Date(occurredAt),
             traceId: envelope.trace_id || null,
@@ -323,4 +324,3 @@ export class SiloDeltaService {
     logger.info('SILO delta service stopped')
   }
 }
-

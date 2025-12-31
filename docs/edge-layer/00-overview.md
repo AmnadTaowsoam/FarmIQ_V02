@@ -1,7 +1,7 @@
 Purpose: Provide an overview of the FarmIQ edge layer and its core responsibilities.  
 Scope: Edge service roles, ownership boundaries, communication patterns, and persistence strategy.  
 Owner: FarmIQ Architecture Team  
-Last updated: 2025-12-20  
+Last updated: 2025-12-31  
 
 ---
 
@@ -24,14 +24,23 @@ Key characteristics:
 
 ## Canonical edge services
 
-See `edge-layer/01-edge-services.md` for per-service details. The canonical list:
-- `edge-mqtt-broker` (EMQX/Mosquitto)
-- `edge-ingress-gateway` (Node, Backend-node boilerplate)
+See `docs/edge-layer/01-edge-services.md` for per-service details.
+
+Core (business) services:
+- `edge-mqtt-broker` (Mosquitto)
+- `edge-ingress-gateway` (Node)
 - `edge-telemetry-timeseries` (Node)
 - `edge-weighvision-session` (Node)
 - `edge-media-store` (Node)
-- `edge-vision-inference` (Python, Backend-python boilerplate)
+- `edge-vision-inference` (Python)
 - `edge-sync-forwarder` (Node)
+
+Ops/support services:
+- `edge-policy-sync` (Node)
+- `edge-retention-janitor` (Node)
+- `edge-observability-agent` (Node)
+- `edge-ops-web` (UI + `/svc/*` proxy for FE/ops)
+- `edge-feed-intake` (Node; local DB-backed intake, optional by deployment)
 
 Ownership guards:
 - **Session owner**: `edge-weighvision-session`.
@@ -40,6 +49,17 @@ Ownership guards:
 - **Sync owner**: `edge-sync-forwarder` (sole path to cloud).
 
 ---
+
+## Local docker-compose setup (FE/ops)
+
+For a reproducible local stack that FE/ops can use (real APIs + real DB data), see:
+- `docs/edge-layer/04-local-compose-setup.md`
+- `docs/edge-layer/05-evidence-local-compose.md`
+
+Local-only components used by compose:
+- Postgres (single edge DB)
+- MinIO (S3-compatible object storage)
+- `cloud-ingestion-mock` (internal-only target for `edge-sync-forwarder`)
 
 ## Communication patterns
 
@@ -223,6 +243,6 @@ All edge services MUST expose:
 
 ## Links
 
-- `edge-layer/01-edge-services.md`
-- `edge-layer/02-edge-storage-buffering.md`
-- `edge-layer/03-edge-inference-pipeline.md`
+- `docs/edge-layer/01-edge-services.md`
+- `docs/edge-layer/02-edge-storage-buffering.md`
+- `docs/edge-layer/03-edge-inference-pipeline.md`

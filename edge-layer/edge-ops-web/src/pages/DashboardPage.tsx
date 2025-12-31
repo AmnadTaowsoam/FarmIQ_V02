@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { 
   Grid, 
   Card, 
@@ -8,38 +8,74 @@ import {
   Chip, 
   Stack,
   Skeleton,
-  Alert
+  Alert,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper
 } from '@mui/material';
 import { Activity, Server, Database, Wifi } from 'lucide-react';
 
 import { useSettings } from '@/contexts/SettingsContext';
-import { edgeOpsApi, MOCK_EDGE_STATUS } from '@/api/client';
+import { edgeOpsApi, TelemetryMetrics, TelemetryReadingsResponse } from '@/api/client';
 import { usePoll } from '@/hooks/usePoll';
 import { MetricCard } from '@/components/ui/MetricCard';
 
 
-// Mock Chart Data Generator
-const generateChartData = () => {
-  return Array.from({ length: 20 }, (_, i) => ({
-    time: i,
-    value: Math.floor(Math.random() * 40) + 10
-  }));
-};
+const MAX_SPARK_POINTS = 20;
 
 export function DashboardPage() {
   const { refreshInterval, lastRefresh, tenantId, apiKey, getServiceUrl } = useSettings();
   
   // Use smart polling hook which handles visibility
-  const { data, isLoading, isError, error } = usePoll(
+  const { data: edgeStatus, isLoading: loadingStatus, isError: errorStatus, error: edgeError } = usePoll(
     ['edge-status', lastRefresh, tenantId], 
     () => edgeOpsApi.getStatus({ tenantId, apiKey, getServiceUrl }),
     refreshInterval
   );
 
-  const status = isError ? MOCK_EDGE_STATUS : (data || MOCK_EDGE_STATUS); // Use mock on error for dev proof
-  const [chartData] = useState(generateChartData()); // Static mock data for charts
+  const { data: telemetryMetrics, isLoading: loadingTelemetry, isError: errorTelemetry, error: telemetryError } = usePoll<TelemetryMetrics>(
+    ['telemetry-metrics', lastRefresh, tenantId],
+    () => edgeOpsApi.getTelemetryMetrics({ tenantId, apiKey, getServiceUrl }),
+    Math.max(refreshInterval, 5000)
+  );
 
-  if (isLoading && !data) {
+  const { data: telemetryReadings, isLoading: loadingReadings, isError: errorReadings, error: readingsError } = usePoll<TelemetryReadingsResponse>(
+    ['telemetry-readings', lastRefresh, tenantId],
+    () => edgeOpsApi.getTelemetryReadings({ limit: 10 }, { tenantId, apiKey, getServiceUrl }),
+    Math.max(refreshInterval * 3, 15000)
+  );
+
+  const safeEdgeStatus = edgeStatus ?? {
+    health: { status: 'error' as const, uptime: 0, version: 'unknown' },
+    resources: { cpuUsage: 0, memoryUsage: 0, diskUsage: { path: '/data', usedPercent: 0, freeGb: 0 } },
+    services: [],
+    sync: { pendingCount: 0, oldestPendingAgeMs: 0, dlqCount: 0 }
+  };
+
+  const [cpuHistory, setCpuHistory] = useState<number[]>([]);
+  const [memHistory, setMemHistory] = useState<number[]>([]);
+  const [ingestRateHistory, setIngestRateHistory] = useState<number[]>([]);
+
+  useEffect(() => {
+    if (!edgeStatus) return;
+    setCpuHistory(prev => [...prev, edgeStatus.resources.cpuUsage].slice(-MAX_SPARK_POINTS));
+    setMemHistory(prev => [...prev, edgeStatus.resources.memoryUsage].slice(-MAX_SPARK_POINTS));
+  }, [edgeStatus]);
+
+  useEffect(() => {
+    if (!telemetryMetrics) return;
+    setIngestRateHistory(prev => [...prev, telemetryMetrics.ingestionRatePerMinute].slice(-MAX_SPARK_POINTS));
+  }, [telemetryMetrics]);
+
+  const cpuChartData = useMemo(() => cpuHistory.map((value, idx) => ({ time: idx, value })), [cpuHistory]);
+  const memChartData = useMemo(() => memHistory.map((value, idx) => ({ time: idx, value })), [memHistory]);
+  const ingestChartData = useMemo(() => ingestRateHistory.map((value, idx) => ({ time: idx, value })), [ingestRateHistory]);
+
+  if (loadingStatus && !edgeStatus) {
     return (
         <Grid container spacing={3}>
             {[1, 2, 3, 4].map(i => (
@@ -54,9 +90,9 @@ export function DashboardPage() {
   return (
     <Stack spacing={4}>
       {/* Error Banner */}
-      {isError && (
+      {errorStatus && (
         <Alert severity="warning" sx={{ mb: 2 }}>
-          Failed to connect to Edge Agent. Showing Mock Data. ({String(error)})
+          เชื่อมต่อ `edge-observability-agent` ไม่ได้ ({String(edgeError)})
         </Alert>
       )}
 
@@ -64,40 +100,127 @@ export function DashboardPage() {
       <Grid container spacing={3}>
         <MetricCard 
           title="CPU Usage" 
-          value={`${status.resources.cpuUsage.toFixed(1)}%`} 
+          value={`${safeEdgeStatus.resources.cpuUsage.toFixed(1)}%`} 
           icon={<Activity color="#60a5fa" />} // Blue
-          chartData={chartData}
+          chartData={cpuChartData}
           color="#60a5fa" 
+          loading={loadingStatus && !edgeStatus}
         />
         <MetricCard 
           title="Memory Usage" 
-          value={`${status.resources.memoryUsage.toFixed(1)}%`} 
+          value={`${safeEdgeStatus.resources.memoryUsage.toFixed(1)}%`} 
           icon={<Server color="#c084fc" />} // Purple
-          chartData={chartData}
+          chartData={memChartData}
           color="#c084fc"
+          loading={loadingStatus && !edgeStatus}
         />
         <MetricCard 
           title="Disk Usage" 
-          value={`${status.resources.diskUsage.usedPercent.toFixed(1)}%`} 
-          subValue={`${status.resources.diskUsage.freeGb} GB Free`}
+          value={`${safeEdgeStatus.resources.diskUsage.usedPercent.toFixed(1)}%`} 
+          subValue={`${safeEdgeStatus.resources.diskUsage.freeGb} GB Free`}
           icon={<Database color="#fbbf24" />} // Amber
           color="#fbbf24" 
+          loading={loadingStatus && !edgeStatus}
         />
         <MetricCard 
           title="Sync Backlog" 
-          value={status.sync.pendingCount.toString()} 
-          subValue={status.sync.dlqCount > 0 ? `${status.sync.dlqCount} in DLQ` : 'Sync Healthy'}
-          icon={<Wifi color={status.sync.dlqCount > 0 ? "#ef4444" : "#22d3ee"} />} 
-          color={status.sync.dlqCount > 0 ? "#ef4444" : "#22d3ee"}
-          alert={status.sync.dlqCount > 0}
+          value={safeEdgeStatus.sync.pendingCount.toString()} 
+          subValue={safeEdgeStatus.sync.dlqCount > 0 ? `${safeEdgeStatus.sync.dlqCount} in DLQ` : 'Sync Healthy'}
+          icon={<Wifi color={safeEdgeStatus.sync.dlqCount > 0 ? "#ef4444" : "#22d3ee"} />} 
+          color={safeEdgeStatus.sync.dlqCount > 0 ? "#ef4444" : "#22d3ee"}
+          alert={safeEdgeStatus.sync.dlqCount > 0}
+          loading={loadingStatus && !edgeStatus}
         />
       </Grid>
+
+      {/* Telemetry (DB-backed) */}
+      <Box>
+        <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>Telemetry (DB)</Typography>
+        {(errorTelemetry || errorReadings) && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            โหลดข้อมูล telemetry ไม่สำเร็จ ({String(telemetryError || readingsError)})
+          </Alert>
+        )}
+
+        <Grid container spacing={3} sx={{ mb: 2 }}>
+          <MetricCard
+            title="Total Readings"
+            value={(telemetryMetrics?.totalReadings ?? 0).toLocaleString()}
+            subValue={`Tenant: ${tenantId}`}
+            icon={<Database color="#10b981" />}
+            color="#10b981"
+            lg={4}
+            chartData={ingestChartData}
+            loading={loadingTelemetry && !telemetryMetrics}
+          />
+          <MetricCard
+            title="Ingestion / min"
+            value={(telemetryMetrics?.ingestionRatePerMinute ?? 0).toLocaleString()}
+            subValue={`Aggregates: ${(telemetryMetrics?.totalAggregates ?? 0).toLocaleString()}`}
+            icon={<Activity color="#3b82f6" />}
+            color="#3b82f6"
+            lg={4}
+            chartData={ingestChartData}
+            loading={loadingTelemetry && !telemetryMetrics}
+          />
+        </Grid>
+
+        <Card variant="outlined">
+          <CardContent>
+            <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>
+              Latest Readings
+            </Typography>
+            <TableContainer component={Paper} variant="outlined">
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>occurred_at</TableCell>
+                    <TableCell>device_id</TableCell>
+                    <TableCell>metric</TableCell>
+                    <TableCell align="right">value</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {(telemetryReadings?.readings ?? []).map((r) => (
+                    <TableRow key={r.id} hover>
+                      <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                        {new Date(r.occurred_at).toLocaleString()}
+                      </TableCell>
+                      <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>{r.device_id}</TableCell>
+                      <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                        {r.metric_type}
+                      </TableCell>
+                      <TableCell align="right" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                        {r.metric_value}{r.unit ? ` ${r.unit}` : ''}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {!loadingReadings && (telemetryReadings?.readings?.length ?? 0) === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={4} sx={{ color: 'text.secondary' }}>
+                        No readings found for tenant `{tenantId}`
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {loadingReadings && !telemetryReadings && (
+                    <TableRow>
+                      <TableCell colSpan={4} sx={{ color: 'text.secondary' }}>
+                        Loading...
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </CardContent>
+        </Card>
+      </Box>
 
       {/* Service Health */}
       <Box>
         <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>Service Status</Typography>
         <Grid container spacing={2}>
-            {status.services.map((svc) => (
+            {safeEdgeStatus.services.map((svc) => (
                 <Grid item xs={12} md={6} lg={4} key={svc.name}>
                     <ServiceCard service={svc} />
                 </Grid>

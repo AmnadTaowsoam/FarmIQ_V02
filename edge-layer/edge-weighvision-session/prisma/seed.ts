@@ -1,5 +1,4 @@
 import { PrismaClient, Prisma } from '@prisma/client'
-import { SEED_IDS, getAllSessionIds } from './seed-constants'
 
 const prisma = new PrismaClient()
 
@@ -12,33 +11,30 @@ if (process.env.NODE_ENV === 'production' && !process.env.ALLOW_SEED_IN_PROD) {
 
 const SEED_COUNT = parseInt(process.env.SEED_COUNT || '30', 10)
 
+function seededUuid(index: number): string {
+  return `00000000-0000-4000-8000-${index.toString(16).padStart(12, '0')}`
+}
+
 async function main() {
   console.log(`Starting seed (SEED_COUNT=${SEED_COUNT})...`)
 
-  // Idempotent: Clear existing data (dev only)
-  if (process.env.NODE_ENV !== 'production') {
-    await prisma.sessionWeight.deleteMany({})
-    await prisma.sessionMediaBinding.deleteMany({})
-    await prisma.weightSession.deleteMany({})
-  }
-
-  const sessionIds = getAllSessionIds()
   const sessionCount = Math.max(SEED_COUNT, 30)
   const now = Date.now()
+  const tenants = ['t-001', 't-002']
 
   const sessions = []
   const sessionConfig = [
-    { tenantId: SEED_IDS.TENANT_1, farmId: SEED_IDS.FARM_1A, barnId: SEED_IDS.BARN_1A_1, deviceId: SEED_IDS.DEVICE_WEIGH_1, stationId: SEED_IDS.STATION_1A_1 },
-    { tenantId: SEED_IDS.TENANT_1, farmId: SEED_IDS.FARM_1A, barnId: SEED_IDS.BARN_1A_2, deviceId: SEED_IDS.DEVICE_WEIGH_2, stationId: SEED_IDS.STATION_1A_2 },
-    { tenantId: SEED_IDS.TENANT_1, farmId: SEED_IDS.FARM_1B, barnId: SEED_IDS.BARN_1B_1, deviceId: SEED_IDS.DEVICE_WEIGH_3, stationId: SEED_IDS.STATION_1B_1 },
-    { tenantId: SEED_IDS.TENANT_2, farmId: SEED_IDS.FARM_2A, barnId: SEED_IDS.BARN_2A_1, deviceId: SEED_IDS.DEVICE_WEIGH_4, stationId: SEED_IDS.STATION_2A_1 },
-    { tenantId: SEED_IDS.TENANT_2, farmId: SEED_IDS.FARM_2A, barnId: SEED_IDS.BARN_2A_2, deviceId: SEED_IDS.DEVICE_WEIGH_5, stationId: SEED_IDS.STATION_2A_2 },
+    { tenantId: tenants[0], farmId: 'f-001', barnId: 'b-001', deviceId: 'wv-001', stationId: 's-001' },
+    { tenantId: tenants[0], farmId: 'f-001', barnId: 'b-002', deviceId: 'wv-002', stationId: 's-002' },
+    { tenantId: tenants[0], farmId: 'f-002', barnId: 'b-003', deviceId: 'wv-003', stationId: 's-003' },
+    { tenantId: tenants[1], farmId: 'f-101', barnId: 'b-101', deviceId: 'wv-101', stationId: 's-101' },
+    { tenantId: tenants[1], farmId: 'f-101', barnId: 'b-102', deviceId: 'wv-102', stationId: 's-102' },
   ]
 
   // Create WeightSession records
   for (let i = 0; i < sessionCount; i++) {
     const config = sessionConfig[i % sessionConfig.length]
-    const sessionId = i < sessionIds.length ? sessionIds[i] : `00000000-0000-4000-8000-0000004000${(i + 1).toString(16).padStart(3, '0')}`
+    const sessionId = seededUuid(4_000 + i)
     const status = i < sessionCount * 0.7 ? 'created' : i < sessionCount * 0.9 ? 'finalized' : 'cancelled'
     const hoursAgo = Math.floor(i / 5)
 
@@ -56,7 +52,7 @@ async function main() {
       initialWeightKg: status !== 'created' ? new Prisma.Decimal(1.2 + (i % 10) * 0.1) : null,
       finalWeightKg: status === 'finalized' ? new Prisma.Decimal(1.5 + (i % 10) * 0.1) : null,
       imageCount: i % 5,
-      inferenceResultId: status === 'finalized' ? `inference-${i}` : null,
+      inferenceResultId: status === 'finalized' ? seededUuid(9_000 + i) : null,
     })
   }
 

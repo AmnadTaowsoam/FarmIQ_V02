@@ -1,15 +1,16 @@
 # Stage 1: Build the application
-FROM node:24-alpine AS build
+FROM node:20-bullseye AS build
  
 # Set the working directory
 WORKDIR /usr/src/app
+
  
 # Copy package.json and package-lock.json
 COPY package*.json ./
 COPY prisma ./prisma/
  
-# Install dependencies
-RUN npm ci
+# Install dependencies (fallback to npm install when lockfile is missing)
+RUN if [ -f package-lock.json ]; then npm ci; else npm install --no-audit --no-fund; fi
  
 # Generate the Prisma client
 RUN if [ -f prisma/schema.prisma ]; then npx prisma generate; fi
@@ -21,10 +22,11 @@ COPY . .
 RUN npm run build
  
 # Stage 2: Create the production image
-FROM node:24-alpine AS production
+FROM node:20-bullseye AS production
  
 # Set the working directory
 WORKDIR /usr/src/app
+
  
 # Set the environment to production
 ENV NODE_ENV=production
@@ -32,8 +34,8 @@ ENV NODE_ENV=production
 # Copy package.json and package-lock.json
 COPY package*.json ./
  
-# Install only production dependencies
-RUN npm ci --only=production
+# Install only production dependencies (fallback when lockfile is missing)
+RUN if [ -f package-lock.json ]; then npm ci --only=production; else npm install --omit=dev --no-audit --no-fund; fi
  
 # Copy the built application and Prisma client from the build stage
 COPY --from=build /usr/src/app/dist ./dist
@@ -44,10 +46,10 @@ COPY --from=build /usr/src/app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=build /usr/src/app/openapi.yaml ./openapi.yaml
  
 # Install curl for healthcheck
-RUN apk add --no-cache curl
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
  
 # Create a non-root user
-RUN adduser -D -u 1001 nodeuser
+RUN adduser --disabled-password --gecos "" --uid 1001 nodeuser
  
 # Change ownership of the app directory
 RUN chown -R nodeuser:nodeuser /usr/src/app
@@ -61,4 +63,3 @@ CMD curl --fail http://localhost:5109/api/health || exit 1
  
 # Start the application
 CMD ["node", "dist/src/index.js"]
-

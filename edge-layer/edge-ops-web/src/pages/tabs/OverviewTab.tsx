@@ -1,21 +1,20 @@
-
 import { useState } from 'react';
 import { 
-  Grid, 
-  Card, 
-  CardContent, 
-  Typography, 
-  Box, 
-  Chip, 
-  Stack, 
-  Button,
-  ToggleButton,
-  ToggleButtonGroup,
-  Tooltip,
-  Skeleton,
-  CircularProgress, 
-  CircularProgressProps,
-  Alert
+    Grid, 
+    Card, 
+    CardContent, 
+    Typography, 
+    Box, 
+    Chip, 
+    Stack, 
+    Button,
+    ToggleButton,
+    ToggleButtonGroup,
+    Tooltip,
+    Skeleton,
+    CircularProgress, 
+    CircularProgressProps,
+    Alert
 } from '@mui/material';
 import { 
     FileText, 
@@ -34,12 +33,12 @@ import { MetricCard } from '@/components/ui/MetricCard';
 
 export function OverviewTab() {
     // 1. Context & State
-    const settings = useSettings(); // Get full settings object for diagnostics export
+    const settings = useSettings();
     const { getServiceUrl, tenantId, apiKey } = settings;
     const [filter, setFilter] = useState<string>('all');
     const [diagLoading, setDiagLoading] = useState(false);
 
-    // 2. Data Fetching
+    // 2. Data Fetching (REAL API calls)
     
     // A. System Status (KPIs)
     const { 
@@ -65,8 +64,38 @@ export function OverviewTab() {
         })
     });
 
-    // 3. Handlers
+    // C. Stats Queries (NEW - Real data from backend)
+    const { 
+        data: telemetryStats,
+        isLoading: telemetryStatsLoading,
+        isError: telemetryStatsError
+    } = useQuery({
+        queryKey: ['telemetry-stats', tenantId],
+        queryFn: () => edgeOpsApi.getTelemetryStats({ tenantId, apiKey, getServiceUrl }),
+        refetchInterval: 5000
+    });
 
+    const { 
+        data: mediaStats,
+        isLoading: mediaStatsLoading,
+        isError: mediaStatsError
+    } = useQuery({
+        queryKey: ['media-stats', tenantId],
+        queryFn: () => edgeOpsApi.getMediaStats({ tenantId, apiKey, getServiceUrl }),
+        refetchInterval: 5000
+    });
+
+    const { 
+        data: visionStats,
+        isLoading: visionStatsLoading,
+        isError: visionStatsError
+    } = useQuery({
+        queryKey: ['vision-stats', tenantId],
+        queryFn: () => edgeOpsApi.getVisionStats({ tenantId, apiKey, getServiceUrl }),
+        refetchInterval: 5000
+    });
+
+    // 3. Handlers
     const handleFilterChange = (_: any, newFilter: string) => {
         if (newFilter) setFilter(newFilter);
     };
@@ -90,6 +119,11 @@ export function OverviewTab() {
     };
 
     const handleCopySupportText = async () => {
+        const formatPercent = (value: number | null | undefined): string => {
+            if (value === null || value === undefined || Number.isNaN(value)) return '--';
+            return `${value.toFixed(2)}%`;
+        };
+
         const lines = [
             `[${new Date().toLocaleString()}] Edge Ops Support Report`,
             `Status: ${edgeStatus?.health?.status || 'UNKNOWN'}`,
@@ -97,9 +131,9 @@ export function OverviewTab() {
             `Version: ${edgeStatus?.health?.version || '?'}`,
             '',
             'Resources:',
-            `- CPU: ${edgeStatus?.resources?.cpuUsage}%`,
-            `- Mem: ${edgeStatus?.resources?.memoryUsage}%`,
-            `- Disk: ${edgeStatus?.resources?.diskUsage?.usedPercent}% (${edgeStatus?.resources?.diskUsage?.freeGb}GB Free)`,
+            `- CPU: ${formatPercent(edgeStatus?.resources?.cpuUsage)}`,
+            `- Mem: ${formatPercent(edgeStatus?.resources?.memoryUsage)}`,
+            `- Disk: ${formatPercent(edgeStatus?.resources?.diskUsage?.usedPercent)} (${edgeStatus?.resources?.diskUsage?.freeGb}GB Free)`,
             '',
             'Sync:',
             `- Backlog: ${edgeStatus?.sync?.pendingCount}`,
@@ -124,7 +158,6 @@ export function OverviewTab() {
         }
     };
 
-
     // 4. Aggregations
     const servicesWithStatus = SERVICE_REGISTRY.map((def, idx) => ({
         def,
@@ -146,57 +179,76 @@ export function OverviewTab() {
     const isAllUp = upCount === totalCount;
     const percentUp = Math.round((upCount / totalCount) * 100);
 
-    // Helpers for safe metric access
-    const cpu = edgeStatus?.resources?.cpuUsage || 0;
-    const mem = edgeStatus?.resources?.memoryUsage || 0;
-    const disk = edgeStatus?.resources?.diskUsage?.usedPercent || 0;
-    const dlq = edgeStatus?.sync?.dlqCount || 0;
+    const formatPercent = (value: number | null | undefined): string => {
+        if (value === null || value === undefined || Number.isNaN(value)) return '--';
+        return `${value.toFixed(2)}%`;
+    };
 
     return (
         <Stack spacing={4}>
-            {/* --- Top Strip: System KPIs --- */}
+            {/* --- Top Strip: System KPIs (with REAL data) --- */}
             {errorStatus ? (
-                 <Alert severity="error" action={<Button size="small" color="inherit" onClick={() => refetchStatus()}>Retry</Button>}>
+                <Alert severity="error" action={<Button size="small" color="inherit" onClick={() => refetchStatus()}>Retry</Button>}>
                     Failed to load System Status. The Observability Agent might be unreachable.
-                 </Alert>
+                </Alert>
             ) : (
                 <Grid container spacing={2}>
                     <MetricCard 
+                        title="Telemetry Readings" 
+                        value={telemetryStats?.totalReadings?.toLocaleString() || '--'} 
+                        subValue={telemetryStats?.lastReadingAt ? new Date(telemetryStats.lastReadingAt).toLocaleString() : 'Never'}
+                        icon={<FileText color="#10b981" />}
+                        loading={telemetryStatsLoading}
+                        alert={telemetryStatsLoading || telemetryStatsError}
+                    />
+                    <MetricCard 
+                        title="Media Objects" 
+                        value={mediaStats?.totalObjects?.toLocaleString() || '--'} 
+                        subValue={mediaStats?.lastCreated ? new Date(mediaStats.lastCreated).toLocaleString() : 'Never'}
+                        icon={<Download color="#10b981" />}
+                        loading={mediaStatsLoading}
+                        alert={mediaStatsLoading || mediaStatsError}
+                    />
+                    <MetricCard 
+                        title="Inference Results" 
+                        value={visionStats?.totalResults?.toLocaleString() || '--'} 
+                        subValue={visionStats?.lastResultAt ? new Date(visionStats.lastResultAt).toLocaleString() : 'Never'}
+                        icon={<Activity color="#10b981" />}
+                        loading={visionStatsLoading}
+                        alert={visionStatsLoading || visionStatsError}
+                    />
+                    <MetricCard 
                         title="CPU Usage" 
-                        value={edgeStatus ? `${cpu}%` : '--'} 
-                        icon={<Cpu color={cpu > 80 ? '#ef4444' : '#3b82f6'} />}
-                        color={cpu > 80 ? '#ef4444' : '#3b82f6'}
+                        value={formatPercent(edgeStatus?.resources?.cpuUsage)} 
+                        icon={<Cpu color={(edgeStatus?.resources?.cpuUsage ?? 0) > 80 ? '#ef4444' : '#3b82f6'} />}
                         loading={loadingStatus}
                     />
                     <MetricCard 
                         title="Memory" 
-                        value={edgeStatus ? `${mem}%` : '--'} 
-                        icon={<Activity color={mem > 85 ? '#f59e0b' : '#3b82f6'} />}
-                        color={mem > 85 ? '#f59e0b' : '#3b82f6'}
+                        value={formatPercent(edgeStatus?.resources?.memoryUsage)} 
+                        icon={<Activity color={(edgeStatus?.resources?.memoryUsage ?? 0) > 85 ? '#f59e0b' : '#3b82f6'} />}
                         loading={loadingStatus}
                     />
                     <MetricCard 
                         title="Disk (/data)" 
-                        value={edgeStatus ? `${disk}%` : '--'} 
-                        subValue={edgeStatus ? `${edgeStatus.resources.diskUsage.freeGb} GB Free` : ''}
-                        icon={<HardDrive color={disk > 90 ? '#ef4444' : '#10b981'} />}
-                        color={disk > 90 ? '#ef4444' : '#10b981'}
+                        value={formatPercent(edgeStatus?.resources?.diskUsage?.usedPercent)} 
+                        subValue={edgeStatus ? `${edgeStatus?.resources?.diskUsage?.freeGb} GB Free` : ''}
+                        icon={<HardDrive color={(edgeStatus?.resources?.diskUsage?.usedPercent ?? 0) > 90 ? '#ef4444' : '#10b981'} />}
                         loading={loadingStatus}
                     />
                     <MetricCard 
                         title="Sync Backlog" 
-                        value={edgeStatus ? edgeStatus.sync.pendingCount.toLocaleString() : '--'} 
+                        value={edgeStatus?.sync?.pendingCount?.toLocaleString() ?? '--'} 
                         icon={<RefreshCw color="#6366f1" />}
-                        color="#6366f1"
                         loading={loadingStatus}
                     />
                     <MetricCard 
                         title="DLQ Events" 
-                        value={edgeStatus ? dlq.toLocaleString() : '--'} 
+                        value={edgeStatus?.sync?.dlqCount?.toLocaleString() ?? '--'} 
                         icon={<Alert severity="error" sx={{ p:0, bgcolor: 'transparent', '& .MuiAlert-icon': { mr: 0 } }} iconMapping={{ error: <Activity /> }} />}
-                        color={dlq > 0 ? '#ef4444' : '#10b981'}
+                        color={(edgeStatus?.sync?.dlqCount ?? 0) > 0 ? '#ef4444' : '#10b981'}
                         loading={loadingStatus}
-                        alert={dlq > 0}
+                        alert={(edgeStatus?.sync?.dlqCount ?? 0) > 0}
                     />
                 </Grid>
             )}
@@ -206,15 +258,13 @@ export function OverviewTab() {
                 <Box>
                     <Typography variant="h5" fontWeight="bold">Service Registry</Typography>
                     <Stack direction="row" alignItems="center" spacing={2} mt={0.5}>
-                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Box sx={{ position: 'relative', display: 'inline-flex' }}>
-                                <StatusProgress value={percentUp} color={isAllUp ? 'success' : 'warning'} />
-                            </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <StatusProgress value={percentUp} color={isAllUp ? 'success' : 'warning'} />
                             <Box>
                                 <Typography variant="caption" display="block" lineHeight={1} fontWeight="bold">OPERATIONAL</Typography>
                                 <Typography variant="caption" color="text.secondary">{upCount}/{totalCount} Services Up</Typography>
                             </Box>
-                         </Box>
+                        </Box>
                          <Chip 
                             label={loadingStatus ? 'Checking...' : (isAllUp ? 'All Systems Go' : 'Degraded')} 
                             color={isAllUp ? "success" : "warning"} 
@@ -280,27 +330,27 @@ import { classifyError, generateCurlCommand } from '@/lib/diagnostics';
 import { Terminal } from 'lucide-react';
 
 function StatusProgress(props: CircularProgressProps & { value: number }) {
-  return (
-    <Box sx={{ position: 'relative', display: 'inline-flex' }}>
-      <CircularProgress variant="determinate" {...props} />
-      <Box
-        sx={{
-          top: 0,
-          left: 0,
-          bottom: 0,
-          right: 0,
-          position: 'absolute',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Typography variant="caption" component="div" color="text.secondary" fontWeight="bold">
-          {`${Math.round(props.value)}%`}
-        </Typography>
-      </Box>
-    </Box>
-  );
+    return (
+        <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+            <CircularProgress variant="determinate" {...props} />
+            <Box
+                sx={{
+                    top: 0,
+                    left: 0,
+                    bottom: 0,
+                    right: 0,
+                    position: 'absolute',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                }}
+            >
+                <Typography variant="caption" component="div" color="text.secondary" fontWeight="bold">
+                    {`${Math.round(props.value)}%`}
+                </Typography>
+            </Box>
+        </Box>
+    );
 }
 
 function ServiceRegistryCard({ def, status, error, loading }: { def: ServiceDef, status?: any, error?: Error | null, loading?: boolean }) {
@@ -310,22 +360,13 @@ function ServiceRegistryCard({ def, status, error, loading }: { def: ServiceDef,
     
     const handleCopyCurl = () => {
         // Construct the health check URL
-        // We use checkService logic to guess the URL used
-        // Or simple getServiceUrl(def.key) + endpoint
         const baseUrl = settings.getServiceUrl(def.key);
-        // Assuming standard health endpoint if not defined, but checkService uses root usually or specific logic
-        // For visual simplicity, let's use the baseUrl
-        const url = `${baseUrl}/health`; 
+        const url = `${baseUrl}${def.healthPath || '/api/health'}`;
         const cmd = generateCurlCommand(url, {
              tenantId: settings.tenantId,
              apiKey: settings.apiKey
         });
         navigator.clipboard.writeText(cmd);
-        // Could show toast, but browser alert is simple enough for now as requested default
-        // In real app, use snackbar. OverviewTab doesn't have local snackbar state.
-        // Alert is disrupting, maybe just console or assume success? 
-        // Let's use a simple window alert or just do it silently? 
-        // User asked for "consistent Copy curl button".
         alert('Curl command copied!');
     };
     
@@ -386,24 +427,23 @@ function ServiceRegistryCard({ def, status, error, loading }: { def: ServiceDef,
                         </Typography>
                      )}
 
-
                     <Box sx={{ bgcolor: 'action.hover', p: 1.5, borderRadius: 1 }}>
                          <Stack direction="row" justifyContent="space-between" alignItems="center">
-                             <Typography variant="caption" fontFamily="monospace" color="text.secondary">
-                                 LATENCY
-                             </Typography>
-                             <Typography variant="caption" fontWeight="bold" fontFamily="monospace">
-                                 {loading ? '...' : (status?.latencyMs ? `${status.latencyMs}ms` : (diag ? 'N/A' : '-'))}
-                             </Typography>
-                         </Stack>
+                            <Typography variant="caption" fontFamily="monospace" color="text.secondary">
+                                LATENCY
+                            </Typography>
+                            <Typography variant="caption" fontWeight="bold" fontFamily="monospace">
+                                {loading ? '...' : (status?.latencyMs ? `${status?.latencyMs}ms` : (diag ? 'N/A' : '-'))}
+                            </Typography>
+                        </Stack>
                     </Box>
 
                     {/* Actions */}
                     <Stack direction="row" spacing={1} mt={1} justifyContent="flex-end">
                         {/* Copy Curl Button (Always visible for HTTP services) */}
                         {def.hasHttp && (
-                             <Tooltip title="Copy Curl Command">
-                                 <Button 
+                            <Tooltip title="Copy Curl Command">
+                                <Button 
                                     size="small" 
                                     variant="outlined" 
                                     color="inherit"
@@ -412,7 +452,7 @@ function ServiceRegistryCard({ def, status, error, loading }: { def: ServiceDef,
                                 >
                                     <Terminal size={14} />
                                 </Button>
-                             </Tooltip>
+                            </Tooltip>
                         )}
                         
                         {def.hasHttp && (
@@ -421,7 +461,7 @@ function ServiceRegistryCard({ def, status, error, loading }: { def: ServiceDef,
                                     size="small" 
                                     variant="outlined" 
                                     startIcon={<FileText size={14} />}
-                                    href={`${def.baseUrl}${def.docsPath || '/api-docs/openapi.json'}`}
+                                    href={`${settings.getServiceUrl(def.key)}${def.docsPath || '/api-docs/openapi.json'}`}
                                     target="_blank"
                                     disabled={loading || !isUp}
                                     sx={{ py: 0.5, fontSize: '0.7rem', flexGrow: 1 }}

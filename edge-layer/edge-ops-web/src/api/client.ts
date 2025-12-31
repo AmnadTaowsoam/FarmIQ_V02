@@ -33,8 +33,11 @@ export interface IngressStats {
 export interface SyncState {
     backlog_count: number;
     dlq_count: number;
-    last_success_at?: string;
-    last_error?: string;
+    claimed_count?: number;
+    oldest_pending_age_seconds?: number | null;
+    last_success_at?: string | null;
+    // Legacy-friendly field: may contain last_error message OR ISO timestamp (last_error_at)
+    last_error?: string | null;
 }
 
 export interface DlqEvent {
@@ -54,6 +57,67 @@ export interface DiagnosticsBundle {
     syncState: SyncState | { error: string };
     dlqHead: DlqEvent[] | { error: string };
     cloudConnectivity: any;
+}
+
+export interface TelemetryMetrics {
+    ingestionRatePerMinute: number;
+    totalReadings: number;
+    totalAggregates: number;
+}
+
+export interface TelemetryReading {
+    id: string;
+    tenant_id: string;
+    farm_id?: string;
+    barn_id?: string;
+    device_id: string;
+    metric_type: string;
+    metric_value: number;
+    unit?: string;
+    occurred_at: string;
+    ingested_at: string;
+}
+
+export interface TelemetryReadingsResponse {
+    readings: TelemetryReading[];
+}
+
+interface AgentEdgeStatusService {
+    name: string;
+    base_url?: string;
+    health_ok: boolean;
+    ready_ok: boolean;
+    latency_ms?: number;
+    last_check_at?: string;
+}
+
+interface AgentEdgeStatusResources {
+    cpu_load_1m: number;
+    cpu_load_5m: number;
+    cpu_load_15m: number;
+    memory_free_bytes: number;
+    memory_total_bytes: number;
+    disk_free_bytes: number;
+    disk_total_bytes: number;
+}
+
+interface AgentSyncState {
+    pending_count: number;
+    claimed_count?: number;
+    dlq_count: number;
+    oldest_pending_age_seconds?: number | null;
+    last_success_at?: string | null;
+    last_error_at?: string | null;
+}
+
+interface AgentEdgeStatusResponse {
+    data: {
+        overall: string;
+        last_check_at: string;
+        services: AgentEdgeStatusService[];
+        resources: AgentEdgeStatusResources;
+        sync_state?: AgentSyncState | null;
+    };
 }
 
 // Reuse existing types
@@ -95,25 +159,141 @@ export const edgeOpsApi = {
      * Fetch Main Edge Node Status (Aggregated by Agent)
      */
     getStatus: async (context?: ApiContext): Promise<EdgeStatus> => {
-        try {
-            const baseUrl = resolveUrl('EDGE_OBSERVABILITY_AGENT', context);
-            return await http.get<EdgeStatus>(`${baseUrl}/api/v1/ops/edge/status`, {
-                tenantId: context?.tenantId,
-                apiKey: context?.apiKey, // We'll handle full AuthMode logic in http.ts or here if needed. 
-                // For now, apiKey is passed. HMAC would need custom header logic if not handled in http.ts
-                // The prompt says "Store secrets... never print".
-                // We will pass authMode/hmacSecret to http if we update http.ts, or just apiKey for now as legacy support.
-                // NOTE: http.ts currently takes apiKey. To support HMAC properly, we'd need to update http.ts signature.
-                // For this step, I'll pass context down if I can, but http.request options are limited.
-                // Let's rely on apiKey for now and assume http.ts might be updated later if full HMAC logic is required.
-                // For 'api-key' mode, we use apiKey. For 'hmac', we might need to sign.
-                // Given the constraints, I will pass the raw apiKey if authMode is 'api-key'.
-                // If 'hmac', we need the secret.
-            });
-        } catch (e) {
-            console.warn('Agent Status check failed, returning mock/fallback', e);
-            return MOCK_EDGE_STATUS;
-        }
+        const baseUrl = resolveUrl('EDGE_OBSERVABILITY_AGENT', context);
+        const response = await http.get<AgentEdgeStatusResponse>(`${baseUrl}/api/v1/ops/edge/status`, {
+            tenantId: context?.tenantId,
+            apiKey: context?.apiKey,
+        });
+
+        const cores =
+            (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) ? navigator.hardwareConcurrency : 4;
+
+        const { resources } = response.data;
+        const cpuUsage = Math.max(
+            0,
+            Math.min(100, (resources.cpu_load_1m / Math.max(1, cores)) * 100)
+        );
+
+        const memoryUsedPercent =
+            resources.memory_total_bytes > 0
+                ? (1 - resources.memory_free_bytes / resources.memory_total_bytes) * 100
+                : 0;
+
+        const diskUsedPercent =
+            resources.disk_total_bytes > 0
+                ? (1 - resources.disk_free_bytes / resources.disk_total_bytes) * 100
+                : 0;
+
+        const services = response.data.services.map((svc) => ({
+            name: svc.name,
+            status: svc.health_ok && svc.ready_ok ? 'up' as const : 'down' as const,
+            latencyMs: typeof svc.latency_ms === 'number' ? Math.round(svc.latency_ms) : undefined,
+        }));
+
+        const pendingCount = response.data.sync_state?.pending_count ?? 0;
+        const dlqCount = response.data.sync_state?.dlq_count ?? 0;
+        const oldestPendingAgeMs =
+            typeof response.data.sync_state?.oldest_pending_age_seconds === 'number'
+                ? response.data.sync_state.oldest_pending_age_seconds * 1000
+                : 0;
+
+        return {
+            health: {
+                status: response.data.overall === 'OK' ? 'ok' : 'error',
+                uptime: 0,
+                version: 'agent',
+            },
+            resources: {
+                cpuUsage,
+                memoryUsage: memoryUsedPercent,
+                diskUsage: {
+                    path: '/data',
+                    usedPercent: diskUsedPercent,
+                    freeGb: Math.round(resources.disk_free_bytes / (1024 ** 3)),
+                },
+            },
+            services,
+            sync: {
+                pendingCount,
+                oldestPendingAgeMs,
+                dlqCount,
+            },
+        };
+    },
+
+    /**
+     * Fetch Telemetry Stats (READINGS COUNT)
+     */
+    getTelemetryStats: async (context?: ApiContext): Promise<{ totalReadings: number; lastReadingAt?: string }> => {
+        const baseUrl = resolveUrl('EDGE_TELEMETRY_TIMESERIES', context);
+        const response = await http.get<{ total_readings: number; last_reading_at?: string }>(`${baseUrl}/api/v1/telemetry/stats`, {
+            tenantId: context?.tenantId,
+            apiKey: context?.apiKey,
+        });
+
+        return {
+            totalReadings: response.total_readings || 0,
+            lastReadingAt: response.last_reading_at,
+        };
+    },
+
+    /**
+     * Fetch Media Store Stats (OBJECTS COUNT)
+     */
+    getMediaStats: async (context?: ApiContext): Promise<{ totalObjects: number; lastCreated?: string }> => {
+        const baseUrl = resolveUrl('EDGE_MEDIA_STORE', context);
+        const response = await http.get<{ total_objects: number; last_created_at?: string }>(`${baseUrl}/api/v1/media/stats`, {
+            tenantId: context?.tenantId,
+            apiKey: context?.apiKey,
+        });
+
+        return {
+            totalObjects: response.total_objects || 0,
+            lastCreated: response.last_created_at,
+        };
+    },
+
+    /**
+     * Fetch Vision Inference Stats (RESULTS COUNT)
+     */
+    getVisionStats: async (context?: ApiContext): Promise<{ totalResults: number; lastResultAt?: string }> => {
+        const baseUrl = resolveUrl('EDGE_VISION_INFERENCE', context);
+        const response = await http.get<{ total_results: number; last_result_at?: string }>(`${baseUrl}/api/v1/inference/stats`, {
+            tenantId: context?.tenantId,
+            apiKey: context?.apiKey,
+        });
+
+        return {
+            totalResults: response.total_results || 0,
+            lastResultAt: response.last_result_at,
+        };
+    },
+
+    /**
+     * Fetch Metrics (with rate)
+     */
+    getTelemetryMetrics: async (context?: ApiContext): Promise<TelemetryMetrics> => {
+        const baseUrl = resolveUrl('EDGE_TELEMETRY_TIMESERIES', context);
+        return http.get<TelemetryMetrics>(`${baseUrl}/api/v1/telemetry/metrics`, {
+            tenantId: context?.tenantId,
+            apiKey: context?.apiKey,
+        });
+    },
+
+    getTelemetryReadings: async (
+        params: { limit?: number; deviceId?: string },
+        context?: ApiContext
+    ): Promise<TelemetryReadingsResponse> => {
+        const baseUrl = resolveUrl('EDGE_TELEMETRY_TIMESERIES', context);
+        return http.get<TelemetryReadingsResponse>(`${baseUrl}/api/v1/telemetry/readings`, {
+            tenantId: context?.tenantId,
+            apiKey: context?.apiKey,
+            searchParams: {
+                tenant_id: context?.tenantId,
+                device_id: params.deviceId,
+                limit: params.limit ?? 10,
+            },
+        });
     },
 
     getCloudDiagnostics: async (context?: ApiContext) => {
@@ -134,10 +314,22 @@ export const edgeOpsApi = {
 
     getSyncState: async (context?: ApiContext): Promise<SyncState> => {
         const baseUrl = resolveUrl('EDGE_SYNC_FORWARDER', context);
-        return http.get<SyncState>(`${baseUrl}/api/v1/sync/state`, {
+        const raw = await http.get<any>(`${baseUrl}/api/v1/sync/state`, {
             tenantId: context?.tenantId,
             apiKey: context?.apiKey
         });
+
+        // Normalize across API versions:
+        // - current: pending_count / claimed_count / dlq_count / last_error_at
+        // - legacy: backlog_count / dlq_count / last_error
+        return {
+            backlog_count: Number(raw?.backlog_count ?? raw?.pending_count ?? 0),
+            dlq_count: Number(raw?.dlq_count ?? 0),
+            claimed_count: raw?.claimed_count != null ? Number(raw.claimed_count) : undefined,
+            oldest_pending_age_seconds: raw?.oldest_pending_age_seconds ?? undefined,
+            last_success_at: raw?.last_success_at ?? undefined,
+            last_error: raw?.last_error ?? raw?.last_error_at ?? undefined,
+        };
     },
 
     triggerSync: async (context?: ApiContext) => {
@@ -150,15 +342,46 @@ export const edgeOpsApi = {
 
     getDlq: async (limit: number, context?: ApiContext): Promise<DlqEvent[]> => {
         const baseUrl = resolveUrl('EDGE_SYNC_FORWARDER', context);
-        return http.get<DlqEvent[]>(`${baseUrl}/api/v1/sync/dlq?limit=${limit}`, {
+        const raw = await http.get<any>(`${baseUrl}/api/v1/sync/dlq?limit=${limit}`, {
             tenantId: context?.tenantId,
             apiKey: context?.apiKey
         });
+
+        // Current API returns { entries: [...], count: number }
+        if (raw && typeof raw === 'object' && Array.isArray(raw.entries)) {
+            return raw.entries.map((e: any) => ({
+                event_id: String(e.id ?? ''),
+                event_type: String(e.event_type ?? ''),
+                tenant_id: String(e.tenant_id ?? ''),
+                attempts: Number(e.attempt_count ?? 0),
+                last_error: String(e.last_error_message ?? e.last_error_code ?? ''),
+                updated_at: String(e.failed_at ?? e.created_at ?? new Date().toISOString()),
+            }));
+        }
+
+        // Legacy API returned DlqEvent[] directly
+        if (Array.isArray(raw)) return raw as DlqEvent[];
+
+        return [];
     },
 
     redriveDlq: async (payload: any, context?: ApiContext) => {
         const baseUrl = resolveUrl('EDGE_SYNC_FORWARDER', context);
-        return http.post(`${baseUrl}/api/v1/sync/dlq/redrive`, payload, {
+
+        // Normalize payload across UI versions:
+        // - UI may send { eventIds: [...] } or { ids: [...] }
+        // - UI may send { allDlq: true } or { all_dlq: true }
+        const normalized = (() => {
+            if (!payload || typeof payload !== 'object') return {};
+            const ids = payload.ids ?? payload.eventIds;
+            const allDlq = payload.allDlq ?? payload.all_dlq;
+            const out: any = {};
+            if (Array.isArray(ids)) out.ids = ids;
+            if (typeof allDlq === 'boolean') out.allDlq = allDlq;
+            return out;
+        })();
+
+        return http.post(`${baseUrl}/api/v1/sync/dlq/redrive`, normalized, {
             tenantId: context?.tenantId,
             apiKey: context?.apiKey
         });

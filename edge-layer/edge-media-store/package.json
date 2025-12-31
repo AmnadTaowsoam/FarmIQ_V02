@@ -9,6 +9,9 @@
     "start": "nyc ts-node src/index.ts",
     "build": "tsc && npm run copy-openapi",
     "copy-openapi": "cp openapi.yaml dist/",
+    "db:migrate": "ts-node src/db/migrate.ts",
+    "db:seed": "prisma db seed",
+    "seed": "prisma db seed",
     "serve": "node dist/index.js",
     "test": "jest",
     "test:coverage": "jest --coverage"
@@ -50,5 +53,8 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.4.5",
     "supertest": "^6.3.4"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
   }
 }

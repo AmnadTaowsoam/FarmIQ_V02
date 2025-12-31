@@ -20,8 +20,9 @@
         "migrate:up": "npx prisma migrate dev --name init",
         "prisma:generate": "npx prisma generate",
         "migrate:undo": "npx prisma migrate reset --force",
-        "db:migrate": "npx prisma migrate deploy",
+        "db:migrate": "ts-node src/db/migrate.ts",
         "db:seed": "prisma db seed",
+        "seed": "prisma db seed",
         "coverage": "npx nyc report --reporter=html && npx opener coverage/index.html",
         "generate-api-types": "openapi-typescript openapi.yaml -o src/api-types.ts"
     },

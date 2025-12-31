@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "nodemon --watch src --ext ts --exec ts-node src/index.ts",
     "start": "nyc ts-node src/index.ts",
-    "build": "tsc && npm run copy-openapi",
+    "build": "tsc -p tsconfig.build.json && npm run copy-openapi",
     "copy-openapi": "cp openapi.yaml dist/",
     "serve": "node dist/index.js",
     "test": "jest",
@@ -18,8 +18,9 @@
     "migrate:up": "npx prisma migrate dev --name init",
     "prisma:generate": "npx prisma generate",
     "migrate:undo": "npx prisma migrate reset --force",
-    "db:migrate": "npx prisma migrate deploy",
+    "db:migrate": "ts-node src/db/migrate.ts",
     "db:seed": "prisma db seed",
+    "seed": "prisma db seed",
     "coverage": "npx nyc report --reporter=html && npx opener coverage/index.html",
     "generate-api-types": "openapi-typescript openapi.yaml -o src/api-types.ts"
   },
@@ -65,4 +66,3 @@
     "seed": "ts-node prisma/seed.ts"
   }
 }
-

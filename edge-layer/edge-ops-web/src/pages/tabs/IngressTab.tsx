@@ -75,6 +75,7 @@ export function IngressTab() {
     const deduped = stats?.messages_deduped_total || 0;
     const invalid = stats?.messages_invalid_total || 0;
     const dedupeRate = total > 0 ? ((deduped / total) * 100).toFixed(1) : '0.0';
+    const hasTraffic = !!stats?.lastMessageAt || history.some((p) => p.total > 0 || p.deduped > 0);
 
     const handleCopyCurl = () => {
         const url = `${getServiceUrl('EDGE_INGRESS_GATEWAY')}/api/v1/ingress/stats`;
@@ -150,6 +151,13 @@ export function IngressTab() {
                     <Card sx={{ height: 400 }}>
                         <CardContent sx={{ height: '100%' }}>
                             <Typography variant="subtitle1" fontWeight="bold" mb={2}>Traffic Session Trend</Typography>
+                            {!hasTraffic && !isLoading && !isError && (
+                                <Alert severity="info" sx={{ mb: 2 }}>
+                                    ยังไม่มี message เข้ามาที่ Ingress Gateway (stats ยังเป็น 0 ทั้งหมด) — ต้อง publish MQTT message ก่อน
+                                    และต้อง seed allowlist ให้ device/station ด้วย
+                                    (แนะนำรัน `edge-layer/scripts/edge-smoke-mqtt.ps1 -Up` หรือ `edge-layer/scripts/edge-smoke-mqtt.sh --up`)
+                                </Alert>
+                            )}
                             <ResponsiveContainer width="100%" height="90%">
                                 <LineChart data={history}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />

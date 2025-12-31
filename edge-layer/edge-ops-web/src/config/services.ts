@@ -48,7 +48,10 @@ export const SERVICE_REGISTRY: ServiceDef[] = [
         description: 'Time-series storage and retrieval',
         hasHttp: true,
         defaultPort: 5104,
-        clusterPath: '/svc/telemetry'
+        clusterPath: '/svc/telemetry',
+        healthPath: '/api/health',
+        readyPath: '/api/ready',
+        docsPath: '/api-docs/openapi.json'
     },
     {
         key: 'EDGE_WEIGHVISION_SESSION',
@@ -56,7 +59,10 @@ export const SERVICE_REGISTRY: ServiceDef[] = [
         description: 'Session management for weighing events',
         hasHttp: true,
         defaultPort: 5105,
-        clusterPath: '/svc/weighvision'
+        clusterPath: '/svc/weighvision',
+        healthPath: '/api/health',
+        readyPath: '/api/ready',
+        docsPath: '/api-docs/openapi.json'
     },
     {
         key: 'EDGE_MEDIA_STORE',
@@ -64,7 +70,10 @@ export const SERVICE_REGISTRY: ServiceDef[] = [
         description: 'Blob storage (MinIO) wrapper',
         hasHttp: true,
         defaultPort: 5106,
-        clusterPath: '/svc/media'
+        clusterPath: '/svc/media',
+        healthPath: '/api/health',
+        readyPath: '/api/ready',
+        docsPath: '/api-docs/openapi.json'
     },
     {
         key: 'EDGE_VISION_INFERENCE',
@@ -72,7 +81,10 @@ export const SERVICE_REGISTRY: ServiceDef[] = [
         description: 'ML Inference API (Python)',
         hasHttp: true,
         defaultPort: 5107,
-        clusterPath: '/svc/vision'
+        clusterPath: '/svc/vision',
+        healthPath: '/api/health',
+        readyPath: '/api/ready',
+        docsPath: '/api-docs/openapi.json'
     },
     {
         key: 'EDGE_SYNC_FORWARDER',
@@ -80,7 +92,10 @@ export const SERVICE_REGISTRY: ServiceDef[] = [
         description: 'Reliable cloud data synchronization',
         hasHttp: true,
         defaultPort: 5108,
-        clusterPath: '/svc/sync'
+        clusterPath: '/svc/sync',
+        healthPath: '/api/health',
+        readyPath: '/api/ready',
+        docsPath: '/api-docs/openapi.json'
     },
     {
         key: 'EDGE_OBSERVABILITY_AGENT',
@@ -88,7 +103,10 @@ export const SERVICE_REGISTRY: ServiceDef[] = [
         description: 'System health and status aggregator',
         hasHttp: true,
         defaultPort: 5111,
-        clusterPath: '/svc/ops'
+        clusterPath: '/svc/ops',
+        healthPath: '/api/health',
+        readyPath: '/api/ready',
+        docsPath: '/api-docs/openapi.json'
     },
     {
         key: 'EDGE_POLICY_SYNC',
@@ -96,15 +114,21 @@ export const SERVICE_REGISTRY: ServiceDef[] = [
         description: 'Synchronizes cloud configuration down to edge',
         hasHttp: true,
         defaultPort: 5109,
-        clusterPath: '/svc/policy'
+        clusterPath: '/svc/policy',
+        healthPath: '/api/health',
+        readyPath: '/api/ready',
+        docsPath: '/api-docs/openapi.json'
     },
     {
         key: 'EDGE_RETENTION_JANITOR',
         name: 'Retention Janitor',
         description: 'Disk cleanup and policy enforcement',
         hasHttp: true,
-        defaultPort: 5113,
-        clusterPath: '/svc/janitor'
+        defaultPort: 5115,
+        clusterPath: '/svc/janitor',
+        healthPath: '/api/health',
+        readyPath: '/api/ready',
+        docsPath: '/api-docs/openapi.json'
     },
     {
         key: 'EDGE_FEED_INTAKE',
@@ -112,7 +136,10 @@ export const SERVICE_REGISTRY: ServiceDef[] = [
         description: 'Feed management inputs',
         hasHttp: true,
         defaultPort: 5112,
-        clusterPath: '/svc/feed'
+        clusterPath: '/svc/feed',
+        healthPath: '/api/health',
+        readyPath: '/api/ready',
+        docsPath: '/api-docs/openapi.json'
     },
     {
         key: 'EDGE_MQTT_BROKER',

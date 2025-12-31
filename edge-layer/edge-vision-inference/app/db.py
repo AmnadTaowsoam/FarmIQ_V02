@@ -3,6 +3,7 @@ import asyncpg
 import logging
 from typing import Optional, List, Dict, Any
 from app.config import Config
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -109,16 +110,17 @@ class InferenceDb:
         metadata: Optional[Dict[str, Any]] = None
     ) -> str:
         """Create inference result and return ID."""
+        metadata_json = json.dumps(metadata) if metadata is not None else None
         async with self.pool.acquire() as conn:
             inserted = await conn.fetchval("""
                 INSERT INTO inference_results (
                     id, event_id, tenant_id, farm_id, barn_id, device_id, session_id, media_id,
                     predicted_weight_kg, confidence, model_version, metadata
-                ) VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                ) VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb)
                 ON CONFLICT (id) DO NOTHING
                 RETURNING id
             """, result_id, result_id, tenant_id, farm_id, barn_id, device_id, session_id, media_id,
-                predicted_weight_kg, confidence, model_version, metadata)
+                predicted_weight_kg, confidence, model_version, metadata_json)
             if inserted:
                 return str(inserted)
             existing = await conn.fetchval("SELECT id FROM inference_results WHERE id = $1::uuid", result_id)
@@ -146,6 +148,31 @@ class InferenceDb:
                 LIMIT $2
             """, session_id, limit)
             return [dict(row) for row in rows]
+
+    async def get_inference_results_count(self, tenant_id: Optional[str]) -> int:
+        """Get total inference results count (tenant-scoped)."""
+        if not tenant_id:
+            return 0
+        async with self.pool.acquire() as conn:
+            value = await conn.fetchval(
+                "SELECT COUNT(*)::int FROM inference_results WHERE tenant_id = $1",
+                tenant_id,
+            )
+            return int(value or 0)
+
+    async def get_last_inference_result_timestamp(self, tenant_id: Optional[str]) -> Optional[str]:
+        """Get ISO timestamp of the most recent inference result (tenant-scoped)."""
+        if not tenant_id:
+            return None
+        async with self.pool.acquire() as conn:
+            value = await conn.fetchval(
+                "SELECT MAX(occurred_at) FROM inference_results WHERE tenant_id = $1",
+                tenant_id,
+            )
+            if value is None:
+                return None
+            # asyncpg returns datetime
+            return value.isoformat()
     
     async def create_outbox_event(
         self,

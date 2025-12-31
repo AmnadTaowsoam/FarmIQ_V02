@@ -1,7 +1,7 @@
 Purpose: Define the canonical FarmIQ edge services, their responsibilities, and ownership boundaries.  
 Scope: Per-service purpose, APIs, owned tables, outbox events, PVC usage, and boilerplate mapping.  
 Owner: FarmIQ Edge Team  
-Last updated: 2025-12-20  
+Last updated: 2025-12-31  
 
 ---
 
@@ -18,6 +18,8 @@ Edge runs on Kubernetes/k3s. The canonical MVP services are:
 - `edge-policy-sync` (Node)
 - `edge-retention-janitor` (Node)
 - `edge-observability-agent` (Node)
+- `edge-ops-web` (UI + `/svc/*` proxy for FE/ops)
+- `edge-feed-intake` (Node; local DB-backed intake, optional by deployment)
 
 ### Required edge infrastructure components (not business microservices)
 
@@ -26,6 +28,18 @@ Edge RabbitMQ is **optional** (cloud RabbitMQ is mandatory). If used, the edge c
   This is a platform component and is not part of the "canonical service list" above.
 
 Edge still uses the **DB-based outbox** (`sync_outbox`) as the authoritative mechanism for cloud sync.
+
+---
+
+## Local FE/ops entrypoint
+
+For local docker-compose setup and verified commands/output, use:
+- `docs/edge-layer/04-local-compose-setup.md`
+- `docs/edge-layer/05-evidence-local-compose.md`
+
+In local compose, FE should prefer going through `edge-ops-web`:
+- UI: `http://localhost:5110/` (and sometimes `http://localhost:5113/` when compose files are merged)
+- Service proxy: `http://localhost:5110/svc/{service}/...` (no browser CORS issues)
 
 ---
 
@@ -40,7 +54,7 @@ Edge still uses the **DB-based outbox** (`sync_outbox`) as the authoritative mec
 
 ## Security & Provisioning (Cross-reference)
 
-See `edge-layer/00-overview.md` "Security & Provisioning" section for:
+See `docs/edge-layer/00-overview.md` "Security & Provisioning" section for:
 - MQTT TLS and device authentication requirements
 - HTTP media upload authentication and rate limiting
 - Secrets storage and rotation policies
@@ -48,6 +62,25 @@ See `edge-layer/00-overview.md` "Security & Provisioning" section for:
 ---
 
 ## Service-by-service design
+
+### `edge-ops-web` (UI + service proxy)
+
+- **Purpose**: Provide an ops/FE-friendly UI and a single browser-friendly origin that proxies internal services via `/svc/*`.
+- **Primary UX path (local compose)**:
+  - UI: `GET /`
+  - Proxy: `/{svc}/{path...}` where `svc` is one of:
+    - `svc/ingress/*` → `edge-ingress-gateway`
+    - `svc/telemetry/*` → `edge-telemetry-timeseries`
+    - `svc/weighvision/*` → `edge-weighvision-session`
+    - `svc/media/*` → `edge-media-store`
+    - `svc/vision/*` → `edge-vision-inference`
+    - `svc/sync/*` → `edge-sync-forwarder`
+    - `svc/ops/*` → `edge-observability-agent`
+    - `svc/policy/*` → `edge-policy-sync`
+    - `svc/janitor/*` → `edge-retention-janitor`
+    - `svc/feed/*` → `edge-feed-intake`
+- **Notes**:
+  - The proxy is implemented in `edge-layer/edge-ops-web/server.js`.
 
 ### `edge-mqtt-broker` (EMQX/Mosquitto)
 

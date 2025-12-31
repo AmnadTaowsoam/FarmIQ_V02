@@ -232,6 +232,50 @@ export class TelemetryController {
     res.status(200).json({ status: 'healthy' })
   }
 
+  getStats = async (req: Request, res: Response): Promise<void> => {
+    const traceId = res.locals.traceId || (req as any).traceId || 'unknown'
+
+    try {
+      // Get tenant_id from query or request header
+      const tenantId = (req.query.tenant_id as string) || (req.headers['x-tenant-id'] as string);
+
+      // Get metrics from service
+      const metrics = await this.telemetryService.getMetrics(tenantId);
+
+      // Get aggregate readings count (sum of all aggregates)
+      const totalReadingsCount = metrics.totalReadings || 0;
+      const totalAggregatesCount = metrics.totalAggregates || 0;
+
+      // Get last reading timestamp
+      let lastReadingAt: string | undefined;
+      try {
+        const lastReading = await this.telemetryService.getLastReading(tenantId);
+        lastReadingAt = lastReading ? lastReading.occurredAt.toISOString() : undefined;
+      } catch (e) {
+        // If query fails, we'll omit the timestamp
+      }
+
+      res.status(200).json({
+        total_readings: totalReadingsCount,
+        total_aggregates: totalAggregatesCount,
+        last_reading_at: lastReadingAt,
+        tenant_id: tenantId,
+      })
+    } catch (error) {
+      logger.error('Failed to get telemetry stats', {
+        error: error instanceof Error ? error.message : String(error),
+        traceId,
+      })
+      res.status(500).json({
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to get telemetry stats',
+          traceId,
+        },
+      })
+    }
+  }
+
   getReady = async (_req: Request, res: Response): Promise<void> => {
     try {
       await this.telemetryService['prisma'].$queryRaw`SELECT 1`

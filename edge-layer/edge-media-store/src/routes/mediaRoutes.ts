@@ -23,6 +23,55 @@ export function buildMediaRoutes(deps: {
   const router = Router()
   const mediaNamespace = uuidv5('farmiq.edge.media-store', uuidv5.DNS)
 
+  router.get('/v1/media/stats', async (req: Request, res: Response) => {
+    const tenantId = req.header('x-tenant-id')
+    if (!tenantId) {
+      return res.status(400).json({
+        error: { code: 'VALIDATION_ERROR', message: 'x-tenant-id header is required', traceId: res.locals.traceId || 'unknown' },
+      })
+    }
+
+    try {
+      const rows = await deps.prisma.$queryRawUnsafe<
+        Array<{ total_objects: bigint | number; total_size_bytes: bigint | number; last_created_at: Date | string | null }>
+      >(
+        `
+        SELECT
+          COUNT(*)::bigint AS total_objects,
+          COALESCE(SUM(size_bytes), 0)::bigint AS total_size_bytes,
+          MAX(created_at) AS last_created_at
+        FROM media_objects
+        WHERE tenant_id = $1::text
+        `,
+        tenantId
+      )
+
+      const row = rows[0] ?? { total_objects: 0, total_size_bytes: 0, last_created_at: null }
+      const totalObjects = Number(row.total_objects ?? 0)
+      const totalSizeBytes = Number(row.total_size_bytes ?? 0)
+      const totalSizeMb = totalSizeBytes > 0 ? Math.round((totalSizeBytes / (1024 * 1024)) * 10) / 10 : 0
+      const lastCreatedAt =
+        row.last_created_at == null
+          ? null
+          : row.last_created_at instanceof Date
+            ? row.last_created_at.toISOString()
+            : new Date(row.last_created_at).toISOString()
+
+      return res.status(200).json({
+        total_objects: totalObjects,
+        total_size_mb: totalSizeMb,
+        last_created_at: lastCreatedAt,
+        tenant_id: tenantId,
+      })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err)
+      logger.error('Failed to get media stats', { tenantId, error: message, traceId: res.locals.traceId })
+      return res.status(500).json({
+        error: { code: 'INTERNAL_ERROR', message: 'Failed to get media stats', traceId: res.locals.traceId || 'unknown' },
+      })
+    }
+  })
+
   router.post('/v1/media/images/presign', async (req: Request, res: Response) => {
     const parsed = MediaImagePresignRequestSchema.safeParse(req.body)
     if (!parsed.success) {

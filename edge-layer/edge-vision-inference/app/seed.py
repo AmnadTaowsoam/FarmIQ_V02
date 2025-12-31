@@ -22,17 +22,17 @@ if os.getenv('NODE_ENV') == 'production' and not os.getenv('ALLOW_SEED_IN_PROD')
 
 SEED_COUNT = int(os.getenv('SEED_COUNT', '30'))
 
-# Fixed IDs matching edge-layer constants
-TENANT_1 = '00000000-0000-4000-8000-000000000001'
-TENANT_2 = '00000000-0000-4000-8000-000000000002'
-FARM_1A = '00000000-0000-4000-8000-000000000101'
-FARM_1B = '00000000-0000-4000-8000-000000000102'
-FARM_2A = '00000000-0000-4000-8000-000000000201'
-BARN_1A_1 = '00000000-0000-4000-8000-000000001101'
-BARN_1A_2 = '00000000-0000-4000-8000-000000001102'
-BARN_1B_1 = '00000000-0000-4000-8000-000000001201'
-DEVICE_WEIGH_1 = '00000000-0000-4000-8000-000000200001'
-DEVICE_WEIGH_2 = '00000000-0000-4000-8000-000000200002'
+# Tenant-friendly IDs (multi-tenant ready)
+TENANT_1 = 't-001'
+TENANT_2 = 't-002'
+FARM_1A = 'f-001'
+FARM_1B = 'f-002'
+FARM_2A = 'f-101'
+BARN_1A_1 = 'b-001'
+BARN_1A_2 = 'b-002'
+BARN_1B_1 = 'b-003'
+DEVICE_WEIGH_1 = 'wv-001'
+DEVICE_WEIGH_2 = 'wv-002'
 
 def get_session_ids():
     """Get fixed session IDs"""
@@ -70,7 +70,6 @@ async def seed_inference(db: InferenceDb):
         if confidence > 1.0:
             confidence = 1.0
 
-        import json
         metadata = {
             'source': 'seed',
             'index': i,
@@ -78,7 +77,9 @@ async def seed_inference(db: InferenceDb):
         }
 
         try:
+            result_id = f'00000000-0000-4000-8000-{(50000 + i):012x}'
             result_id = await db.create_inference_result(
+                result_id=result_id,
                 tenant_id=config['tenant_id'],
                 farm_id=config['farm_id'],
                 barn_id=config['barn_id'],
@@ -88,7 +89,7 @@ async def seed_inference(db: InferenceDb):
                 predicted_weight_kg=predicted_weight,
                 confidence=confidence,
                 model_version=model_version,
-                metadata=json.dumps(metadata),  # Convert to JSON string
+                metadata=metadata,
             )
             results_created += 1
         except Exception as e:
@@ -97,6 +98,8 @@ async def seed_inference(db: InferenceDb):
                 print(f'Warning: Failed to insert inference result {i}: {e}')
 
     print(f'Inserted {results_created} inference_results')
+    if results_created < 30:
+        raise RuntimeError(f'Seed expected >= 30 inference_results, got {results_created}')
 
     await db.close()
     print('Seed completed successfully!')
@@ -120,4 +123,3 @@ async def main():
 
 if __name__ == '__main__':
     asyncio.run(main())
-

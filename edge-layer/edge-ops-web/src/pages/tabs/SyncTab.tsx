@@ -253,8 +253,8 @@ export function SyncTab() {
                              <IconButton 
                                 size="small" 
                                 onClick={() => {
-                                    const url = `${getServiceUrl('EDGE_SYNC_FORWARDER')}/api/v1/dlq/redrive`;
-                                    const cmd = generateCurlCommand(url, { method: 'POST', body: { all_dlq: true }, tenantId, apiKey });
+                                    const url = `${getServiceUrl('EDGE_SYNC_FORWARDER')}/api/v1/sync/dlq/redrive`;
+                                    const cmd = generateCurlCommand(url, { method: 'POST', body: { allDlq: true }, tenantId, apiKey });
                                     navigator.clipboard.writeText(cmd);
                                     alert('Curl for Redrive All copied!');
                                 }}

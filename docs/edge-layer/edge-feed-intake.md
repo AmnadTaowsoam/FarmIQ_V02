@@ -45,29 +45,46 @@ sequenceDiagram
 ### Table: feed_intake_local
 | column | type | null | default | constraints | index | description |
 |---|---|---|---|---|---|---|
-| id | uuidv7 | no | gen_random_uuid() | pk | pk | Local intake record id |
-| tenant_id | uuidv7 | no | none | fk tenant | idx (tenant_id, occurred_at) | Tenant scope |
-| farm_id | uuidv7 | no | none | fk farm | idx (tenant_id, farm_id, occurred_at) | Farm scope |
-| barn_id | uuidv7 | no | none | fk barn | idx (tenant_id, barn_id, occurred_at) | Barn scope |
-| batch_id | uuidv7 | yes | null | fk batch | idx (tenant_id, batch_id, occurred_at) | Batch scope (optional) |
-| device_id | uuidv7 | yes | null | fk device | idx (tenant_id, device_id, occurred_at) | Device scope (SILO_AUTO only) |
-| source | text | no | none | check in (MANUAL, API_IMPORT, SILO_AUTO) | idx (tenant_id, source, occurred_at) | Intake source |
-| feed_formula_id | uuidv7 | yes | null | fk feed_formula | idx (tenant_id, feed_formula_id) | Formula reference |
-| feed_lot_id | uuidv7 | yes | null | fk feed_lot | idx (tenant_id, feed_lot_id) | Lot reference |
-| quantity_kg | numeric(12,3) | no | none | check >= 0 | none | Intake quantity in kg |
-| occurred_at | timestamptz | no | none | not null | idx (tenant_id, occurred_at desc) | When intake occurred |
-| created_at | timestamptz | no | now() | none | idx (tenant_id, created_at desc) | Local insert time |
-| external_ref | text | yes | null | unique (tenant_id, external_ref) | uniq (tenant_id, external_ref) | External import id |
-| event_id | uuidv7 | yes | null | unique (tenant_id, event_id) | uniq (tenant_id, event_id) | Event id for SILO_AUTO |
+| id | uuid | no | generated | pk | pk | Local intake record id |
+| tenant_id | text | no | none | tenant scope | idx (tenant_id, barn_id, occurred_at desc) | Tenant scope |
+| farm_id | text | yes | null | none | none | Farm scope (optional) |
+| barn_id | text | no | none | none | idx (tenant_id, barn_id, occurred_at desc) | Barn scope |
+| batch_id | text | yes | null | none | none | Batch scope (optional) |
+| device_id | text | yes | null | none | idx (tenant_id, device_id, occurred_at desc) | Device scope (SILO / device events) |
+| source | text | no | none | e.g., MANUAL, API_IMPORT, SILO_AUTO, MQTT_DISPENSED | none | Intake source |
+| feed_formula_id | text | yes | null | none | none | Formula reference (optional) |
+| feed_lot_id | text | yes | null | none | none | Lot reference (optional) |
+| quantity_kg | numeric(10,3) | no | none | check >= 0 | none | Intake quantity in kg |
+| occurred_at | timestamptz | no | none | not null | idx (tenant_id, barn_id, occurred_at desc) | When intake occurred |
+| ingested_at | timestamptz | no | now() | none | none | When ingested into edge DB |
+| event_id | text | yes | null | unique (tenant_id, event_id) | uniq (tenant_id, event_id) | Event id (when available) |
+| external_ref | text | yes | null | unique (tenant_id, external_ref) | uniq (tenant_id, external_ref) | External import id (when available) |
+| sequence | int | yes | null | none | none | Optional sequence to preserve ordering |
+| notes | text | yes | null | none | none | Optional human/system notes |
+| created_at | timestamptz | no | now() | none | none | Local insert time |
+| updated_at | timestamptz | no | now() | none | none | Updated time |
 
 ### Table: feed_intake_dedupe
 | column | type | null | default | constraints | index | description |
 |---|---|---|---|---|---|---|
-| tenant_id | uuidv7 | no | none | pk part | pk (tenant_id, dedupe_key) | Tenant scope |
-| dedupe_key | text | no | none | pk part | pk (tenant_id, dedupe_key) | Hash of source + occurred_at + barn_id + sequence |
-| first_seen_at | timestamptz | no | now() | none | idx (first_seen_at) | First seen timestamp |
+| id | uuid | no | generated | pk | pk | Row id |
+| tenant_id | text | no | none | unique(tenant_id, event_id) | uniq (tenant_id, event_id) | Tenant scope |
+| event_id | text | no | none | unique(tenant_id, event_id) | uniq (tenant_id, event_id) | Dedup key (event id) |
+| external_ref | text | yes | null | none | idx (tenant_id, external_ref) | Optional external import ref |
+| device_id | text | yes | null | none | none | Optional device scope |
+| processed_at | timestamptz | no | now() | none | none | When this event/ref was processed |
 | expires_at | timestamptz | no | none | none | idx (expires_at) | TTL cleanup |
-| event_id | uuidv7 | yes | null | none | idx (tenant_id, event_id) | Original event id |
+
+### Table: silo_weight_snapshot
+| column | type | null | default | constraints | index | description |
+|---|---|---|---|---|---|---|
+| id | uuid | no | generated | pk | pk | Row id |
+| tenant_id | text | no | none | unique(tenant_id, device_id) | uniq (tenant_id, device_id) | Tenant scope |
+| device_id | text | no | none | unique(tenant_id, device_id) | uniq (tenant_id, device_id) | Device scope |
+| weight_kg | numeric(10,3) | no | none | check >= 0 | none | Latest known silo weight |
+| recorded_at | timestamptz | no | none | not null | idx (tenant_id, device_id, recorded_at desc) | Source timestamp |
+| created_at | timestamptz | no | now() | none | none | Local insert time |
+| updated_at | timestamptz | no | now() | none | none | Updated time |
 
 ### Table: sync_outbox (edge shared)
 | column | type | null | default | constraints | index | description |
@@ -104,6 +121,8 @@ sequenceDiagram
 ## Testing and Verification
 - Simulate duplicate MQTT publish with same `event_id` and verify dedupe.
 - Verify `sync_outbox` batch retries without duplicating records in cloud.
+
+Note: The current running schema is defined by Prisma in `edge-layer/edge-feed-intake/prisma/schema.prisma`.
 
 ## Open Questions
 1) Should edge allow manual entry when cloud is offline, or only via local UI?
