@@ -88,6 +88,7 @@ All FarmIQ services must follow `shared/01-api-standards.md`:
   - `GET /api/v1/telemetry/readings`
   - `GET /api/v1/telemetry/aggregates`
   - `GET /api/v1/telemetry/metrics`
+  - `GET /api/v1/telemetry/stats` - Returns `total_readings`, `total_aggregates`, `last_reading_at`
 - **Data ownership**: `telemetry_raw`, `telemetry_agg`
 - **Implementation notes**: `boilerplates/Backend-node`
 
@@ -124,6 +125,7 @@ All FarmIQ services must follow `shared/01-api-standards.md`:
   - `POST /api/v1/media/images/complete` (confirm upload via S3 HEAD; persists metadata; emits `media.stored`)
   - `GET /api/v1/media/objects/{mediaId}` (internal; bytes; requires `x-tenant-id`)
   - `GET /api/v1/media/objects/{mediaId}/meta` (internal; metadata; requires `x-tenant-id`)
+  - `GET /api/v1/media/stats` - Returns `total_objects`, `total_size_mb`, `last_created_at`
 - **Data ownership**: `media_objects` + S3 bucket objects (MinIO/S3)
 - **Implementation notes**: `boilerplates/Backend-node`
 
@@ -164,7 +166,8 @@ All FarmIQ services must follow `shared/01-api-standards.md`:
   - `GET /api/v1/inference/jobs/{jobId}`
   - `GET /api/v1/inference/results`
   - `GET /api/v1/inference/models`
-- **Primary interface**: Consumes inference jobs (optional) from Edge RabbitMQ.
+  - `GET /api/v1/inference/stats` - Returns `total_results`, `last_result_at`
+- **Primary interface**: Currently synchronous HTTP POST; planned RabbitMQ consumption for async jobs.
 - **Data ownership**: `inference_results`
 - **Implementation notes**: `boilerplates/Backend-python`
 

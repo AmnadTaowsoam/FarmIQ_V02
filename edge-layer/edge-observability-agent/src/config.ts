@@ -33,7 +33,7 @@ export function loadConfigFromEnv(): ObservabilityConfig {
   return {
     appPort: Number(process.env.APP_PORT || 3000),
     pollIntervalSeconds: Number(process.env.OBS_POLL_INTERVAL_SECONDS || 30),
-    diskPath: process.env.DISK_PATH || '/data',
+    diskPath: process.env.DISK_PATH || '/',
     targets: buildTargetsFromEnv(),
     syncUrl: process.env.EDGE_SYNC_URL,
   }

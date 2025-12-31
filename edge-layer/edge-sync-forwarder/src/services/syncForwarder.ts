@@ -1,21 +1,25 @@
-import { OutboxRepository, OutboxRow } from './outboxRepository'
-import { SyncConfig } from '../config'
-import { computeBackoffSeconds } from './backoff'
 import { logger } from '../utils/logger'
+import { type OutboxRow, type OutboxRepository } from './outboxRepository'
+import { type SyncConfig } from '../config'
 
-type CloudResult = {
+export interface CloudResult {
   accepted?: number
   duplicated?: number
   rejected?: number
   errors?: Array<{ event_id: string; error: string }>
 }
 
+export type CloudAuthMode = 'none' | 'api_key' | 'hmac'
+
 export class SyncForwarder {
   constructor(
     private readonly repo: OutboxRepository,
     private readonly config: SyncConfig,
     private readonly cloudIngestionUrl: string,
-    private readonly workerId: string
+    private readonly workerId: string,
+    private readonly cloudAuthMode: CloudAuthMode = 'none',
+    private readonly cloudApiKey?: string,
+    private readonly cloudHmacSecret?: string
   ) {}
 
   async runOnce(): Promise<void> {
@@ -36,11 +40,9 @@ export class SyncForwarder {
 
     const response = await this.postToCloud(events)
     if (!response.ok) {
-      await Promise.all(
-        claimed.map((row) =>
-          this.handleFailure(row, response.error || 'cloud request failed')
-        )
-      )
+      for (const row of claimed) {
+        await this.handleFailure(row, response.error || 'cloud request failed')
+      }
       return
     }
 
@@ -95,18 +97,29 @@ export class SyncForwarder {
     events: Array<Record<string, unknown>>
   ): Promise<{ ok: boolean; data?: CloudResult; error?: string }> {
     try {
+      // Build request body string
+      const bodyString = JSON.stringify({
+        tenant_id: (events[0] as any).tenant_id,
+        edge_id: this.workerId,
+        sent_at: new Date().toISOString(),
+        events,
+      })
+      
+      // Build headers including HMAC authentication if configured
+      const headers: Record<string, string> = {
+        'content-type': 'application/json',
+        'x-idempotency-key': `${this.workerId}:${events.length}`,
+      }
+      
+      // Add API key authentication if configured
+      if (this.cloudAuthMode === 'api_key' && this.cloudApiKey) {
+        headers['x-api-key'] = this.cloudApiKey
+      }
+      
       const response = await fetch(this.cloudIngestionUrl, {
         method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-idempotency-key': `${this.workerId}:${events.length}`,
-        },
-        body: JSON.stringify({
-          tenant_id: (events[0] as any).tenant_id,
-          edge_id: this.workerId,
-          sent_at: new Date().toISOString(),
-          events,
-        }),
+        headers,
+        body: bodyString,
       })
 
       const text = await response.text()
@@ -162,20 +175,12 @@ export class SyncForwarder {
       return
     }
 
-    const backoffSeconds = computeBackoffSeconds({
-      attempt,
-      capSeconds: this.config.backoffCapSeconds,
-      jitterRatio: 0.3,
-    })
-    const nextAttemptAt = new Date(Date.now() + backoffSeconds * 1000)
-
     await this.repo.markFailed({
       outboxId: row.id,
       attemptCount: attempt,
-      nextAttemptAt,
+      nextAttemptAt: new Date(),
       lastError: trimmedError,
     })
-
     logger.warn('outbox send failed', {
       workerId: this.workerId,
       outboxId: row.id,
@@ -183,7 +188,6 @@ export class SyncForwarder {
       eventType: row.eventType,
       attempts: attempt,
       status: 'pending',
-      nextAttemptAt: nextAttemptAt.toISOString(),
     })
   }
 }

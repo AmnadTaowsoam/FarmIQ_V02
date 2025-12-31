@@ -1,5 +1,6 @@
 import { ObservabilityConfig } from '../config'
 import { StatusService, EdgeStatusSnapshot } from './statusService'
+import { logger } from '../utils/logger'
 
 export class StatusScheduler {
   private readonly service: StatusService
@@ -26,7 +27,12 @@ export class StatusScheduler {
   }
 
   private async runOnce(): Promise<void> {
-    await this.service.poll()
-    this.timer = setTimeout(() => void this.runOnce(), this.config.pollIntervalSeconds * 1000)
+    try {
+      await this.service.poll()
+    } catch (error) {
+      logger.warn('Status poll failed; will retry', { error })
+    } finally {
+      this.timer = setTimeout(() => void this.runOnce(), this.config.pollIntervalSeconds * 1000)
+    }
   }
 }

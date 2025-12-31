@@ -1,12 +1,11 @@
-# Offline-friendly runtime image (uses checked-in `node_modules/` + prebuilt `dist/`)
-FROM node:18-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
 ENV NODE_ENV=production
 
 COPY package.json package-lock.json* ./
-COPY node_modules ./node_modules
+RUN npm ci --omit=dev
 COPY dist ./dist
 COPY server.js .
 

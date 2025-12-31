@@ -1,248 +1,257 @@
-Purpose: Provide an overview of the FarmIQ edge layer and its core responsibilities.  
-Scope: Edge service roles, ownership boundaries, communication patterns, and persistence strategy.  
-Owner: FarmIQ Architecture Team  
-Last updated: 2025-12-31  
+# Edge Layer Overview
+
+**Purpose:** Define the edge layer architecture, core responsibilities, and canonical data flows.
+**Scope:** Edge service roles, ownership boundaries, communication patterns, and persistence strategy.
+**Owner:** FarmIQ Architecture Team
+**Last updated:** 2025-12-31
 
 ---
 
-## Edge-layer overview
+## Edge Layer Purpose
 
-The edge layer runs on a k3s/Kubernetes cluster deployed close to barns. It is responsible for:
-- Ingesting IoT telemetry and events via MQTT (at-least-once).
-- Temporarily buffering telemetry and media when cloud is unreachable.
-- Managing weigh sessions and running local ML inference.
-- Performing reliable, idempotent synchronization of events to the cloud.
-
-Key characteristics:
-- Stateless services where possible, with persistence handled via:
-  - A relational DB for telemetry, sessions, outbox, etc.
-  - S3-compatible object storage for media (`edge-media-store` uses MinIO or AWS S3).
-- Internal communication via HTTP/gRPC and a DB-based outbox for cloud sync.
-  - RabbitMQ on edge is **optional** and should be used only where it materially simplifies async processing (e.g., inference job queue). Cloud sync remains outbox-driven.
+The edge layer runs on k3s/Kubernetes clusters deployed close to barns. It provides:
+- **Local buffering** of telemetry and media when cloud is unreachable
+- **Real-time inference** on WeighVision sessions for immediate feedback
+- **Reliable synchronization** to cloud using outbox pattern with idempotent delivery
+- **Offline-first operation** for critical barn operations
 
 ---
 
-## Canonical edge services
+## Canonical Data Flow
 
-See `docs/edge-layer/01-edge-services.md` for per-service details.
+### Primary Flow: MQTT → Ingress → DB → Outbox → Sync → Cloud
 
-Core (business) services:
-- `edge-mqtt-broker` (Mosquitto)
-- `edge-ingress-gateway` (Node)
-- `edge-telemetry-timeseries` (Node)
-- `edge-weighvision-session` (Node)
-- `edge-media-store` (Node)
-- `edge-vision-inference` (Python)
-- `edge-sync-forwarder` (Node)
+```mermaid
+flowchart LR
+  subgraph "IoT Devices"
+    dev["iot-sensor-agent<br/>iot-weighvision-agent"]
+  end
 
-Ops/support services:
-- `edge-policy-sync` (Node)
-- `edge-retention-janitor` (Node)
-- `edge-observability-agent` (Node)
-- `edge-ops-web` (UI + `/svc/*` proxy for FE/ops)
-- `edge-feed-intake` (Node; local DB-backed intake, optional by deployment)
+  subgraph "Edge Layer"
+    mqtt["edge-mqtt-broker<br/>:1883 (MQTT)"]
+    ingress["edge-ingress-gateway<br/>:3000"]
+    ts["edge-telemetry-timeseries<br/>:3000"]
+    wv["edge-weighvision-session<br/>:3000"]
+    ms["edge-media-store<br/>:3000"]
+    infer["edge-vision-inference<br/>:8000"]
+    sync["edge-sync-forwarder<br/>:3000"]
+    db[(PostgreSQL<br/>:5432)]
+    minio[(MinIO<br/>S3-compatible)]
+  end
 
-Ownership guards:
-- **Session owner**: `edge-weighvision-session`.
-- **Media owner**: `edge-media-store`.
-- **Inference owner**: `edge-vision-inference`.
-- **Sync owner**: `edge-sync-forwarder` (sole path to cloud).
+  subgraph "Cloud Layer"
+    cloud["cloud-ingestion<br/>HTTPS"]
+    rmq["RabbitMQ<br/>Events"]
+  end
 
----
+  dev -->|MQTT telemetry/events| mqtt
+  dev -->|HTTP presigned upload| ms
 
-## Local docker-compose setup (FE/ops)
+  mqtt -->|subscribe| ingress
 
-For a reproducible local stack that FE/ops can use (real APIs + real DB data), see:
-- `docs/edge-layer/04-local-compose-setup.md`
-- `docs/edge-layer/05-evidence-local-compose.md`
+  ingress -->|write telemetry| ts
+  ingress -->|create/update sessions| wv
 
-Local-only components used by compose:
-- Postgres (single edge DB)
-- MinIO (S3-compatible object storage)
-- `cloud-ingestion-mock` (internal-only target for `edge-sync-forwarder`)
+  wv -->|request media| ms
+  ms -->|store object| minio
+  ms -->|trigger inference| infer
+  infer -->|write results| wv
 
-## Communication patterns
+  ts -->|append to outbox| db
+  wv -->|append to outbox| db
+  ms -->|append to outbox| db
 
-- **Ingress from IoT**
-  - MQTT (100%) → `edge-mqtt-broker` → `edge-ingress-gateway` for all telemetry and device events.
-  - HTTP is used only for media upload: device → `edge-media-store` directly via `POST /api/v1/media/images/presign` + `PUT {upload_url}` (presigned upload). **Decision**: Devices bypass `edge-ingress-gateway` for media uploads to avoid gateway bottleneck and scale better. Ingress gateway does NOT proxy image bytes.
+  sync -->|read outbox| db
+  sync -->|batched HTTPS POST| cloud
 
-- **Internal edge communication**
-  - HTTP/gRPC calls between edge services (e.g., ingress → telemetry, ingress → session).
-  - Shared relational DB for operational tables and `sync_outbox`.
+  cloud -->|publish deduped events| rmq
+```
 
-- **Sync to cloud**
-  - `edge-sync-forwarder` reads `sync_outbox`, batches events, and calls `cloud-ingestion` via HTTPS.
-  - Cloud dedupes by `event_id + tenant_id`, then publishes to RabbitMQ.
+### Flow Details
 
----
+**1. Telemetry Ingestion**
+- IoT devices publish to MQTT topics: `iot/telemetry/{tenantId}/{farmId}/{barnId}/{deviceId}/{metric}`
+- `edge-mqtt-broker` receives messages and forwards to `edge-ingress-gateway`
+- `edge-ingress-gateway` validates envelope, deduplicates, and writes to `edge-telemetry-timeseries`
+- `edge-telemetry-timeseries` stores in PostgreSQL and appends to `sync_outbox`
 
-## Persistence strategy
+**2. WeighVision Session Flow**
+- Device captures weight + image, publishes session events to MQTT
+- `edge-ingress-gateway` creates/updates session via `edge-weighvision-session`
+- Device uploads image via presigned URL to `edge-media-store` (bypasses ingress gateway)
+- `edge-media-store` stores in MinIO and triggers `edge-vision-inference`
+- `edge-vision-inference` runs ML model and writes results back to session
+- Session finalized, events appended to `sync_outbox`
 
-- **Database**
-  - Single relational DB instance per edge cluster (PostgreSQL recommended).
-  - Tables: `telemetry_raw`, `telemetry_agg`, `weight_sessions`, `media_objects`, `inference_results`, `sync_outbox`, `sync_state`, `ingress_dedupe`.
-
-- **Object Storage (S3-compatible)**
-  - Media storage: S3-compatible object storage (MinIO recommended for edge, AWS S3 for cloud)
-  - Object key convention: `tenants/{tenant_id}/farms/{farm_id}/barns/{barn_id}/devices/{device_id}/images/{year}/{month}/{day}/{id}.{ext}`
-  - PVCs (if used):
-    - `edge-db-volume` for DB storage (if not external).
-    - Note: Media is stored in S3, not on PVC filesystem.
-
----
-
-## Security & Provisioning
-
-### MQTT Security
-
-**TLS**: TLS 1.2+ is **REQUIRED** in production for MQTT connections. Devices MUST connect via `mqtts://` (port 8883 standard, configurable). 
-
-**Current Status**: The default `mosquitto.conf` configuration is **development-only** and uses plain MQTT (port 1883) with anonymous access enabled. This configuration is **NOT suitable for production**.
-
-**Production TLS Setup**: 
-- Configure TLS on port 8883 in `mosquitto.conf` (see configuration file comments for details)
-- Obtain TLS certificates from your PKI or use cert-manager in Kubernetes
-- Store certificates in Kubernetes Secrets and mount to `/mosquitto/config/`
-- Disable anonymous access (`allow_anonymous false`)
-- Enable authentication (password file or mTLS client certificates)
-- Configure ACL rules for topic-level authorization
-- Update IoT device configuration to use `mqtts://` (port 8883) with TLS
-- Refer to `edge-layer/edge-mqtt-broker/mosquitto.conf` for detailed production configuration instructions
-
-**Device Authentication** (choose one method per deployment):
-- **Method A (Recommended)**: Per-device username/password + ACL
-  - Each device has a unique username/password pair stored in the broker's password file.
-  - ACL rules restrict publish/subscribe to tenant-scoped topics: `iot/telemetry/{tenantId}/{farmId}/{barnId}/{deviceId}/+` (device can only publish to its own scope).
-  - Topic-level authorization: devices MUST publish/subscribe only to their assigned tenant/farm/barn/device scope.
-- **Method B (Enterprise)**: Mutual TLS (mTLS) client certificates
-  - Each device has a unique client certificate issued by the edge cluster CA.
-  - Broker validates client certificate CN (Common Name) maps to device_id.
-  - ACL rules enforce tenant scope as above.
-
-**Credential Revocation**:
-- Disable credentials in broker password file or revoke client certificate in CA.
-- Rotate credentials/certificates on compromise or scheduled basis (guidance: annually or on personnel changes).
-- Devices reconnect with new credentials on next session.
-
-### HTTP Security (Media Upload)
-
-**Authentication**: Media upload presign endpoint (`POST /api/v1/media/images/presign`) MUST authenticate devices using:
-- Short-lived signed token (JWT) issued by `edge-ingress-gateway` or `cloud-identity-access` (valid for 5-15 minutes).
-- OR device certificate validation (mTLS) if certificates are used.
-
-**Authorization**: Validate device belongs to the requested tenant/farm/barn scope before issuing presigned URL.
-
-**Rate Limiting**: 
-- Per-device rate limit: **10 presign requests per minute** (configurable).
-- Per-upload size limit: **10 MB per image** (configurable, reject larger uploads).
-
-**Logging**: NEVER log raw image bytes or full payloads. Log only: `media_id`, `device_id`, `tenant_id`, `content_length`, `trace_id`.
-
-### Secrets & Rotation
-
-**Storage**: All secrets (MQTT passwords, JWT signing keys, DB credentials) MUST be stored in Kubernetes Secrets (NOT in environment variables in code or env files committed to version control).
-
-**Rotation**:
-- Rotate secrets on compromise or scheduled basis (guidance: annually for passwords, quarterly for signing keys).
-- Support rolling rotation: deploy new secret, allow overlap period, then remove old secret.
-- Update device configurations securely (via secure config push or device registration flow).
+**3. Cloud Synchronization**
+- `edge-sync-forwarder` reads `sync_outbox` (pending rows) with `SELECT FOR UPDATE SKIP LOCKED`
+- Batches events by tenant_id to optimize cloud processing
+- Sends to `cloud-ingestion` via HTTPS (idempotent via event_id)
+- Cloud validates, deduplicates by `(tenant_id, event_id)`, publishes to RabbitMQ
+- Edge retries with exponential backoff on failure; after 10 attempts, moves to DLQ
 
 ---
 
-## Edge offline behavior (cloud down)
+## Core Services
+
+### Business Services
+
+| Service | Port | Purpose | Owner |
+|----------|-------|---------|--------|
+| **edge-mqtt-broker** | 5100 (host) → 1883 (container) | MQTT message bus for IoT devices |
+| **edge-ingress-gateway** | 5103 (host) → 3000 (container) | MQTT normalizer, routes to internal services |
+| **edge-telemetry-timeseries** | 5104 (host) → 3000 (container) | Telemetry persistence and aggregation |
+| **edge-weighvision-session** | 5105 (host) → 3000 (container) | Session lifecycle owner |
+| **edge-media-store** | 5106 (host) → 3000 (container) | Media owner (S3-compatible storage) |
+| **edge-vision-inference** | 5107 (host) → 8000 (container) | ML inference owner |
+| **edge-sync-forwarder** | 5108 (host) → 3000 (container) | Sync owner (outbox → cloud) |
+| **edge-feed-intake** | 5112 (host) → 5109 (container) | Local feed intake management |
+
+### Ops/Support Services
+
+| Service | Port | Purpose |
+|----------|-------|---------|
+| **edge-policy-sync** | 5109 (host) → 3000 (container) | Cache cloud config offline |
+| **edge-retention-janitor** | 5114 (host) → 3000 (container) | Enforce media retention policies |
+| **edge-observability-agent** | 5111 (host) → 3000 (container) | Aggregate health/status for ops |
+| **edge-ops-web** | 5113 (host) → 80 (container) | UI for edge operations |
+
+### Development Infrastructure
+
+| Component | Host Port | Purpose |
+|-----------|-----------|---------|
+| **PostgreSQL** | 5141 → 5432 | Single relational DB for edge services |
+| **MinIO** | 9000 (API), 9001 (Console) | S3-compatible object storage |
+| **cloud-ingestion-mock** | internal only | Mock cloud endpoint for testing |
+
+---
+
+## Ownership Guards
+
+**Critical:** Single domain ownership prevents data corruption and race conditions.
+
+| Domain | Owner Service | Tables Owned |
+|---------|--------------|--------------|
+| Sessions | `edge-weighvision-session` | `weight_sessions` |
+| Media | `edge-media-store` | `media_objects` (metadata), S3 objects |
+| Inference | `edge-vision-inference` | `inference_results` |
+| Sync | `edge-sync-forwarder` | `sync_outbox`, `sync_state`, `sync_outbox_dlq` |
+| Telemetry | `edge-telemetry-timeseries` | `telemetry_raw`, `telemetry_agg` |
+
+**Cross-cutting concerns:**
+- `edge-ingress-gateway`: Stateless router, writes `ingress_dedupe` table only
+- `edge-observability-agent`: Aggregator only, no data ownership
+- `edge-ops-web`: UI/proxy layer, no direct DB access
+
+---
+
+## Communication Patterns
+
+### External → Edge
+- **MQTT:** All device telemetry via `edge-mqtt-broker` (port 1883, TLS 8883 in production)
+- **HTTP Presigned Uploads:** Media uploads go directly to `edge-media-store` (bypasses ingress gateway)
+
+### Internal Edge
+- **HTTP:** All inter-service communication via HTTP/gRPC
+- **DB:** Shared PostgreSQL for structured data and outbox
+- **Message Queue:** Optional edge RabbitMQ for async inference jobs (not yet implemented)
+
+### Edge → Cloud
+- **HTTPS Batched:** `edge-sync-forwarder` batches events to `cloud-ingestion`
+- **Idempotency:** Cloud deduplicates by `(tenant_id, event_id)`
+- **Offline Buffering:** Outbox stores events until connectivity restored
+
+---
+
+## Persistence Strategy
+
+### Database (PostgreSQL)
+Single DB instance per edge cluster with tables:
+- `telemetry_raw`, `telemetry_agg` - Telemetry storage
+- `weight_sessions` - WeighVision sessions
+- `media_objects` - Media metadata
+- `inference_results` - ML inference results
+- `sync_outbox` - Events pending sync
+- `sync_outbox_dlq` - Failed sync events
+- `ingress_dedupe` - MQTT duplicate prevention
+
+### Object Storage (MinIO / S3)
+Media storage with path structure:
+```
+tenants/{tenant_id}/farms/{farm_id}/barns/{barn_id}/devices/{device_id}/images/{year}/{month}/{day}/{id}.{ext}
+```
+
+**Note:** Media stored in MinIO, not on PVC filesystem. `edge-media-store` maintains metadata only.
+
+---
+
+## Offline Behavior
 
 When cloud connectivity is down:
-- Edge continues to ingest MQTT and store locally (telemetry DB, session DB, S3/MinIO media).
-- `sync_outbox` grows; `edge-sync-forwarder` retries with exponential backoff.
+- ✅ Edge continues to ingest MQTT and store locally (DB + MinIO)
+- ✅ `sync_outbox` grows with pending events
+- ✅ `edge-sync-forwarder` retries with exponential backoff (max 10 attempts)
+- ✅ Failed events moved to DLQ for manual recovery
 
-Required alerts/telemetry (see Operational Readiness section below and `shared/02-observability-datadog.md`):
-- Outbox backlog size and oldest pending age.
-- Disk usage thresholds (object storage + DB volumes).
-- Last successful sync timestamp (per edge cluster/tenant).
+**Required alerts:**
+- Outbox backlog size and oldest pending age
+- Disk usage thresholds (MinIO + DB volumes)
+- Last successful sync timestamp
+
+---
+
+## Security
+
+### MQTT (Production)
+- **TLS 1.2+ REQUIRED** on port 8883 (development uses plain 1883)
+- **Device Authentication:** Per-device username/password + ACL OR mTLS certificates
+- **Topic Authorization:** Devices restricted to `iot/telemetry/{tenantId}/{farmId}/{barnId}/{deviceId}/+`
+- **See:** `edge-mqtt-broker/mosquitto.conf` for production configuration
+
+### HTTP (Media Upload)
+- **Authentication:** JWT or mTLS on presign endpoint
+- **Rate Limiting:** 10 presign requests per minute per device
+- **Upload Limits:** 10 MB per image
+- **No Logging:** Never log image bytes or full payloads
+
+### Secrets Management
+- Store all secrets in Kubernetes Secrets (NOT in env files)
+- Rotate secrets quarterly (passwords) or annually (certificates)
+- Support rolling rotation without downtime
 
 ---
 
 ## Operational Readiness
 
-### Standard Health Endpoints
+### Health Endpoints
+All services expose:
+- `GET /api/health` - Liveness (process alive)
+- `GET /api/ready` - Readiness (DB + dependencies)
+- `GET /api-docs` - OpenAPI/Swagger documentation
 
-All edge services MUST expose:
-- `GET /api/health` (liveness probe): Returns 200 if service process is alive. No dependency checks.
-- `GET /api/ready` (readiness probe): Returns 200 if service can serve traffic. MUST check DB connectivity and critical dependencies (e.g., media-store checks S3/MinIO access, forwarder checks DB and cloud endpoint reachability).
-- `GET /api-docs` (OpenAPI documentation).
+### Alert Thresholds
 
-### Production Alert Thresholds
+| Metric | Warning | Critical |
+|--------|----------|----------|
+| Outbox pending rows | > 1,000 | > 10,000 |
+| Oldest pending event age | > 1 hour | > 24 hours |
+| Media storage usage | > 75% | > 90% |
+| DB volume usage | > 80% | > 95% |
+| Last successful sync | > 5 minutes | > 1 hour |
+| Consecutive sync failures | > 5 | > 10 |
 
-**Default thresholds** (configurable per environment):
-
-**Outbox Backlog**:
-- Warning: `sync_outbox` pending rows > **1000** OR oldest pending age > **1 hour**.
-- Critical: `sync_outbox` pending rows > **10000** OR oldest pending age > **24 hours**.
-
-**Storage Usage**:
-- Warning: Media object storage usage (e.g., MinIO disk) > **75%** OR DB volume usage > **80%**.
-- Critical: Media object storage usage (e.g., MinIO disk) > **90%** OR DB volume usage > **95%**.
-
-**Inference Queue** (if RabbitMQ enabled):
-- Warning: Queue depth > **1000 jobs** OR oldest job age > **30 minutes**.
-- Critical: Queue depth > **10000 jobs** OR oldest job age > **2 hours**.
-
-**Sync Health**:
-- Warning: Last successful sync timestamp > **5 minutes ago** (for active clusters).
-- Critical: Last successful sync timestamp > **1 hour ago** OR consecutive failures > **10**.
-
-### Minimal SLO Guidance
-
-**Availability**:
-- Target: **99.5%** uptime (per edge cluster) excluding planned maintenance.
-- Measurement: Service health endpoints return 200.
-
-**Error Rate**:
-- Target: **< 0.1%** of requests return 5xx errors (excluding transient network errors to cloud).
-- Measurement: HTTP status codes from service logs/metrics.
-
-**Pipeline Latency** (interactive flow):
-- Target: End-to-end image upload → inference complete ≤ **15 seconds** (p95).
-- Target: Session finalize acknowledgement ≤ **3 seconds** (p95).
-
-**Data Loss**:
-- Target: **Zero** data loss during cloud connectivity outages up to **7 days** (buffered in outbox/object storage).
-- Measurement: Outbox replay success rate and sync deduplication metrics.
+### SLO Targets
+- **Availability:** 99.5% uptime per edge cluster
+- **Error Rate:** < 0.1% HTTP 5xx errors
+- **Inference Latency:** p95 ≤ 15 seconds (upload → result)
+- **Data Loss:** Zero loss during outages up to 7 days
 
 ---
-
-## Kubernetes Deployment Guardrails
-
-**Resource Requests/Limits**: All services MUST have explicit `resources.requests` and `resources.limits` set:
-- CPU: Typical requests 100-500m, limits 1-2 CPU per pod.
-- Memory: Typical requests 256Mi-1Gi, limits 512Mi-2Gi per pod.
-- See `01-edge-services.md` per-service recommendations.
-
-**Node Affinity**:
-- `edge-vision-inference` pods MUST schedule to GPU nodes (if GPU inference is enabled) via node selector or affinity rules.
-- Other services: no special affinity requirements.
-
-**Horizontal Pod Autoscaling (HPA)**:
-- `edge-sync-forwarder`: Can scale horizontally (uses SELECT FOR UPDATE SKIP LOCKED for safe concurrent processing).
-- `edge-vision-inference`: Can scale horizontally (consumes from RabbitMQ queue or polls DB).
-- DB owners (`edge-telemetry-timeseries`, `edge-weighvision-session`, `edge-media-store`): Scale carefully; prefer vertical scaling if DB becomes bottleneck.
-
-**PVC Sizing**:
-- Media object storage (e.g., MinIO volume): Size based on retention policy (e.g., 30 days) × average daily image volume × 1.5 safety margin.
-  - Example: 1000 images/day × 2MB × 30 days × 1.5 = **90 GB minimum**.
-- DB PVC: Size based on telemetry retention (e.g., 90 days) and outbox retention (30 days) with growth projections.
-
----
-
-## Implementation Notes
-
-- All Node edge services should be based on `boilerplates/Backend-node`, using Express, Prisma, Winston JSON logging, and dd-trace.
-- The Python inference service should be based on `boilerplates/Backend-python`, using FastAPI and JSON logging.
-- No external in-memory cache/session store is permitted; durable media storage uses S3-compatible object storage, and structured data uses the DB (backed by PVs where applicable).  
 
 ## Links
 
-- `docs/edge-layer/01-edge-services.md`
-- `docs/edge-layer/02-edge-storage-buffering.md`
-- `docs/edge-layer/03-edge-inference-pipeline.md`
+- [01-services.md](01-services.md) - Service table with ports, dependencies, endpoints
+- [02-setup-run.md](02-setup-run.md) - How to run compose, env vars, troubleshooting
+- [03-edge-ops-web.md](03-edge-ops-web.md) - UI usage, profiles, metrics sources
+- [Evidence](../progress/edge-compose-verify.md) - Verified compose run results
+- [Evidence](../progress/edge-ops-realdata.md) - Real data integration details

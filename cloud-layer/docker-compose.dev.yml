@@ -169,6 +169,7 @@ services:
       target: development
     ports:
       - "5122:3000"
+      - "5300:3000"
     volumes:
       - ./cloud-ingestion/src:/usr/src/app/src:ro
       - ./cloud-ingestion/package.json:/usr/src/app/package.json:ro

@@ -139,9 +139,22 @@ export class StatusService {
     const totalMem = os.totalmem()
     const freeMem = os.freemem()
 
-    const stats = await fs.statfs(this.config.diskPath)
-    const diskFree = stats.bavail * stats.bsize
-    const diskTotal = stats.blocks * stats.bsize
+    let diskFree = 0
+    let diskTotal = 0
+    try {
+      const stats = await fs.statfs(this.config.diskPath)
+      diskFree = stats.bavail * stats.bsize
+      diskTotal = stats.blocks * stats.bsize
+    } catch {
+      try {
+        const stats = await fs.statfs('/')
+        diskFree = stats.bavail * stats.bsize
+        diskTotal = stats.blocks * stats.bsize
+      } catch {
+        diskFree = 0
+        diskTotal = 0
+      }
+    }
 
     this.diskFreeGauge.set(diskFree)
     this.memoryFreeGauge.set(freeMem)
