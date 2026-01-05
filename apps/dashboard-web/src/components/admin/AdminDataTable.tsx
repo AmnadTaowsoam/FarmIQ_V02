@@ -106,6 +106,7 @@ export const AdminDataTable: React.FC<AdminDataTableProps> = ({
     ids: new Set<GridRowId>(),
   });
   const [bulkMenuAnchor, setBulkMenuAnchor] = useState<null | HTMLElement>(null);
+  const isServerPagination = typeof totalRows === 'number';
 
   // Initialize from URL params
   useEffect(() => {
@@ -283,9 +284,9 @@ export const AdminDataTable: React.FC<AdminDataTableProps> = ({
           sortModel={sortModel}
           onSortModelChange={handleSortChange}
           pageSizeOptions={pageSizeOptions}
-          rowCount={totalRows || rows.length}
-          paginationMode={totalRows ? 'server' : 'client'}
-          sortingMode={totalRows ? 'server' : 'client'}
+          {...(isServerPagination ? { rowCount: totalRows } : {})}
+          paginationMode={isServerPagination ? 'server' : 'client'}
+          sortingMode={isServerPagination ? 'server' : 'client'}
           checkboxSelection={enableSelection}
           disableRowSelectionOnClick
           rowSelectionModel={selectionModel}
