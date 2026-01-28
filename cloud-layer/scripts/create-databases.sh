@@ -13,6 +13,7 @@ POSTGRES_PORT="${POSTGRES_PORT:-5432}"
 DATABASES=(
   "cloud_identity_access"
   "cloud_tenant_registry"
+  "cloud_standards_service"
   "cloud_ingestion"
   "cloud_telemetry"
   "cloud_api_gateway_bff"
@@ -23,6 +24,12 @@ DATABASES=(
   "cloud_feed"
   "cloud_barn_records"
   "cloud_weighvision_readmodel"
+  "cloud_analytics"
+  "cloud_advanced_analytics"
+  "cloud_data_pipeline"
+  "cloud_billing"
+  "cloud_llm_insights"
+  "cloud_fleet_management"
 )
 
 echo "Creating databases for each service..."

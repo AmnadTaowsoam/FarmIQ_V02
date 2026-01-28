@@ -1,0 +1,19 @@
+{
+  "name": "@farmiq/feature-flags",
+  "version": "1.0.0",
+  "description": "Feature flags integration for FarmIQ using Unleash",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest"
+  },
+  "dependencies": {
+    "unleash-client": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.5",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.5",
+    "typescript": "^5.4.5"
+  }
+}

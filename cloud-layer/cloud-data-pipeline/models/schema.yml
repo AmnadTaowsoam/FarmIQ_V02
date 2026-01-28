@@ -1,0 +1,282 @@
+version: 2
+
+sources:
+  - name: feed_service
+    database: "{{ target.database }}"
+    schema: "{{ target.schema }}"
+    tables:
+      - name: feed_intake_records
+        description: "Raw feed intake records from cloud-feed-service"
+        columns:
+          - name: id
+            description: "Primary key"
+            tests:
+              - unique
+              - not_null
+          - name: tenant_id
+            description: "Tenant identifier"
+            tests:
+              - not_null
+          - name: farm_id
+            description: "Farm identifier"
+          - name: barn_id
+            description: "Barn identifier"
+            tests:
+              - not_null
+          - name: batch_id
+            description: "Batch identifier"
+          - name: occurred_at
+            description: "When the feed intake occurred"
+            tests:
+              - not_null
+          - name: quantity_kg
+            description: "Feed quantity in kilograms"
+            tests:
+              - not_null
+
+  - name: telemetry_service
+    database: "{{ target.database }}"
+    schema: "{{ target.schema }}"
+    tables:
+      - name: telemetry_records
+        description: "Raw telemetry records from cloud-telemetry-service"
+        columns:
+          - name: id
+            description: "Primary key"
+            tests:
+              - unique
+              - not_null
+          - name: tenant_id
+            description: "Tenant identifier"
+            tests:
+              - not_null
+          - name: farm_id
+            description: "Farm identifier"
+          - name: barn_id
+            description: "Barn identifier"
+          - name: device_id
+            description: "Device identifier"
+            tests:
+              - not_null
+          - name: metric_type
+            description: "Type of metric (temperature, humidity, etc.)"
+            tests:
+              - not_null
+          - name: metric_value
+            description: "Metric value"
+            tests:
+              - not_null
+          - name: occurred_at
+            description: "When the reading was taken"
+            tests:
+              - not_null
+
+  - name: weighvision_readmodel
+    database: "{{ target.database }}"
+    schema: "{{ target.schema }}"
+    tables:
+      - name: weighvision_sessions
+        description: "Weighvision session data from cloud-weighvision-readmodel"
+        columns:
+          - name: id
+            description: "Primary key"
+            tests:
+              - unique
+              - not_null
+          - name: tenant_id
+            description: "Tenant identifier"
+            tests:
+              - not_null
+          - name: farm_id
+            description: "Farm identifier"
+          - name: barn_id
+            description: "Barn identifier"
+            tests:
+              - not_null
+          - name: batch_id
+            description: "Batch identifier"
+          - name: session_id
+            description: "Session identifier"
+            tests:
+              - not_null
+          - name: started_at
+            description: "Session start time"
+            tests:
+              - not_null
+          - name: final_weight_kg
+            description: "Final weight in kilograms"
+          - name: avg_weight_kg
+            description: "Average weight in kilograms"
+          - name: quality_pass_rate
+            description: "Quality pass rate (0-1)"
+
+  - name: barn_records_service
+    database: "{{ target.database }}"
+    schema: "{{ target.schema }}"
+    tables:
+      - name: barn_records
+        description: "Daily barn records from cloud-barn-records-service"
+        columns:
+          - name: id
+            description: "Primary key"
+            tests:
+              - unique
+              - not_null
+          - name: tenant_id
+            description: "Tenant identifier"
+            tests:
+              - not_null
+          - name: farm_id
+            description: "Farm identifier"
+          - name: barn_id
+            description: "Barn identifier"
+            tests:
+              - not_null
+          - name: batch_id
+            description: "Batch identifier"
+          - name: record_date
+            description: "Record date"
+            tests:
+              - not_null
+          - name: animal_count
+            description: "Number of animals"
+            tests:
+              - not_null
+          - name: mortality_count
+            description: "Mortality count"
+          - name: cull_count
+            description: "Cull count"
+          - name: average_weight_kg
+            description: "Average weight in kilograms"
+          - name: biomass_kg
+            description: "Total biomass in kilograms"
+
+models:
+  - name: stg_feed_intake
+    description: "Staging model for feed intake records"
+    columns:
+      - name: tenant_id
+        tests:
+          - not_null
+      - name: quantity_kg
+        tests:
+          - not_null
+      - name: occurred_at
+        tests:
+          - not_null
+
+  - name: stg_telemetry
+    description: "Staging model for telemetry records"
+    columns:
+      - name: tenant_id
+        tests:
+          - not_null
+      - name: metric_type
+        tests:
+          - not_null
+      - name: metric_value
+        tests:
+          - not_null
+
+  - name: stg_weighvision_sessions
+    description: "Staging model for weighvision sessions"
+    columns:
+      - name: tenant_id
+        tests:
+          - not_null
+      - name: session_id
+        tests:
+          - not_null
+      - name: started_at
+        tests:
+          - not_null
+
+  - name: stg_barn_records
+    description: "Staging model for barn records"
+    columns:
+      - name: tenant_id
+        tests:
+          - not_null
+      - name: record_date
+        tests:
+          - not_null
+      - name: animal_count
+        tests:
+          - not_null
+
+  - name: fact_daily_kpi
+    description: "Daily KPI fact table combining feed, weight, and barn records"
+    columns:
+      - name: tenant_id
+        tests:
+          - not_null
+      - name: kpi_date
+        tests:
+          - not_null
+      - name: animal_count
+        tests:
+          - not_null
+      - name: fcr
+        description: "Feed Conversion Ratio"
+      - name: adg_kg
+        description: "Average Daily Gain in kg"
+      - name: sgr_pct
+        description: "Specific Growth Rate in percentage"
+
+  - name: fact_feed_cost
+    description: "Feed cost analysis fact table"
+    columns:
+      - name: tenant_id
+        tests:
+          - not_null
+      - name: cost_date
+        tests:
+          - not_null
+      - name: feed_cost_thb
+        description: "Feed cost in Thai Baht"
+      - name: cost_per_kg_gain_thb
+        description: "Cost per kg of weight gain"
+
+  - name: fact_batch_cohort
+    description: "Batch cohort analysis fact table"
+    columns:
+      - name: tenant_id
+        tests:
+          - not_null
+      - name: batch_start_date
+        tests:
+          - not_null
+      - name: avg_fcr
+        description: "Average FCR for the batch"
+      - name: avg_adg_kg
+        description: "Average ADG for the batch"
+      - name: survival_rate
+        description: "Survival rate (0-1)"
+
+  - name: fact_trend_analysis
+    description: "Trend analysis fact table with moving averages"
+    columns:
+      - name: tenant_id
+        tests:
+          - not_null
+      - name: kpi_date
+        tests:
+          - not_null
+      - name: ma7_weight_kg
+        description: "7-day moving average of weight"
+      - name: weight_trend_pct
+        description: "Daily weight trend percentage"
+      - name: fcr_trend_pct
+        description: "Daily FCR trend percentage"
+
+  - name: fact_data_quality
+    description: "Data quality monitoring fact table"
+    columns:
+      - name: data_source
+        tests:
+          - not_null
+      - name: total_records
+        tests:
+          - not_null
+      - name: data_quality_score
+        description: "Data quality score (0-100)"

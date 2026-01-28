@@ -1,0 +1,68 @@
+# Prometheus Alerting Rules for Performance
+
+groups:
+  - name: performance_alerts
+    interval: 30s
+    rules:
+      - alert: HighAPIResponseTime
+        expr: histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API response time p99 exceeds 1000ms"
+          description: "API p99 response time is {{ $value }}s (threshold: 1s) for more than 5 minutes"
+
+      - alert: HighAPIErrorRate
+        expr: sum(rate(http_requests_total{status=~"5.."}[5m])) / sum(rate(http_requests_total[5m])) > 0.05
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API error rate exceeds 5%"
+          description: "API error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+
+      - alert: HighMQTTLatency
+        expr: histogram_quantile(0.95, sum(rate(mqtt_message_latency_seconds_bucket[5m])) by (le)) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MQTT message latency exceeds 100ms"
+          description: "MQTT p95 latency is {{ $value }}s (threshold: 100ms)"
+
+      - alert: HighDatabaseQueryTime
+        expr: histogram_quantile(0.95, sum(rate(db_query_duration_seconds_bucket[5m])) by (le, query)) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Database query time exceeds 200ms"
+          description: "Query {{ $labels.query }} p95 duration is {{ $value }}s (threshold: 200ms)"
+
+      - alert: HighRabbitMQQueueDepth
+        expr: rabbitmq_queue_messages > 100000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "RabbitMQ queue depth exceeds 100,000"
+          description: "Queue {{ $labels.queue }} has {{ $value }} messages (threshold: 100,000)"
+
+      - alert: HighCPUUtilization
+        expr: 100 - (avg(irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU utilization exceeds 80%"
+          description: "CPU utilization is {{ $value }}% (threshold: 80%)"
+
+      - alert: HighMemoryUtilization
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Memory utilization exceeds 85%"
+          description: "Memory utilization is {{ $value }}% (threshold: 85%)"

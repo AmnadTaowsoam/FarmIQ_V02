@@ -47,3 +47,15 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'cloud_weighvision_rea
 
 SELECT 'CREATE DATABASE cloud_llm_insights'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'cloud_llm_insights')\gexec
+
+SELECT 'CREATE DATABASE cloud_advanced_analytics'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'cloud_advanced_analytics')\gexec
+
+SELECT 'CREATE DATABASE cloud_data_pipeline'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'cloud_data_pipeline')\gexec
+
+SELECT 'CREATE DATABASE cloud_fleet_management'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'cloud_fleet_management')\gexec
+
+SELECT 'CREATE DATABASE cloud_billing'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'cloud_billing')\gexec

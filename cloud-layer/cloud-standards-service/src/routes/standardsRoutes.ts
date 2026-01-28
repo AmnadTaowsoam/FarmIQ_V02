@@ -20,6 +20,8 @@ import {
   upsertStandardSchemasHandler,
   listBreederCompaniesHandler,
   upsertBreederCompaniesHandler,
+  exportStandardsHandler,
+  deleteSetHandler,
 } from '../controllers/standardsController'
 
 const router = express.Router()
@@ -55,5 +57,11 @@ router.post('/catalog/genetic-lines', requireRole('platform_admin', 'tenant_admi
 
 router.get('/catalog/standard-schemas', listStandardSchemasHandler)
 router.post('/catalog/standard-schemas', requireRole('platform_admin', 'tenant_admin'), upsertStandardSchemasHandler)
+
+// Export standards
+router.get('/export', exportStandardsHandler)
+
+// Delete standard set
+router.delete('/sets/:setId', requireRole('platform_admin', 'tenant_admin'), deleteSetHandler)
 
 export default router

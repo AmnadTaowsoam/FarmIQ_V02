@@ -1,28 +1,27 @@
 
 import { useState } from 'react';
-import { 
-  Box, 
-  Typography, 
-  Stack, 
-  Button, 
-  Paper, 
-  Checkbox, 
-  FormControlLabel, 
+import {
+  Box,
+  Typography,
+  Stack,
+  Checkbox,
+  FormControlLabel,
   Grid,
   Alert,
   Divider,
   CircularProgress
 } from '@mui/material';
-import { 
-  ClipboardCopy, 
-  Download, 
-  CheckCircle2, 
+import {
+  ClipboardCopy,
+  Download,
+  CheckCircle2,
   Camera,
   FileText
 } from 'lucide-react';
 import { useSettings } from '@/contexts/SettingsContext';
 import { edgeOpsApi } from '@/api/client';
 import { useQuery } from '@tanstack/react-query';
+import { PremiumCard, PremiumButton, PremiumButtonOutline } from '@/components';
 
 export function EvidenceTab() {
     const settings = useSettings();
@@ -101,7 +100,7 @@ export function EvidenceTab() {
             <Grid container spacing={3}>
                 {/* 1. Automated Actions */}
                 <Grid item xs={12} md={6}>
-                    <Paper variant="outlined" sx={{ p: 3, height: '100%' }}>
+                    <PremiumCard sx={{ p: 3, height: '100%' }}>
                         <Stack spacing={3}>
                             <Stack direction="row" alignItems="center" spacing={1}>
                                 <FileText size={20} />
@@ -114,15 +113,14 @@ export function EvidenceTab() {
                                 <Typography variant="caption" color="text.secondary" paragraph>
                                     Downloads a complete JSON bundle including system info, service status, and recent logs.
                                 </Typography>
-                                <Button 
-                                    variant="contained" 
+                                <PremiumButton
                                     fullWidth
                                     startIcon={diagLoading ? <CircularProgress size={16} color="inherit" /> : <Download size={16} />}
                                     onClick={handleExportDiagnostics}
                                     disabled={diagLoading}
                                 >
                                     {diagLoading ? 'Generating Bundle...' : 'Download Diagnostics Bundle'}
-                                </Button>
+                                </PremiumButton>
                             </Box>
 
                             <Box>
@@ -130,22 +128,21 @@ export function EvidenceTab() {
                                 <Typography variant="caption" color="text.secondary" paragraph>
                                     Copies a short text summary of the current system state to your clipboard.
                                 </Typography>
-                                <Button 
-                                    variant="outlined" 
+                                <PremiumButtonOutline
                                     fullWidth
                                     startIcon={<ClipboardCopy size={16} />}
                                     onClick={handleCopySupportSummary}
                                 >
                                     Copy Summary Text
-                                </Button>
+                                </PremiumButtonOutline>
                             </Box>
                         </Stack>
-                    </Paper>
+                    </PremiumCard>
                 </Grid>
 
                 {/* 2. Manual Checklist */}
                 <Grid item xs={12} md={6}>
-                    <Paper variant="outlined" sx={{ p: 3, height: '100%' }}>
+                    <PremiumCard sx={{ p: 3, height: '100%' }}>
                          <Stack spacing={3}>
                             <Stack direction="row" alignItems="center" spacing={1}>
                                 <Camera size={20} />
@@ -182,7 +179,7 @@ export function EvidenceTab() {
                                 </Alert>
                             )}
                         </Stack>
-                    </Paper>
+                    </PremiumCard>
                 </Grid>
             </Grid>
         </Stack>

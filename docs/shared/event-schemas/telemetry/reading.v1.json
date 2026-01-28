@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Telemetry Reading Event",
+  "description": "Event published when a device sends telemetry reading",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "event_id",
+    "trace_id",
+    "tenant_id",
+    "event_type",
+    "ts",
+    "payload"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["1.0"],
+      "description": "Schema version"
+    },
+    "event_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique event identifier"
+    },
+    "trace_id": {
+      "type": "string",
+      "description": "Trace correlation ID"
+    },
+    "tenant_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Tenant identifier"
+    },
+    "device_id": {
+      "type": "string",
+      "description": "Device identifier (optional)"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": ["telemetry.reading"],
+      "description": "Event type"
+    },
+    "ts": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Event timestamp (UTC)"
+    },
+    "payload": {
+      "type": "object",
+      "required": ["metric", "value", "unit"],
+      "properties": {
+        "metric": {
+          "type": "string",
+          "enum": ["temperature", "humidity", "weight", "pressure"],
+          "description": "Metric type"
+        },
+        "value": {
+          "type": "number",
+          "description": "Metric value"
+        },
+        "unit": {
+          "type": "string",
+          "description": "Unit of measurement (e.g., C, %, kg)"
+        },
+        "sensor_id": {
+          "type": "string",
+          "description": "Sensor identifier (optional)"
+        }
+      }
+    }
+  }
+}

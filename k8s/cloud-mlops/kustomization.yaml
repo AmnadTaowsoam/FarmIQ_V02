@@ -1,0 +1,30 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: farmiq-mlops
+namePrefix: farmiq-
+commonLabels:
+  project: farmiq
+  layer: cloud
+  component: mlops
+  environment: prod
+resources:
+  - 00-namespace.yaml
+  - 01-mlflow-registry-deployment.yaml
+  - 02-inference-server-deployment.yaml
+images:
+  - name: farmiq-mlflow-registry
+    newTag: v1.0.0
+  - name: farmiq-inference-server
+    newTag: v1.0.0
+  - name: farmiq-feature-store
+    newTag: v1.0.0
+  - name: farmiq-drift-detection
+    newTag: v1.0.0
+  - name: farmiq-hybrid-router
+    newTag: v1.0.0
+configMapGenerator:
+  - name: mlops-config
+    literals:
+      - LOG_LEVEL=INFO
+      - DD_ENV=prod
+      - DD_SITE=datadoghq.com

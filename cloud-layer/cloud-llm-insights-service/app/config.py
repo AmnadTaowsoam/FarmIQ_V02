@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     llm_model: str = os.getenv("LLM_MODEL", "gpt-4.1-mini")
     prompt_version: str = os.getenv("PROMPT_VERSION", "v1")
 
+    # Cost tracking
+    llm_monthly_budget_usd: float = float(os.getenv("LLM_MONTHLY_BUDGET_USD", "100.0"))
+    llm_rate_limit_per_minute: int = int(os.getenv("LLM_RATE_LIMIT_PER_MINUTE", "10"))
+
     testing: bool = False
 
     def new_id(self) -> str:

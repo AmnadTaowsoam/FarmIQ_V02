@@ -15,10 +15,32 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-farmiq}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
     networks:
       - farmiq-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-farmiq}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-farmiq}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  vault:
+    image: hashicorp/vault:1.13.3
+    container_name: farmiq-cloud-vault
+    ports:
+      - "8200:8200"
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: root
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+      VAULT_ADDR: http://127.0.0.1:8200
+    cap_add:
+      - IPC_LOCK
+    volumes:
+      - vault_data:/vault/file
+    networks:
+      - farmiq-net
+    healthcheck:
+      test: [ "CMD", "vault", "status" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -27,8 +49,8 @@ services:
     image: rabbitmq:3.13-management-alpine
     container_name: farmiq-cloud-rabbitmq
     ports:
-      - "5150:5672"   # AMQP port
-      - "5151:15672"  # Management UI port
+      - "5150:5672" # AMQP port
+      - "5151:15672" # Management UI port
     environment:
       - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER:-farmiq}
       - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS:-farmiq_dev}
@@ -41,7 +63,7 @@ services:
     networks:
       - farmiq-net
     healthcheck:
-      test: ["CMD", "rabbitmqctl", "status"]
+      test: [ "CMD", "rabbitmqctl", "status" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -51,7 +73,7 @@ services:
     container_name: farmiq-cloud-datadog-agent
     restart: unless-stopped
     ports:
-      - "8126:8126"   # APM intake
+      - "8126:8126" # APM intake
       - "8125:8125/udp" # dogstatsd
     environment:
       - DD_API_KEY=${DD_API_KEY}
@@ -83,9 +105,9 @@ services:
     ports:
       - "5120:3000"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
       - APP_PORT=3000
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_identity_access
       - DD_ENV=${DD_ENV:-prod}
       - DD_SERVICE=cloud-identity-access
       - DD_VERSION=${DD_VERSION:-local}
@@ -93,8 +115,11 @@ services:
       - DD_TRACE_AGENT_PORT=8126
     networks:
       - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -108,9 +133,9 @@ services:
     ports:
       - "5121:3000"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
       - APP_PORT=3000
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_tenant_registry
       - DD_ENV=${DD_ENV:-prod}
       - DD_SERVICE=cloud-tenant-registry
       - DD_VERSION=${DD_VERSION:-local}
@@ -118,8 +143,11 @@ services:
       - DD_TRACE_AGENT_PORT=8126
     networks:
       - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -133,9 +161,9 @@ services:
     ports:
       - "5122:3000"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
       - APP_PORT=3000
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_ingestion
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
       - CLOUD_AUTH_MODE=${CLOUD_AUTH_MODE:-api_key}
       - CLOUD_API_KEYS=${CLOUD_API_KEYS:-edge-local-key}
@@ -147,8 +175,13 @@ services:
       - DD_TRACE_AGENT_PORT=8126
     networks:
       - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -162,9 +195,9 @@ services:
     ports:
       - "5123:3000"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
       - APP_PORT=3000
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_telemetry
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
       - DD_ENV=${DD_ENV:-prod}
       - DD_SERVICE=cloud-telemetry-service
@@ -173,8 +206,13 @@ services:
       - DD_TRACE_AGENT_PORT=8126
     networks:
       - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -189,8 +227,22 @@ services:
     environment:
       - LOG_LEVEL=INFO
       - PORT=8000
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_analytics
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
+      - BARN_RECORDS_SERVICE_URL=http://cloud-barn-records-service:3000
+      - STANDARDS_SERVICE_URL=http://cloud-standards-service:3000
+      - INSIGHTS_ORCHESTRATOR_ENABLED=true
+      - LLM_INSIGHTS_BASE_URL=http://cloud-llm-insights-service:8000
+      - READY_CHECK_LLM_INSIGHTS=true
+      - LLM_TIMEOUT_S=10
+      - LLM_MAX_RETRIES=1
+      - ML_FALLBACK_ENABLED=false
+      - ML_MODEL_BASE_URL=http://cloud-ml-model-service:8000
+      - ML_TIMEOUT_S=4
+      - ML_MAX_RETRIES=2
+      - NOTIFICATIONS_ENABLED=true
+      - NOTIFICATIONS_TIMEOUT_MS=2000
+      - NOTIFICATION_SERVICE_URL=http://cloud-notification-service:3000
       - DD_ENV=${DD_ENV:-prod}
       - DD_SERVICE=cloud-analytics-service
       - DD_VERSION=${DD_VERSION:-local}
@@ -198,8 +250,15 @@ services:
       - DD_TRACE_AGENT_PORT=8126
     networks:
       - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      cloud-llm-insights-service:
+        condition: service_started
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8000/api/health"]
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8000/api/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -213,9 +272,9 @@ services:
     ports:
       - "5126:3000"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
       - APP_PORT=3000
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_config_rules
       - DD_ENV=${DD_ENV:-prod}
       - DD_SERVICE=cloud-config-rules-service
       - DD_VERSION=${DD_VERSION:-local}
@@ -227,7 +286,7 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -241,9 +300,9 @@ services:
     ports:
       - "5127:3000"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
       - APP_PORT=3000
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_audit_log
       - DD_ENV=${DD_ENV:-prod}
       - DD_SERVICE=cloud-audit-log-service
       - DD_VERSION=${DD_VERSION:-local}
@@ -255,7 +314,39 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cloud-fleet-management:
+    build:
+      context: ./cloud-fleet-management
+      dockerfile: Dockerfile
+      target: production
+    container_name: farmiq-cloud-fleet-management
+    ports:
+      - "5144:3000"
+    environment:
+      - NODE_ENV=development
+      - APP_PORT=3000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_fleet_management
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
+      - VAULT_ADDR=http://vault:8200
+      - DD_ENV=${DD_ENV:-prod}
+      - DD_SERVICE=cloud-fleet-management
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+    networks:
+      - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -269,9 +360,9 @@ services:
     ports:
       - "5128:3000"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
       - APP_PORT=3000
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_notification
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
       - WORKER_CONCURRENCY=1
       - DD_ENV=${DD_ENV:-prod}
@@ -287,7 +378,7 @@ services:
       rabbitmq:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -301,14 +392,14 @@ services:
     ports:
       - "5129:3000"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
       - APP_PORT=3000
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_reporting_export
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
       - REPORT_DOWNLOAD_SECRET=${REPORT_DOWNLOAD_SECRET:-dev-report-secret}
       - EXPORT_ROOT=/data/exports
       - WORKER_CONCURRENCY=1
-      - CLOUD_FEED_SERVICE_URL=http://cloud-feed-service:5130
+      - CLOUD_FEED_SERVICE_URL=http://cloud-feed-service:3000
       - DD_ENV=${DD_ENV:-prod}
       - DD_SERVICE=cloud-reporting-export-service
       - DD_VERSION=${DD_VERSION:-local}
@@ -324,7 +415,7 @@ services:
     volumes:
       - report_exports_data:/data/exports
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -338,9 +429,9 @@ services:
     ports:
       - "5130:3000"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
       - APP_PORT=3000
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_feed
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
       - DD_ENV=${DD_ENV:-prod}
       - DD_SERVICE=cloud-feed-service
@@ -356,7 +447,7 @@ services:
       rabbitmq:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -370,9 +461,9 @@ services:
     ports:
       - "5131:3000"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
       - APP_PORT=3000
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_barn_records
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
       - DD_ENV=${DD_ENV:-prod}
       - DD_SERVICE=cloud-barn-records-service
@@ -388,7 +479,7 @@ services:
       rabbitmq:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -404,7 +495,7 @@ services:
     environment:
       - NODE_ENV=production
       - APP_PORT=3000
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_weighvision_readmodel
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
       - DD_ENV=${DD_ENV:-prod}
       - DD_SERVICE=cloud-weighvision-readmodel
@@ -420,7 +511,248 @@ services:
       rabbitmq:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cloud-llm-insights-service:
+    build:
+      context: ./cloud-llm-insights-service
+      dockerfile: Dockerfile
+    container_name: farmiq-cloud-llm-insights-service
+    ports:
+      - "5134:8000"
+    environment:
+      - LOG_LEVEL=INFO
+      - PORT=8000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_llm_insights
+      - LLM_PROVIDER=${LLM_PROVIDER:-openai}
+      - LLM_TIMEOUT_S=${LLM_TIMEOUT_S:-10}
+      - LLM_MAX_TOKENS=${LLM_MAX_TOKENS:-1024}
+      - LLM_MODEL=${LLM_MODEL:-gpt-4.1-mini}
+      - PROMPT_VERSION=${PROMPT_VERSION:-v1}
+      - LLM_MONTHLY_BUDGET_USD=${LLM_MONTHLY_BUDGET_USD:-100.0}
+      - LLM_RATE_LIMIT_PER_MINUTE=${LLM_RATE_LIMIT_PER_MINUTE:-10}
+      - DD_ENV=${DD_ENV:-prod}
+      - DD_SERVICE=cloud-llm-insights-service
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+    networks:
+      - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8000/api/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cloud-ml-model-service:
+    build:
+      context: ./cloud-ml-model-service
+      dockerfile: Dockerfile
+    container_name: farmiq-cloud-ml-model-service
+    ports:
+      - "5135:8000"
+    environment:
+      - LOG_LEVEL=INFO
+      - PORT=8000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_ml_model
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
+      - DD_ENV=${DD_ENV:-prod}
+      - DD_SERVICE=cloud-ml-model-service
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+    networks:
+      - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8000/api/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # MLOPS INFRASTRUCTURE
+  # ============================================
+  cloud-mlflow-registry:
+    build:
+      context: ./cloud-mlflow-registry
+      dockerfile: Dockerfile
+    container_name: farmiq-cloud-mlflow-registry
+    ports:
+      - "5136:5000"
+    environment:
+      - LOG_LEVEL=INFO
+      - PORT=5000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_mlflow
+      - DD_ENV=${DD_ENV:-prod}
+      - DD_SERVICE=cloud-mlflow-registry
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+    networks:
+      - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:5000/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cloud-feature-store:
+    build:
+      context: ./cloud-feature-store
+      dockerfile: Dockerfile
+    container_name: farmiq-cloud-feature-store
+    ports:
+      - "5137:5137"
+    environment:
+      - LOG_LEVEL=INFO
+      - PORT=5137
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_feature_store
+      - DD_ENV=${DD_ENV:-prod}
+      - DD_SERVICE=cloud-feature-store
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+    networks:
+      - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:5137/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cloud-drift-detection:
+    build:
+      context: ./cloud-drift-detection
+      dockerfile: Dockerfile
+    container_name: farmiq-cloud-drift-detection
+    ports:
+      - "5138:5138"
+    environment:
+      - LOG_LEVEL=INFO
+      - PORT=5138
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_drift_detection
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
+      - DD_ENV=${DD_ENV:-prod}
+      - DD_SERVICE=cloud-drift-detection
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+    networks:
+      - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:5138/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cloud-inference-server:
+    build:
+      context: ./cloud-inference-server
+      dockerfile: Dockerfile
+    container_name: farmiq-cloud-inference-server
+    ports:
+      - "5139:5139"
+    environment:
+      - LOG_LEVEL=INFO
+      - PORT=5139
+      - DD_ENV=${DD_ENV:-prod}
+      - DD_SERVICE=cloud-inference-server
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+    networks:
+      - farmiq-net
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:5139/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  cloud-hybrid-router:
+    build:
+      context: ./cloud-hybrid-router
+      dockerfile: Dockerfile
+    container_name: farmiq-cloud-hybrid-router
+    ports:
+      - "5140:5140"
+    environment:
+      - LOG_LEVEL=INFO
+      - PORT=5140
+      - DD_ENV=${DD_ENV:-prod}
+      - DD_SERVICE=cloud-hybrid-router
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+      - EDGE_MCU_ENDPOINT=http://edge-mcu:8080
+      - EDGE_GPU_ENDPOINT=http://edge-gpu:8081
+      - CLOUD_GPU_ENDPOINT=http://cloud-inference-server:5139
+    networks:
+      - farmiq-net
+    depends_on:
+      cloud-inference-server:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:5140/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cloud-standards-service:
+    build:
+      context: ./cloud-standards-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: farmiq-cloud-standards-service
+    ports:
+      - "5133:3000"
+    environment:
+      - NODE_ENV=production
+      - APP_PORT=3000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_standards_service
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
+      - DD_ENV=${DD_ENV:-prod}
+      - DD_SERVICE=cloud-standards-service
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+    networks:
+      - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -434,40 +766,234 @@ services:
     ports:
       - "5125:3000"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
       - APP_PORT=3000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_api_gateway_bff
       - IDENTITY_BASE_URL=http://cloud-identity-access:3000
       - REGISTRY_BASE_URL=http://cloud-tenant-registry:3000
       - TELEMETRY_BASE_URL=http://cloud-telemetry-service:3000
       - ANALYTICS_BASE_URL=http://cloud-analytics-service:8000
       - WEIGHVISION_READMODEL_BASE_URL=http://cloud-weighvision-readmodel:3000
+      - STANDARDS_SERVICE_URL=http://cloud-standards-service:3000
+      - CLOUD_STANDARDS_SERVICE_URL=http://cloud-standards-service:3000
       - CONFIG_RULES_BASE_URL=http://cloud-config-rules-service:3000
       - AUDIT_LOG_BASE_URL=http://cloud-audit-log-service:3000
       - NOTIFICATION_BASE_URL=http://cloud-notification-service:3000
+      - CLOUD_NOTIFICATION_SERVICE_URL=http://cloud-notification-service:3000
       - REPORTING_EXPORT_BASE_URL=http://cloud-reporting-export-service:3000
       - FEED_SERVICE_URL=http://cloud-feed-service:3000
       - BARN_RECORDS_SERVICE_URL=http://cloud-barn-records-service:3000
+      - LLM_INSIGHTS_BASE_URL=http://cloud-llm-insights-service:8000
+      - ML_MODEL_BASE_URL=http://cloud-ml-model-service:8000
+      - FLEET_MANAGEMENT_BASE_URL=http://cloud-fleet-management:3000
+      - STANDARDS_BASE_URL=http://cloud-standards-service:3000
+      - BILLING_SERVICE_URL=http://cloud-billing-service:3000
+      - CLOUD_BILLING_SERVICE_URL=http://cloud-billing-service:3000
+      - ADVANCED_ANALYTICS_BASE_URL=http://cloud-advanced-analytics:8000
+      - CLOUD_ADVANCED_ANALYTICS_BASE_URL=http://cloud-advanced-analytics:8000
+      - DATA_PIPELINE_BASE_URL=http://cloud-data-pipeline:8000
+      - CLOUD_DATA_PIPELINE_BASE_URL=http://cloud-data-pipeline:8000
+      - BI_METABASE_BASE_URL=http://cloud-bi-metabase:3000
+      - CLOUD_BI_METABASE_BASE_URL=http://cloud-bi-metabase:3000
       - DD_ENV=${DD_ENV:-prod}
       - DD_SERVICE=cloud-api-gateway-bff
       - DD_VERSION=${DD_VERSION:-local}
       - DD_AGENT_HOST=datadog
       - DD_TRACE_AGENT_PORT=8126
     depends_on:
-      - cloud-identity-access
-      - cloud-tenant-registry
-      - cloud-telemetry-service
-      - cloud-analytics-service
-      - cloud-config-rules-service
-      - cloud-audit-log-service
-      - cloud-feed-service
-      - cloud-barn-records-service
+      postgres:
+        condition: service_healthy
+      cloud-identity-access:
+        condition: service_healthy
+      cloud-tenant-registry:
+        condition: service_healthy
+      cloud-telemetry-service:
+        condition: service_healthy
+      cloud-analytics-service:
+        condition: service_healthy
+      cloud-config-rules-service:
+        condition: service_healthy
+      cloud-audit-log-service:
+        condition: service_healthy
+      cloud-feed-service:
+        condition: service_healthy
+      cloud-barn-records-service:
+        condition: service_healthy
+      cloud-llm-insights-service:
+        condition: service_healthy
+      cloud-ml-model-service:
+        condition: service_healthy
+      cloud-standards-service:
+        condition: service_healthy
+      cloud-billing-service:
+        condition: service_healthy
+      cloud-advanced-analytics:
+        condition: service_healthy
+      cloud-data-pipeline:
+        condition: service_healthy
+      cloud-bi-metabase:
+        condition: service_healthy
     networks:
       - farmiq-net
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # ============================================
+  # FRONTEND APPLICATIONS
+  # ============================================
+  dashboard-web:
+    build:
+      context: ../apps/dashboard-web
+      dockerfile: Dockerfile
+    container_name: farmiq-dashboard-web
+    ports:
+      - "5142:80"
+    environment:
+      - VITE_API_BASE_URL=http://cloud-api-gateway-bff:3000
+      - VITE_AUTH_URL=http://cloud-identity-access:3000
+    networks:
+      - farmiq-net
+    depends_on:
+      - cloud-api-gateway-bff
+    profiles:
+      - ui
+
+  admin-web:
+    build:
+      context: ../apps/admin-web
+      dockerfile: Dockerfile
+    container_name: farmiq-admin-web
+    ports:
+      - "5143:80"
+    environment:
+      - VITE_API_BASE_URL=http://cloud-api-gateway-bff:3000
+      - VITE_AUTH_URL=http://cloud-identity-access:3000
+    networks:
+      - farmiq-net
+    depends_on:
+      - cloud-api-gateway-bff
+    profiles:
+      - ui
+
+  cloud-billing-service:
+    build:
+      context: ./cloud-billing-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: farmiq-cloud-billing-service
+    ports:
+      - "5145:3000"
+    environment:
+      - NODE_ENV=production
+      - APP_PORT=3000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_billing
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
+      - DD_ENV=${DD_ENV:-prod}
+      - DD_SERVICE=cloud-billing-service
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+    networks:
+      - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cloud-advanced-analytics:
+    build:
+      context: ./cloud-advanced-analytics
+      dockerfile: Dockerfile
+    container_name: farmiq-cloud-advanced-analytics
+    ports:
+      - "5146:8000"
+    environment:
+      - LOG_LEVEL=INFO
+      - PORT=8000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_advanced_analytics
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
+      - DD_ENV=${DD_ENV:-prod}
+      - DD_SERVICE=cloud-advanced-analytics
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+    networks:
+      - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8000/api/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cloud-data-pipeline:
+    build:
+      context: ./cloud-data-pipeline
+      dockerfile: Dockerfile
+    container_name: farmiq-cloud-data-pipeline
+    ports:
+      - "5147:8000"
+    environment:
+      - LOG_LEVEL=INFO
+      - PORT=8000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_data_pipeline
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
+      - DD_ENV=${DD_ENV:-prod}
+      - DD_SERVICE=cloud-data-pipeline
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+    networks:
+      - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "dbt", "--version" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  cloud-bi-metabase:
+    build:
+      context: ./cloud-bi-metabase
+      dockerfile: Dockerfile
+    container_name: farmiq-cloud-bi-metabase
+    ports:
+      - "5148:3000"
+    environment:
+      - MB_DB_FILE=/metabase-data/metabase.db
+      - MB_JETTY_HOST=0.0.0.0
+      - MB_JETTY_PORT=3000
+      - DD_ENV=${DD_ENV:-prod}
+      - DD_SERVICE=cloud-bi-metabase
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+    volumes:
+      - metabase_data:/metabase-data
+    networks:
+      - farmiq-net
+    healthcheck:
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 networks:
   farmiq-net:
@@ -475,5 +1001,7 @@ networks:
 
 volumes:
   postgres_data:
+  vault_data:
   rabbitmq_data:
   report_exports_data:
+  metabase_data:

@@ -1,0 +1,26 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "search": "Search",
+    "filter": "Filter",
+    "actions": "Actions",
+    "overview": "Overview",
+    "settings": "Settings",
+    "logout": "Logout",
+    "login": "Login",
+    "password": "Password",
+    "email": "Email",
+    "submit": "Submit",
+    "welcome": "Welcome"
+  }
+}

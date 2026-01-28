@@ -1,0 +1,96 @@
+// Billing Service Prisma Schema
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Phase 3: Usage Metrics
+model UsageMetric {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  metricType  String   @map("metric_type") // "devices", "api_calls", "storage_gb", "telemetry_points"
+  value       Float
+  period      String   // "hourly", "daily", "monthly"
+  periodStart DateTime @map("period_start")
+  periodEnd   DateTime @map("period_end")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@unique([tenantId, metricType, period, periodStart])
+  @@index([tenantId])
+  @@index([tenantId, periodStart])
+  @@index([metricType])
+  @@map("usage_metrics")
+}
+
+// Phase 3: Invoices
+model Invoice {
+  id            String   @id @default(uuid())
+  tenantId      String   @map("tenant_id")
+  invoiceNumber String   @unique @map("invoice_number")
+  amount        Decimal  @db.Decimal(10, 2)
+  currency      String   @default("USD")
+  status        String   @default("draft") // "draft", "sent", "paid", "overdue", "cancelled"
+  dueDate       DateTime @map("due_date")
+  periodStart   DateTime @map("period_start")
+  periodEnd     DateTime @map("period_end")
+  lineItems     Json     @map("line_items") // Array of line items
+  metadata      Json?    // Additional metadata
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  paidAt        DateTime? @map("paid_at")
+
+  payments      Payment[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, periodStart])
+  @@index([status])
+  @@map("invoices")
+}
+
+// Phase 3: Payments
+model Payment {
+  id            String   @id @default(uuid())
+  invoiceId     String   @map("invoice_id")
+  invoice       Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount        Decimal  @db.Decimal(10, 2)
+  currency      String   @default("USD")
+  status        String   @default("pending") // "pending", "completed", "failed", "refunded"
+  paymentMethod String   @map("payment_method") // "stripe", "bank_transfer", etc.
+  externalId    String?  @map("external_id") // Stripe payment intent ID, etc.
+  metadata      Json?    // Payment provider metadata
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  completedAt   DateTime? @map("completed_at")
+
+  @@index([invoiceId])
+  @@index([status])
+  @@index([externalId])
+  @@map("payments")
+}
+
+// Phase 3: Subscriptions
+model Subscription {
+  id            String   @id @default(uuid())
+  tenantId      String   @unique @map("tenant_id")
+  plan          String   // "standard", "enterprise", "trial"
+  status        String   @default("active") // "active", "cancelled", "expired", "past_due"
+  billingCycle  String   @map("billing_cycle") // "monthly", "annual"
+  currentPeriodStart DateTime @map("current_period_start")
+  currentPeriodEnd   DateTime @map("current_period_end")
+  cancelAtPeriodEnd Boolean @default(false) @map("cancel_at_period_end")
+  stripeSubscriptionId String? @map("stripe_subscription_id")
+  metadata      Json?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([stripeSubscriptionId])
+  @@map("subscriptions")
+}

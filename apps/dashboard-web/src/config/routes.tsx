@@ -14,18 +14,20 @@ import {
   FileText,
   Settings,
   Users,
-  Shield,
   Eye,
   Database,
   BarChart3,
   ClipboardList,
+  HelpCircle,
+  BookOpen,
+  History,
 } from 'lucide-react';
 
 export type Role = 'platform_admin' | 'tenant_admin' | 'farm_manager' | 'operator' | 'viewer';
 
 const FEED_PROGRAMS_ENABLED = import.meta.env.VITE_FEED_PROGRAMS_ENABLED === 'true';
 
-export type NavSectionKey = 'operations' | 'ai' | 'admin';
+export type NavSectionKey = 'operations' | 'ai';
 
 export interface RouteConfig {
   path: string;
@@ -41,7 +43,6 @@ export interface RouteConfig {
 export const NAV_SECTIONS: { key: NavSectionKey; labelKey: string }[] = [
   { key: 'operations', labelKey: 'nav.sections.operations' },
   { key: 'ai', labelKey: 'nav.sections.ai' },
-  { key: 'admin', labelKey: 'nav.sections.admin' },
 ];
 
 export const ROUTES: RouteConfig[] = [
@@ -357,100 +358,24 @@ export const ROUTES: RouteConfig[] = [
       },
     ],
   },
-  // Admin Section - Comprehensive Sitemap
+  // Help & Resources (Bottom section - no section assignment)
   {
-    path: '/admin/overview',
-    label: 'Admin Overview',
-    icon: <LayoutDashboard size={20} />,
-    requiredRoles: ['platform_admin', 'tenant_admin'],
-    section: 'admin',
+    path: '/help',
+    label: 'Help Center',
+    labelKey: 'nav.items.helpCenter',
+    icon: <HelpCircle size={20} />,
   },
   {
-    path: '/admin/governance',
-    label: 'Governance',
-    icon: <Building2 size={20} />,
-    requiredRoles: ['platform_admin'],
-    section: 'admin',
-    children: [
-      {
-        path: '/admin/tenants',
-        label: 'Tenants',
-        icon: <Warehouse size={18} />,
-        requiredRoles: ['platform_admin'],
-      },
-    ],
+    path: '/user-guide',
+    label: 'User Guide',
+    labelKey: 'nav.items.userGuide',
+    icon: <BookOpen size={20} />,
   },
   {
-    path: '/admin/identity',
-    label: 'Identity & Access',
-    icon: <Users size={20} />,
-    requiredRoles: ['platform_admin', 'tenant_admin'],
-    section: 'admin',
-    children: [
-      {
-        path: '/admin/identity/users',
-        label: 'Users',
-        icon: <Users size={18} />,
-        requiredRoles: ['platform_admin', 'tenant_admin'],
-      },
-      {
-        path: '/admin/identity/roles',
-        label: 'Roles',
-        icon: <Shield size={18} />,
-        requiredRoles: ['platform_admin', 'tenant_admin'],
-      },
-    ],
-  },
-  {
-    path: '/admin/fleet',
-    label: 'Fleet',
-    icon: <Server size={20} />,
-    requiredRoles: ['platform_admin', 'tenant_admin'],
-    section: 'admin',
-    children: [
-      {
-        path: '/admin/devices',
-        label: 'Devices',
-        icon: <Server size={18} />,
-        requiredRoles: ['platform_admin', 'tenant_admin'],
-      },
-      {
-        path: '/admin/devices/onboarding',
-        label: 'Device Onboarding',
-        icon: <Server size={18} />,
-        requiredRoles: ['platform_admin', 'tenant_admin'],
-      },
-    ],
-  },
-  {
-    path: '/admin/operations',
-    label: 'Operations',
-    icon: <Activity size={20} />,
-    requiredRoles: ['platform_admin', 'tenant_admin'],
-    section: 'admin',
-    children: [
-      {
-        path: '/admin/ops/health',
-        label: 'System Health',
-        icon: <Activity size={18} />,
-        requiredRoles: ['platform_admin', 'tenant_admin'],
-      },
-    ],
-  },
-  {
-    path: '/admin/compliance',
-    label: 'Compliance',
-    icon: <FileText size={20} />,
-    requiredRoles: ['platform_admin', 'tenant_admin'],
-    section: 'admin',
-    children: [
-      {
-        path: '/admin/audit-log',
-        label: 'Audit Log',
-        icon: <FileText size={18} />,
-        requiredRoles: ['platform_admin', 'tenant_admin'],
-      },
-    ],
+    path: '/changelog',
+    label: 'Changelog',
+    labelKey: 'nav.items.changelog',
+    icon: <History size={20} />,
   },
 ];
 

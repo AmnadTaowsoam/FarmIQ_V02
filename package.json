@@ -5,7 +5,18 @@
     "api:generate": "pnpm -C packages/farmiq-api-client generate",
     "api:lint": "pnpm -C packages/farmiq-api-client build",
     "contracts:generate": "pnpm -C packages/contracts generate",
-    "contracts:build": "pnpm -C packages/contracts build"
+    "contracts:build": "pnpm -C packages/contracts build",
+    "validate:openapi": "pwsh scripts/validate-openapi.ps1",
+    "validate:openapi:service": "pwsh scripts/validate-openapi.ps1",
+    "detect:breaking": "pwsh scripts/detect-breaking-changes.ps1",
+    "contracts:test": "cd tools/contract-tests && npm test",
+    "quality:gates": "npm run validate:openapi && npm run contracts:test",
+    "perf:api": "cd tools/performance-tests && npm run test:api",
+    "perf:db": "cd tools/performance-tests && npm run test:db",
+    "perf:mq": "cd tools/performance-tests && npm run test:mq",
+    "perf:frontend": "cd tools/performance-tests && npm run test:frontend",
+    "perf:stress": "cd tools/performance-tests && npm run test:stress",
+    "perf:iot": "cd tools/performance-tests/iot-simulator && npm start"
   },
   "dependencies": {
     "@types/amqplib": "^0.10.8",

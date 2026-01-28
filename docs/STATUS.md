@@ -31,8 +31,8 @@ Recent verification notes:
 | cloud-ingestion | cloud | 5122 | OK | OK | done | Antigravity |
 | cloud-telemetry-service | cloud | 5123 | OK | OK | done | CursorAI |
 | cloud-analytics-service | cloud | 5124 | OK | OK | done | Antigravity |
-| cloud-llm-insights-service | cloud | 5134 | - | - | doing | Codex |
-| cloud-ml-model-service | cloud | TBD | - | - | TODO | Codex |
+| cloud-llm-insights-service | cloud | 5134 | OK | OK | done | Codex |
+| cloud-ml-model-service | cloud | 5135 | OK | OK | done | Codex |
 | cloud-api-gateway-bff | cloud | 5125 | OK | OK | done | CursorAI |
 | cloud-config-rules-service | cloud | 5126 | OK | OK | done | CursorAI |
 | cloud-audit-log-service | cloud | 5127 | OK | OK | done | CursorAI |
@@ -41,7 +41,7 @@ Recent verification notes:
 | cloud-feed-service | cloud | 5130 | OK | OK | done | CursorAI |
 | cloud-barn-records-service | cloud | 5131 | OK | OK | done | CursorAI |
 | cloud-weighvision-readmodel | cloud | 5132 | OK | OK | done | CursorAI |
-| cloud-standards-service | cloud | 5133 | - | - | doing | Codex |
+| cloud-standards-service | cloud | 5133 | OK | OK | done | Codex |
 | dashboard-web | ui | 5142 | OK | OK | doing | Antigravity |
 
 ### Contracts Freeze

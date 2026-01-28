@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  admin-web:
+    build:
+      context: ..
+      dockerfile: apps/admin-web/Dockerfile
+      target: development
+      args:
+        - APP_NAME=admin-web
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    container_name: farmiq-admin-web-dev
+    ports:
+      - "5143:5173"
+    volumes:
+      - ./admin-web/src:/app/src:ro
+      - ./admin-web/package.json:/app/package.json:ro
+      - ./admin-web/vite.config.ts:/app/vite.config.ts:ro
+    environment:
+      - NODE_ENV=development
+      # Prevent a single ts-node process from consuming all memory and getting OOM-killed under WSL/Docker Desktop.
+      - NODE_OPTIONS=--max-old-space-size=256
+    command: ["npm", "run", "dev"]
+    networks:
+      - farmiq-net
+
+  dashboard-web:
+    build:
+      context: ..
+      dockerfile: apps/dashboard-web/Dockerfile
+      target: development
+      args:
+        - APP_NAME=dashboard-web
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    container_name: farmiq-dashboard-web-dev
+    ports:
+      - "5135:5173"
+    volumes:
+      - ./dashboard-web/src:/app/src:ro
+      - ./dashboard-web/package.json:/app/package.json:ro
+      - ./dashboard-web/vite.config.ts:/app/vite.config.ts:ro
+    environment:
+      - NODE_ENV=development
+      # Prevent a single ts-node process from consuming all memory and getting OOM-killed under WSL/Docker Desktop.
+      - NODE_OPTIONS=--max-old-space-size=256
+    command: ["npm", "run", "dev"]
+    networks:
+      - farmiq-net
+
+networks:
+  farmiq-net:
+    driver: bridge

@@ -31,9 +31,47 @@ model Tenant {
   sensors Sensor[] @relation("SensorToTenant")
   sensorBindings SensorBinding[] @relation("BindingToTenant")
   sensorCalibrations SensorCalibration[] @relation("CalibrationToTenant")
+  
+  // Phase 3: Quotas and Rate Limiting
+  quota     TenantQuota?
+  rateLimits TenantRateLimit[]
 
   @@index([status])
   @@map("tenants")
+}
+
+// Phase 3: Tenant Quotas
+model TenantQuota {
+  id              String   @id @default(uuid())
+  tenantId        String   @unique @map("tenant_id")
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  maxDevices      Int?     @map("max_devices")
+  maxFarms        Int?     @map("max_farms")
+  maxBarns        Int?     @map("max_barns")
+  maxUsers        Int?     @map("max_users")
+  maxStorageGb    Int?     @map("max_storage_gb")
+  maxApiCallsPerDay Int?   @map("max_api_calls_per_day")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("tenant_quotas")
+}
+
+// Phase 3: Tenant Rate Limits
+model TenantRateLimit {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  endpoint    String?  // null = global rate limit
+  requestsPerMinute Int @map("requests_per_minute")
+  requestsPerHour    Int @map("requests_per_hour")
+  requestsPerDay     Int @map("requests_per_day")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, endpoint])
+  @@index([tenantId])
+  @@map("tenant_rate_limits")
 }
 
 model Farm {
@@ -117,6 +155,13 @@ model Device {
   deviceType  String   // e.g., "sensor-gateway", "weighvision"
   serialNo    String?  // Optional serial number
   status      String   @default("active") // active, inactive, maintenance
+  
+  // Phase 2: Lifecycle & OTA
+  lifecycleState  String   @default("PROVISIONED") // PROVISIONED, ACTIVE, MAINTENANCE, DECOMMISSIONED
+  firmwareVersion String?
+  lastHello       DateTime?
+  healthScore     Float?   @default(100.0)
+
   metadata    Json?    // Additional device-specific metadata
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

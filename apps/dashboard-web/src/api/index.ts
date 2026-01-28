@@ -206,6 +206,10 @@ export const api = {
         kpi: (params: { tenantId: string; barnId?: string; startDate: string; endDate: string }) =>
             httpClient.get<ApiResponse<any>>(FEEDING_ENDPOINTS.KPI, { params }),
 
+        // Daily feeding data for charts
+        daily: (params: { tenant_id: string; farm_id?: string; barn_id?: string; batch_id?: string; start_date: string; end_date: string }) =>
+            httpClient.get<ApiResponse<any>>(`${FEEDING_ENDPOINTS.KPI.replace('/kpi', '')}/daily`, { params }),
+
         intakeRecords: {
             list: (params?: any) => httpClient.get<ApiResponse<any[]>>(FEEDING_ENDPOINTS.INTAKE_RECORDS, { params }),
             create: (data: any) => httpClient.post<ApiResponse<any>>(FEEDING_ENDPOINTS.INTAKE_RECORDS, data),

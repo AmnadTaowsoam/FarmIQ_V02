@@ -1,0 +1,13 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: farmiq-bi
+
+resources:
+  - namespace.yaml
+  - 01-metabase-deployment.yaml
+
+images:
+  - name: metabase
+    newName: metabase/metabase
+    newTag: v0.50.10

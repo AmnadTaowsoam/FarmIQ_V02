@@ -1,0 +1,22 @@
+{
+  "name": "@farmiq/contract-tests",
+  "version": "1.0.0",
+  "description": "Contract testing with Pact for FarmIQ services",
+  "scripts": {
+    "test": "jest",
+    "test:pact": "jest --testPathPattern=pact",
+    "pact:publish": "pact-broker publish pacts --broker-base-url=$PACT_BROKER_URL --consumer-app-version=$CI_COMMIT_SHA",
+    "pact:verify": "pact-broker verify --broker-base-url=$PACT_BROKER_URL"
+  },
+  "dependencies": {
+    "@pact-foundation/pact": "^13.0.0",
+    "axios": "^1.6.0",
+    "jest": "^29.7.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.16.5",
+    "ts-jest": "^29.1.5",
+    "typescript": "^5.4.5"
+  }
+}

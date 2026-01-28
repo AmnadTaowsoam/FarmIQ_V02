@@ -1,0 +1,47 @@
+openapi: 3.0.0
+info:
+  title: FarmIQ Advanced Analytics API
+  version: 1.0.0
+  description: API for cohort analysis, forecasting, and anomalies
+paths:
+  /api/v1/analytics/cohorts:
+    get:
+      summary: List cohorts
+      tags: [Analytics]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of cohorts
+    post:
+      summary: Analyze cohort
+      tags: [Analytics]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Analysis result
+  /api/v1/analytics/forecasts/weight:
+    post:
+      summary: Generate weight forecast
+      tags: [Analytics]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Forecast data
+  /api/v1/analytics/anomalies:
+    get:
+      summary: List anomalies
+      tags: [Analytics]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of anomalies
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

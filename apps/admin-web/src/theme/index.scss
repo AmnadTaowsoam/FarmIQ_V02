@@ -1,0 +1,127 @@
+// Admin Web Theme Styles - Premium Agricultural Green Theme
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', 'Roboto', 'Helvetica Neue', 'Arial', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #F4F6F8;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+// Premium animations
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+// Glass morphism utility classes
+.glass-effect {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.glass-effect-dark {
+  background: rgba(30, 30, 30, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+// Premium card shadows
+.premium-card-shadow {
+  box-shadow: 0px 4px 24px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.premium-card-shadow:hover {
+  box-shadow: 0px 12px 40px rgba(0, 0, 0, 0.12);
+  transform: translateY(-4px);
+}
+
+// Premium button gradients
+.premium-gradient-primary {
+  background: linear-gradient(135deg, #4caf50 0%, #43a047 100%);
+}
+
+.premium-gradient-secondary {
+  background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
+}
+
+.premium-gradient-accent {
+  background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+}
+
+// Scrollbar styling
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(76, 175, 80, 0.3);
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(76, 175, 80, 0.5);
+}
+
+// Dark mode scrollbar
+@media (prefers-color-scheme: dark) {
+  ::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: rgba(102, 187, 106, 0.3);
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(102, 187, 106, 0.5);
+  }
+}

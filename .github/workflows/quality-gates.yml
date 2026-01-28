@@ -1,0 +1,124 @@
+name: Quality Gates
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+jobs:
+  lint-and-typecheck:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Type Check
+        run: npm run typecheck || npx tsc --noEmit
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: npm ci
+      - name: Run tests
+        run: npm test
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/lcov.info
+
+  openapi-validation:
+    name: OpenAPI Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+      - name: Install Spectral
+        run: npm install -g @stoplight/spectral-cli
+      - name: Validate OpenAPI
+        run: |
+          find . -name "openapi.yaml" -path "*/cloud-layer/*" -o -path "*/edge-layer/*" | while read file; do
+            echo "Validating: $file"
+            spectral lint "$file" || exit 1
+          done
+
+  breaking-change-detection:
+    name: Breaking Change Detection
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+      - name: Detect breaking changes
+        run: |
+          find . -name "openapi.yaml" -path "*/cloud-layer/*" -o -path "*/edge-layer/*" | while read file; do
+            dir=$(dirname "$file")
+            if [ -f "$dir/openapi.yaml" ]; then
+              echo "Checking: $dir"
+              # Compare with previous version
+              git diff HEAD~1 "$file" > /tmp/diff.txt || true
+              # Simple breaking change detection
+              if grep -q "^-.*required:" /tmp/diff.txt; then
+                echo "❌ Breaking change detected: Required field removed"
+                exit 1
+              fi
+            fi
+          done
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  contract-tests:
+    name: Contract Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        working-directory: tools/contract-tests
+        run: npm ci
+      - name: Run contract tests
+        working-directory: tools/contract-tests
+        run: npm test
+      - name: Publish contracts
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        working-directory: tools/contract-tests
+        env:
+          PACT_BROKER_URL: ${{ secrets.PACT_BROKER_URL }}
+          CI_COMMIT_SHA: ${{ github.sha }}
+        run: npm run pact:publish || echo "Pact broker not configured"

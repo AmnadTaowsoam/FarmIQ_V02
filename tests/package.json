@@ -1,0 +1,27 @@
+{
+    "name": "farmiq-tests",
+    "version": "1.0.0",
+    "description": "Integration and E2E tests for FarmIQ",
+    "scripts": {
+        "test": "jest",
+        "test:iot": "jest tests/integration/iot",
+        "test:cloud": "jest tests/integration/cloud",
+        "test:sync": "jest tests/integration/edge-cloud",
+        "test:e2e": "playwright test",
+        "simulate:iot": "node tests/integration/iot-simulator/simulator.js"
+    },
+    "dependencies": {
+        "mqtt": "^5.0.0",
+        "axios": "^1.6.0",
+        "dotenv": "^16.3.0",
+        "pg": "^8.11.0"
+    },
+    "devDependencies": {
+        "@playwright/test": "^1.40.0",
+        "@types/jest": "^29.5.0",
+        "jest": "^29.7.0",
+        "ts-jest": "^29.1.0",
+        "typescript": "^5.0.0",
+        "supertest": "^6.3.0"
+    }
+}

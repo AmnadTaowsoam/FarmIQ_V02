@@ -20,32 +20,32 @@ export function getServiceBaseUrls(): ServiceBaseUrls {
   const identityBaseUrl =
     process.env.IDENTITY_BASE_URL ||
     process.env.IDENTITY_SERVICE_URL ||
-    'http://cloud-identity-access:3000'
+    'http://cloud-identity-access:5120'
 
   const registryBaseUrl =
     process.env.REGISTRY_BASE_URL ||
     process.env.TENANT_REGISTRY_URL ||
-    'http://cloud-tenant-registry:3000'
+    'http://cloud-tenant-registry:5121'
 
   const telemetryBaseUrl =
     process.env.TELEMETRY_BASE_URL ||
     process.env.TELEMETRY_SERVICE_URL ||
-    'http://cloud-telemetry-service:3000'
+    'http://cloud-telemetry-service:5123'
 
   const analyticsBaseUrl =
     process.env.ANALYTICS_BASE_URL ||
     process.env.ANALYTICS_SERVICE_URL ||
-    'http://cloud-analytics-service:8000'
+    'http://cloud-analytics-service:5124'
 
   const weighvisionReadModelBaseUrl =
     process.env.WEIGHVISION_READMODEL_BASE_URL ||
-    'http://cloud-weighvision-readmodel:3000'
+    'http://cloud-weighvision-readmodel:5132'
 
   const standardsBaseUrl =
     process.env.STANDARDS_SERVICE_URL ||
     process.env.CLOUD_STANDARDS_SERVICE_URL ||
     process.env.STANDARDS_BASE_URL ||
-    'http://cloud-standards-service:3000'
+    'http://cloud-standards-service:5133'
 
   const configRulesBaseUrl =
     process.env.CONFIG_RULES_BASE_URL ||

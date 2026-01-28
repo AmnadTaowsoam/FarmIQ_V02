@@ -85,12 +85,9 @@ export async function getSyncStatus(req: Request, res: Response) {
 }
 
 export async function getOpsHealth(req: Request, res: Response) {
+  // Make tenantId optional for admin users
   const tenantId = getTenantIdFromRequest(res, req.query.tenantId as string)
-  if (!tenantId) {
-    return res.status(400).json({
-      error: { code: 'VALIDATION_ERROR', message: 'tenantId is required', traceId: res.locals.traceId || 'unknown' },
-    })
-  }
+  const isAdmin = !tenantId // Admin users don't provide tenantId
 
   const bases = getServiceBaseUrls()
   const targets: Array<{ name: string; url: string }> = [
@@ -115,12 +112,22 @@ export async function getOpsHealth(req: Request, res: Response) {
     uptime_percent: null,
   })
 
+  // For admin users (no tenantId), return data directly without wrapping
+  // For tenant-scoped requests, wrap in data object
+  const response = {
+    generated_at: new Date().toISOString(),
+    system_metrics: buildSystemMetrics(),
+    services,
+  }
+
+  if (isAdmin) {
+    return res.json(response)
+  }
+
   return res.json({
     data: {
       tenant_id: tenantId,
-      generated_at: new Date().toISOString(),
-      system_metrics: buildSystemMetrics(),
-      services,
+      ...response,
     },
   })
 }

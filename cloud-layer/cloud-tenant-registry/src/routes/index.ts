@@ -9,6 +9,7 @@ import topologyRoutes from './topologyRoutes'
 import sensorRoutes from './sensorRoutes'
 import adminTenantRoutes from './adminTenantRoutes'
 import adminDeviceRoutes from './adminDeviceRoutes'
+import quotaRoutes from './quotaRoutes'
 
 /**
  * Setup all routes for cloud-tenant-registry service
@@ -27,4 +28,5 @@ export function setupRoutes(app: Express) {
   app.use('/api/v1/stations', stationRoutes)
   app.use('/api/v1/topology', topologyRoutes)
   app.use('/api/v1/sensors', sensorRoutes)
+  app.use('/api/v1', quotaRoutes)
 }

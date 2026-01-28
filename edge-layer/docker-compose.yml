@@ -47,7 +47,7 @@ services:
     environment:
       - NODE_ENV=production
       - APP_PORT=3000
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/edge_ingress_gateway
       - MQTT_BROKER_URL=mqtt://edge-mqtt-broker:1883
       - EDGE_TELEMETRY_TIMESERIES_URL=http://edge-telemetry-timeseries:3000
       - EDGE_WEIGHVISION_SESSION_URL=http://edge-weighvision-session:3000
@@ -57,6 +57,8 @@ services:
       - DD_SERVICE=edge-ingress-gateway
       - DD_ENV=production
     depends_on:
+      postgres:
+        condition: service_healthy
       edge-mqtt-broker:
         condition: service_started
       edge-telemetry-timeseries:
@@ -81,11 +83,14 @@ services:
     environment:
       - NODE_ENV=production
       - APP_PORT=3000
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/edge_telemetry_timeseries
       - DD_SERVICE=edge-telemetry-timeseries
       - DD_ENV=production
     networks:
       - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 10s
@@ -102,11 +107,14 @@ services:
     environment:
       - NODE_ENV=production
       - APP_PORT=3000
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/edge_weighvision_session
       - DD_SERVICE=edge-weighvision-session
       - DD_ENV=production
     networks:
       - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 10s
@@ -123,7 +131,7 @@ services:
     environment:
       - NODE_ENV=production
       - APP_PORT=3000
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/edge_media_store
       - MEDIA_STORAGE_PATH=/data/media
       - DD_SERVICE=edge-media-store
       - DD_ENV=production
@@ -131,6 +139,9 @@ services:
       - ./data/edge-media:/data/media
     networks:
       - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 10s
@@ -147,14 +158,16 @@ services:
     environment:
       - LOG_LEVEL=INFO
       - PORT=8000
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
-      - MEDIA_STORAGE_PATH=/data/media
+      - MEDIA_STORE_URL=http://edge-media-store:3000
       - DD_SERVICE=edge-vision-inference
       - DD_ENV=production
     volumes:
       - ./data/edge-media:/data/media:ro
     networks:
       - farmiq-net
+    depends_on:
+      edge-media-store:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-fsS", "--max-time", "2", "http://localhost:8000/api/health"]
       interval: 10s
@@ -171,14 +184,18 @@ services:
     environment:
       - NODE_ENV=production
       - APP_PORT=3000
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/edge_sync_forwarder
       - CLOUD_INGESTION_URL=http://cloud-ingestion-mock:3000/api/v1/edge/batch
       - CLOUD_INGESTION_URL_REQUIRED=true
       - CLOUD_AUTH_MODE=${CLOUD_AUTH_MODE:-api_key}
       - CLOUD_API_KEY=${CLOUD_API_KEY:-edge-local-key}
+      - OUTBOX_MAX_ATTEMPTS=${OUTBOX_MAX_ATTEMPTS:-10}
+      - INTERNAL_ADMIN_ENABLED=${INTERNAL_ADMIN_ENABLED:-true}
       - DD_SERVICE=edge-sync-forwarder
       - DD_ENV=production
     depends_on:
+      postgres:
+        condition: service_healthy
       edge-cloud-ingestion-mock:
         condition: service_healthy
     networks:
@@ -199,7 +216,7 @@ services:
     environment:
       - NODE_ENV=production
       - APP_PORT=3000
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/edge_policy_sync
       - BFF_BASE_URL=http://cloud-api-gateway-bff:3000
       - EDGE_CLOUD_TOKEN=${EDGE_CLOUD_TOKEN:-}
       - POLICY_SYNC_INTERVAL_SECONDS=60
@@ -210,6 +227,9 @@ services:
       - DD_ENV=production
     networks:
       - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 10s
@@ -226,6 +246,7 @@ services:
     environment:
       - NODE_ENV=production
       - APP_PORT=3000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/edge_retention_janitor
       - MEDIA_BASE_PATH=/data/media
       - MEDIA_RETENTION_DAYS=7
       - MIN_FREE_DISK_GB=5
@@ -237,6 +258,9 @@ services:
       - ./data/edge-media:/data/media
     networks:
       - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 10s
@@ -254,7 +278,7 @@ services:
       - NODE_ENV=production
       - APP_PORT=3000
       - OBS_POLL_INTERVAL_SECONDS=30
-      - DISK_PATH=/data
+      - DISK_PATH=/
       - EDGE_INGRESS_URL=http://edge-ingress-gateway:3000
       - EDGE_TELEMETRY_URL=http://edge-telemetry-timeseries:3000
       - EDGE_WEIGHVISION_URL=http://edge-weighvision-session:3000
@@ -281,14 +305,17 @@ services:
     environment:
       - NODE_ENV=production
       - APP_PORT=5109
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/edge_feed_intake
       - MQTT_BROKER_URL=mqtt://edge-mqtt-broker:1883
+      - MQTT_CLIENT_ID=edge-feed-intake
       - EDGE_SYNC_FORWARDER_URL=http://edge-sync-forwarder:3000
       - DD_SERVICE=edge-feed-intake
       - DD_ENV=production
     networks:
       - farmiq-net
     depends_on:
+      postgres:
+        condition: service_healthy
       edge-mqtt-broker:
         condition: service_started
       edge-sync-forwarder:

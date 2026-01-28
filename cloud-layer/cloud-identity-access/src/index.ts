@@ -7,12 +7,29 @@ import { setupRoutes } from './routes'
 import { setupSwagger } from './utils/swagger'
 import { logger } from './utils/logger'
 import { PrismaClient } from '@prisma/client'
+import vault from 'node-vault'
 
 const app = express()
 const port = process.env.APP_PORT || 3000
 const prisma = new PrismaClient()
 
-const allowedOrigins = ['http://localhost:3000', 'http://localhost:5120', 'http://localhost:5130']
+// Vault Client Configuration
+const vaultClient = vault({
+  apiVersion: 'v1',
+  endpoint: process.env.VAULT_ADDR || 'http://vault:8200',
+  token: process.env.VAULT_TOKEN || 'root', // In prod, use AppRole or K8s Auth
+})
+
+
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5120',
+  'http://localhost:5125',
+  'http://localhost:5130',
+  'http://localhost:5135',
+  'http://localhost:5142',
+  'http://localhost:5143'
+]
 
 if (process.env.NODE_ENV === 'development') {
   const corsOptions = {
@@ -72,6 +89,24 @@ async function startServer() {
   try {
     await prisma.$connect()
     logger.info('Database connection has been established successfully.')
+
+    // Attempt to load secrets from Vault
+    try {
+      const secrets = await vaultClient.read(
+        'secret/data/farmiq/cloud-identity-access'
+      )
+      if (secrets && secrets.data) {
+        logger.info('Successfully loaded secrets from HashiCorp Vault')
+        // In a real app, you would assign these to process.env or a config object
+        // Object.assign(process.env, secrets.data.data);
+      }
+    } catch (vaultError) {
+      logger.warn(
+        'Failed to load secrets from Vault (is it running?):',
+        vaultError
+      )
+    }
+
     server = app.listen(port, () => {
       logger.info(`App running on port ${port}`)
     })

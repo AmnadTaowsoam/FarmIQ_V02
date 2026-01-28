@@ -1,0 +1,16 @@
+fastapi==0.109.0
+uvicorn[standard]==0.34.2
+python-dotenv==1.1.0
+pydantic==2.5.0
+pydantic-settings==2.2.1
+python-json-logger==2.0.7
+asyncpg==0.29.0
+ddtrace==2.12.3
+
+# RabbitMQ
+aio-pika==9.4.3
+
+# Tests
+pytest==8.3.4
+pytest-asyncio==0.25.0
+httpx==0.28.1

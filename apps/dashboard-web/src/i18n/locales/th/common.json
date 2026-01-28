@@ -42,7 +42,10 @@
       "adminUsers": "ผู้ใช้และบทบาท",
       "adminAudit": "บันทึกตรวจสอบ",
       "profile": "โปรไฟล์",
-      "settings": "ตั้งค่า"
+      "settings": "ตั้งค่า",
+      "helpCenter": "ศูนย์ช่วยเหลือ",
+      "userGuide": "คู่มือผู้ใช้",
+      "changelog": "บันทึกการเปลี่ยนแปลง"
     }
   },
   "pages": {

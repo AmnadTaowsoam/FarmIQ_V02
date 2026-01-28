@@ -1,0 +1,66 @@
+openapi: 3.0.0
+info:
+  title: FarmIQ Fleet Management API
+  version: 1.0.0
+  description: API for managing device fleet, firmware, and OTA campaigns
+paths:
+  /api/v1/fleet/firmwares:
+    get:
+      summary: List firmwares
+      tags: [Fleet]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of firmwares
+    post:
+      summary: Upload firmware
+      tags: [Fleet]
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                version:
+                  type: string
+      responses:
+        '201':
+          description: Firmware uploaded
+  /api/v1/fleet/campaigns:
+    get:
+      summary: List OTA campaigns
+      tags: [Fleet]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of campaigns
+    post:
+      summary: Create OTA campaign
+      tags: [Fleet]
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Campaign created
+  /api/v1/fleet/devices/status:
+    get:
+      summary: Get device fleet status
+      tags: [Fleet]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Device status list
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

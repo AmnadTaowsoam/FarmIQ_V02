@@ -18,7 +18,7 @@ export const login = async (req: Request, res: Response) => {
             include: { roles: true },
         });
 
-        if (!user || !(await bcrypt.compare(password, user.password))) {
+        if (!user || !user.password || !(await bcrypt.compare(password, user.password))) {
             return res.status(401).json({
                 error: {
                     code: 'UNAUTHORIZED',

@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { 
-  Grid, 
-  Typography, 
-  Stack, 
+import {
+  Grid,
+  Typography,
+  Stack,
   Box,
   Alert,
   Button,
@@ -28,11 +28,11 @@ import {
   AlertTitle,
   Tooltip
 } from '@mui/material';
-import { 
-    RefreshCw, 
-    Activity, 
-    Play, 
-    RotateCcw, 
+import {
+    RefreshCw,
+    Activity,
+    Play,
+    RotateCcw,
     CheckCircle2,
     Terminal
 } from 'lucide-react';
@@ -41,6 +41,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { edgeOpsApi, DlqEvent } from '@/api/client';
 import { MetricCard } from '@/components/ui/MetricCard';
 import { useMutation } from '@tanstack/react-query';
+import { PremiumButton, PremiumButtonDanger } from '@/components';
 
 // Type for the redrive API response
 interface RedriveResponse {
@@ -181,15 +182,13 @@ export function SyncTab() {
                      </Tooltip>
                      <Tooltip title={!enableDangerousActions ? "Enable 'Dangerous Actions' in Settings to use this." : ""}>
                         <span>
-                            <Button 
-                                variant="contained" 
-                                color="primary" 
+                            <PremiumButton
                                 startIcon={triggerMutation.isPending ? <CircularProgress size={16} color="inherit"/> : <Play size={16} />}
                                 onClick={() => triggerMutation.mutate()}
                                 disabled={!enableDangerousActions || triggerMutation.isPending || loadingState || !!errorState}
                             >
                                 Trigger Sync
-                            </Button>
+                            </PremiumButton>
                         </span>
                      </Tooltip>
                  </Stack>
@@ -272,15 +271,13 @@ export function SyncTab() {
                         </FormControl>
                         <Tooltip title={!enableDangerousActions ? "Enable 'Dangerous Actions' in Settings to use this." : ""}>
                             <span>
-                                <Button 
-                                    variant="outlined" 
-                                    color="error" 
+                                <PremiumButtonDanger
                                     startIcon={<RotateCcw size={16} />}
                                     disabled={!enableDangerousActions || dlqCount === 0 || redriveMutation.isPending || loadingState}
                                     onClick={() => setConfirmOpen(true)}
                                 >
                                     Redrive All
-                                </Button>
+                                </PremiumButtonDanger>
                             </span>
                         </Tooltip>
                     </Stack>
@@ -373,9 +370,9 @@ export function SyncTab() {
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setConfirmOpen(false)}>Cancel</Button>
-                    <Button onClick={handleRedriveAll} variant="contained" color="error" autoFocus>
+                    <PremiumButtonDanger onClick={handleRedriveAll} autoFocus>
                         Redrive All
-                    </Button>
+                    </PremiumButtonDanger>
                 </DialogActions>
             </Dialog>
 

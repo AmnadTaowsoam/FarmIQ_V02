@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useActiveContext } from '../contexts/ActiveContext';
-import { api } from '../api';
+import { api, unwrapApiResponse } from '../api';
 import { usePolling } from './usePolling';
 import type { components } from '@farmiq/api-client';
 
@@ -23,7 +23,7 @@ export const useFeeding = () => {
         try {
             const startDate = timeRange.start.toISOString().slice(0, 10);
             const endDate = timeRange.end.toISOString().slice(0, 10);
-            const response = await api.feedingDaily({
+            const response = await api.feeding.daily({
                 tenant_id: tenantId,
                 farm_id: farmId || undefined,
                 barn_id: barnId || undefined,
@@ -32,7 +32,8 @@ export const useFeeding = () => {
                 end_date: endDate,
             });
 
-            setDailyData(response.data?.daily_feed || []);
+            const data = unwrapApiResponse<any>(response);
+            setDailyData(data?.daily_feed || data || []);
             setError(null);
         } catch (err: any) {
             setError(err.message || 'Failed to fetch feeding data');

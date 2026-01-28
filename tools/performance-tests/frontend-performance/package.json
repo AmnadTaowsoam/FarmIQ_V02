@@ -1,0 +1,13 @@
+{
+  "name": "@farmiq/frontend-performance",
+  "version": "1.0.0",
+  "description": "Frontend performance testing with Lighthouse",
+  "main": "run-lighthouse.js",
+  "scripts": {
+    "test": "node run-lighthouse.js"
+  },
+  "dependencies": {
+    "lighthouse": "^11.4.0",
+    "chrome-launcher": "^1.1.0"
+  }
+}

@@ -1,0 +1,13 @@
+apiVersion: v2
+name: cloud-identity-access
+description: FarmIQ Cloud Identity & Access Service
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - farmiq
+  - identity
+  - access
+  - auth
+maintainers:
+  - name: FarmIQ Platform Team

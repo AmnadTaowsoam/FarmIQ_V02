@@ -9,7 +9,7 @@ COPY package*.json ./
 COPY prisma ./prisma/
 
 # Prisma engine selection depends on OpenSSL availability; install it in the build stage
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl3 libssl3
 
 # Configure npm for better network reliability
 RUN npm config set fetch-retries 5 && \

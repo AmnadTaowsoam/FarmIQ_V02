@@ -42,7 +42,10 @@
       "adminUsers": "Users & Roles",
       "adminAudit": "Audit Log",
       "profile": "Profile",
-      "settings": "Settings"
+      "settings": "Settings",
+      "helpCenter": "Help Center",
+      "userGuide": "User Guide",
+      "changelog": "Changelog"
     }
   },
   "pages": {

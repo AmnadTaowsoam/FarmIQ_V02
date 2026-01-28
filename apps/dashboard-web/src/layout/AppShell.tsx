@@ -7,8 +7,8 @@ import { Footer } from './Footer';
 import { SupportDrawer } from '../components/support/SupportDrawer';
 import { ApiDiagnosticsPanel } from '../components/dev/ApiDiagnosticsPanel';
 
-const SIDEBAR_WIDTH = 260;
-const SIDEBAR_COLLAPSED_WIDTH = 72;
+const SIDEBAR_WIDTH = 360;
+const SIDEBAR_COLLAPSED_WIDTH = 88;
 const SIDEBAR_STORAGE_KEY = 'farmiQ.sidebar';
 
 export const AppShell: React.FC = () => {

@@ -6,6 +6,8 @@ import {
   LogOut,
   Bell,
   HelpCircle,
+  BookOpen,
+  History,
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
@@ -19,7 +21,7 @@ import { SupportDrawer } from '../components/support/SupportDrawer';
 import { BrandMark } from '../components/Brand/BrandMark';
 import { SidebarNavItem } from '../components/layout/SidebarNavItem';
 
-const SIDEBAR_WIDTH = 280;
+const SIDEBAR_WIDTH = 360;
 const COLLAPSED_SIDEBAR_WIDTH = 88;
 
 export const MainLayout: React.FC = () => {
@@ -107,40 +109,40 @@ export const MainLayout: React.FC = () => {
 
   const drawerContent = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflowX: 'hidden' }}>
-      {/* Brand */}
-      <Box 
-        onClick={() => navigate('/overview')}
-        sx={{ 
-          p: 3, 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: 1.5,
-          cursor: 'pointer',
-          '&:hover': { opacity: 0.8 },
-          transition: 'opacity 0.2s',
-          justifyContent: isCollapsed ? 'center' : 'flex-start',
-        }}
-      >
-        <BrandMark sx={{ fontSize: 32, color: 'primary.main', minWidth: 32 }} />
-        <Typography 
-            variant="h5" 
-            fontWeight="800" 
-            color="text.primary" 
-            sx={{ 
-                letterSpacing: -0.5,
-                opacity: isCollapsed ? 0 : 1,
-                width: isCollapsed ? 0 : 'auto',
-                transition: theme.transitions.create(['opacity', 'width'], { duration: 200 }),
-                whiteSpace: 'nowrap',
-                overflow: 'hidden'
-            }}
+      {/* Logo Section (Desktop only) */}
+      {isDesktop && (
+        <Box
+          sx={{
+            height: 64,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: isCollapsed ? 'center' : 'flex-start',
+            px: isCollapsed ? 0 : 3,
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+            cursor: 'pointer',
+          }}
+          onClick={() => navigate('/overview')}
         >
-          FarmIQ
-        </Typography>
-      </Box>
+          <BrandMark sx={{ color: 'primary.main', fontSize: 32 }} />
+          {!isCollapsed && (
+            <Typography
+              variant="h5"
+              fontWeight="800"
+              color="text.primary"
+              sx={{ ml: 1.5, letterSpacing: -0.5 }}
+            >
+              FarmIQ
+            </Typography>
+          )}
+        </Box>
+      )}
+
+      {/* Spacer for AppBar (Mobile only) */}
+      {!isDesktop && <Toolbar />}
 
       {/* Menu */}
-      <List sx={{ flexGrow: 1, px: 2 }}>
+      <List sx={{ flexGrow: 1, px: 2, py: 2 }}>
         {renderMenuItems(menuItems)}
       </List>
 
@@ -152,6 +154,80 @@ export const MainLayout: React.FC = () => {
             </IconButton>
         </Box>
       )}
+
+      {/* Help & Resources Section */}
+      {!isCollapsed && <Divider sx={{ my: 1 }} />}
+      <List sx={{ px: 2, pb: 1 }}>
+        <Tooltip title="Help Center" placement="right" disableInteractive={!isCollapsed}>
+          <ListItemButton 
+            onClick={() => handleNavigate('/help')}
+            sx={{ 
+              borderRadius: 1.5,
+              justifyContent: isCollapsed ? 'center' : 'flex-start',
+              px: isCollapsed ? 1.5 : 2
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: 0, mr: isCollapsed ? 0 : 2, justifyContent: 'center' }}>
+              <HelpCircle size={20} />
+            </ListItemIcon>
+            <ListItemText 
+              primary="Help Center" 
+              sx={{ 
+                opacity: isCollapsed ? 0 : 1,
+                width: isCollapsed ? 0 : 'auto',
+                transition: theme.transitions.create(['opacity', 'width'], { duration: 200 }),
+                whiteSpace: 'nowrap',
+              }}
+            />
+          </ListItemButton>
+        </Tooltip>
+        <Tooltip title="User Guide" placement="right" disableInteractive={!isCollapsed}>
+          <ListItemButton 
+            onClick={() => handleNavigate('/user-guide')}
+            sx={{ 
+              borderRadius: 1.5,
+              justifyContent: isCollapsed ? 'center' : 'flex-start',
+              px: isCollapsed ? 1.5 : 2
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: 0, mr: isCollapsed ? 0 : 2, justifyContent: 'center' }}>
+              <BookOpen size={20} />
+            </ListItemIcon>
+            <ListItemText 
+              primary="User Guide" 
+              sx={{ 
+                opacity: isCollapsed ? 0 : 1,
+                width: isCollapsed ? 0 : 'auto',
+                transition: theme.transitions.create(['opacity', 'width'], { duration: 200 }),
+                whiteSpace: 'nowrap',
+              }}
+            />
+          </ListItemButton>
+        </Tooltip>
+        <Tooltip title="Changelog" placement="right" disableInteractive={!isCollapsed}>
+          <ListItemButton 
+            onClick={() => handleNavigate('/changelog')}
+            sx={{ 
+              borderRadius: 1.5,
+              justifyContent: isCollapsed ? 'center' : 'flex-start',
+              px: isCollapsed ? 1.5 : 2
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: 0, mr: isCollapsed ? 0 : 2, justifyContent: 'center' }}>
+              <History size={20} />
+            </ListItemIcon>
+            <ListItemText 
+              primary="Changelog" 
+              sx={{ 
+                opacity: isCollapsed ? 0 : 1,
+                width: isCollapsed ? 0 : 'auto',
+                transition: theme.transitions.create(['opacity', 'width'], { duration: 200 }),
+                whiteSpace: 'nowrap',
+              }}
+            />
+          </ListItemButton>
+        </Tooltip>
+      </List>
 
       {/* User Footer */}
       <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
@@ -184,21 +260,16 @@ export const MainLayout: React.FC = () => {
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
-      {/* AppBar (Desktop: shift right, Mobile: full width) */}
+      {/* AppBar (Clipped Drawer: Full width, on top) */}
       <AppBar
         position="fixed"
         elevation={0}
         sx={{
-          width: { md: `calc(100% - ${currentSidebarWidth}px)` },
-          ml: { md: `${currentSidebarWidth}px` },
-          bgcolor: 'background.default', // Transparent/matching bg
+          zIndex: (theme) => theme.zIndex.drawer + 1,
+          bgcolor: 'background.default',
           borderBottom: '1px solid',
           borderColor: 'divider',
           color: 'text.primary',
-          transition: theme.transitions.create(['width', 'margin'], {
-            easing: theme.transitions.easing.sharp,
-            duration: theme.transitions.duration.leavingScreen,
-          }),
         }}
       >
         <Toolbar>
@@ -212,10 +283,24 @@ export const MainLayout: React.FC = () => {
                 <MenuIcon />
             </IconButton>
             
-            {/* Mobile Brand */}
-            <Box sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center', gap: 1, ml: 1, flexGrow: 1 }}>
-                <BrandMark sx={{ color: 'primary.main', fontSize: 24 }} />
-                <Typography variant="h6" fontWeight="bold" color="text.primary" sx={{ letterSpacing: -0.5 }}>
+            {/* Brand (Mobile only - hidden on desktop as it's in sidebar) */}
+            <Box 
+                onClick={() => navigate('/overview')}
+                sx={{ 
+                    display: { xs: 'flex', md: 'none' },
+                    alignItems: 'center', 
+                    gap: 1.5, 
+                    mr: 2, 
+                    cursor: 'pointer',
+                }}
+            >
+                <BrandMark sx={{ color: 'primary.main', fontSize: 32 }} />
+                <Typography 
+                    variant="h5" 
+                    fontWeight="800" 
+                    color="text.primary" 
+                    sx={{ letterSpacing: -0.5, display: { xs: 'none', sm: 'block', md: 'none' } }}
+                >
                     FarmIQ
                 </Typography>
             </Box>
@@ -299,6 +384,7 @@ export const MainLayout: React.FC = () => {
         sx={{
           flexGrow: 1,
           width: { md: `calc(100% - ${currentSidebarWidth}px)` },
+          // Ensure main content is not hidden behind sidebar or navbar
           transition: theme.transitions.create(['width', 'margin'], {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.leavingScreen,

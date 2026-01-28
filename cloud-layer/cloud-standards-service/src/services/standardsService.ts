@@ -686,6 +686,20 @@ export async function getImportJob(jobId: string) {
   })
 }
 
+export async function deleteSet(setId: string, tenantId: string | null) {
+  const existing = await prisma.standardSet.findUnique({ where: { id: setId } })
+  if (!existing) {
+    throw new Error('Standard set not found')
+  }
+
+  // Check tenant access
+  if (existing.scope !== 'GLOBAL' && tenantId && existing.tenantId && existing.tenantId !== tenantId) {
+    throw new Error('Access denied: tenant mismatch')
+  }
+
+  await prisma.standardSet.delete({ where: { id: setId } })
+}
+
 export async function createImportJob(params: {
   status: 'DRAFT' | 'VALIDATED' | 'COMMITTED' | 'FAILED'
   filename: string

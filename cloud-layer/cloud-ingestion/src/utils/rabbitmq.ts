@@ -65,6 +65,33 @@ export async function publishEvent(exchange: string, routingKey: string, content
     }
 }
 
+// Retry Policy with Exponential Backoff
+export async function publishWithRetry(
+    exchange: string,
+    routingKey: string,
+    content: any,
+    headers: any = {},
+    maxRetries = 3
+) {
+    let attempt = 0;
+    while (attempt < maxRetries) {
+        try {
+            await publishEvent(exchange, routingKey, content, headers);
+            return;
+        } catch (error) {
+            attempt++;
+            logger.warn(`Publish failed (attempt ${attempt}/${maxRetries}). Retrying...`);
+            if (attempt >= maxRetries) {
+                logger.error(`Max retries reached for ${exchange}/${routingKey}`);
+                throw error;
+            }
+            // Exponential backoff: 100ms, 200ms, 400ms...
+            const delay = 100 * Math.pow(2, attempt - 1);
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+    }
+}
+
 export async function closeRabbitMQ() {
     try {
         if (channel) await channel.close();

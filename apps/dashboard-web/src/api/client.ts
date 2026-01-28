@@ -2,8 +2,31 @@ import axios, { AxiosError } from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 
 // Environment variable for BFF Base URL
-const BFF_BASE_URL = import.meta.env.VITE_BFF_BASE_URL || import.meta.env.VITE_API_BASE_URL || '/api';
+const rawBffUrl = import.meta.env.VITE_BFF_BASE_URL;
+const rawApiUrl = import.meta.env.VITE_API_BASE_URL;
+
+let envBaseUrl = rawBffUrl || rawApiUrl;
+
+// Sanitize: If the URL looks like a variable assignment partial (e.g. "/VITE_MOCK_MODE=true"), ignore it.
+if (envBaseUrl && (envBaseUrl.includes('VITE_MOCK_MODE=') || envBaseUrl.includes('='))) {
+    console.warn('⚠️ [DEBUG] Detected malformed BASE_URL:', envBaseUrl);
+    envBaseUrl = '';
+}
+
+// If env var is set, use it. Otherwise, default to empty string (to use relative path with proxy)
+// instead of '/api' which causes double prefixing if endpoints also start with /api
+const BFF_BASE_URL = envBaseUrl !== undefined ? envBaseUrl : '';
 const MOCK_MODE = import.meta.env.VITE_MOCK_MODE === 'true' || import.meta.env.NEXT_PUBLIC_MOCK_MODE === 'true';
+
+// 🔍 DIAGNOSTIC LOG: Log API Client Configuration
+console.log('🔍 [DEBUG] Dashboard API Client Configuration:', {
+    rawBffUrl,
+    rawApiUrl,
+    finalBaseUrl: BFF_BASE_URL,
+    VITE_MOCK_MODE: import.meta.env.VITE_MOCK_MODE,
+    MOCK_MODE,
+    NODE_ENV: import.meta.env.MODE
+});
 
 export const apiClient = axios.create({
     baseURL: BFF_BASE_URL,

@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useActiveContext } from '../contexts/ActiveContext';
-import { api } from '../api';
+import { api, unwrapApiResponse } from '../api';
 import { usePolling } from './usePolling';
 import type { components } from '@farmiq/api-client';
 
@@ -13,7 +13,7 @@ export const useSensors = () => {
     const [error, setError] = useState<string | null>(null);
 
     const fetchSensors = useCallback(async () => {
-        if (!tenantId || !barnId) {
+        if (!tenantId) {
             setSensors([]);
             setLoading(false);
             return;
@@ -21,11 +21,14 @@ export const useSensors = () => {
 
         setLoading(true);
         try {
-            const response = await api.telemetryLatest({
-                tenantId: tenantId,
-                barn_id: barnId,
+            const response = await api.sensors.list({
+                tenantId,
+                barnId: barnId || undefined,
             });
-            setSensors(response.data?.sensors || []);
+            const data = unwrapApiResponse<any>(response);
+            // Handle response format: { items: Sensor[], nextCursor }
+            const items = data?.items || data || [];
+            setSensors(Array.isArray(items) ? items : []);
             setError(null);
         } catch (err: any) {
             setError(err.message || 'Failed to fetch sensors');

@@ -1,0 +1,21 @@
+# dbt requirements for FarmIQ data pipeline
+
+# Core dbt
+dbt-core==1.7.0
+dbt-postgres==1.7.0
+# Note: dbt-utils is a dbt package, not a PyPI package
+# It should be installed via packages.yml and 'dbt deps' command
+
+# Note: Airflow is a separate service that reads DAGs from this service
+# Airflow DAGs are in dags/ directory but Airflow runs in its own container
+
+# Database drivers
+psycopg2-binary==2.9.9
+
+# Utilities
+python-dotenv==1.0.0
+pyyaml==6.0.1
+
+# Pin protobuf to fix compatibility issue with dbt-core 1.7.0
+# See: https://github.com/databricks/dbt-databricks/issues/614
+protobuf==4.25.3

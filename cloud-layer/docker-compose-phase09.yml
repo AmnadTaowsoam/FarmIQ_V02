@@ -1,0 +1,109 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # PHASE 09: DATA ANALYTICS & BUSINESS INTELLIGENCE
+  # ============================================
+  
+  cloud-data-pipeline:
+    build:
+      context: ./cloud-data-pipeline
+      dockerfile: Dockerfile
+    container_name: farmiq-cloud-data-pipeline
+    ports:
+      - "5141:8000"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER:-farmiq}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-farmiq_dev}
+      - DB_NAME=farmiq_analytics
+      - DBT_THREADS=4
+      - DD_ENV=${DD_ENV:-prod}
+      - DD_SERVICE=cloud-data-pipeline
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+    volumes:
+      - dbt_project:/app
+      - dbt_profiles:/root/.dbt
+    networks:
+      - farmiq-net
+    depends_on:
+      - postgres:
+          condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "dbt", "--version" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  cloud-bi-metabase:
+    build:
+      context: ./cloud-bi-metabase
+      dockerfile: Dockerfile
+    container_name: farmiq-cloud-bi-metabase
+    ports:
+      - "5142:3000"
+    environment:
+      - MB_DB_TYPE=postgres
+      - MB_DB_HOST=postgres
+      - MB_DB_PORT=5432
+      - MB_DB_NAME=farmiq_analytics
+      - MB_DB_USER=${POSTGRES_USER:-farmiq}
+      - MB_DB_PASS=${POSTGRES_PASSWORD:-farmiq_dev}
+      - MB_JETTY_HOST=0.0.0.0
+      - MB_JETTY_PORT=3000
+      - MB_SITE_URL=http://localhost:5142
+      - DD_ENV=${DD_ENV:-prod}
+      - DD_SERVICE=cloud-bi-metabase
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+    volumes:
+      - metabase_data:/metabase-data
+    networks:
+      - farmiq-net
+    depends_on:
+      - postgres:
+          condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:3000/api/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  cloud-advanced-analytics:
+    build:
+      context: ./cloud-advanced-analytics
+      dockerfile: Dockerfile
+    container_name: farmiq-cloud-advanced-analytics
+    ports:
+      - "5143:8000"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/farmiq_analytics
+      - LOG_LEVEL=INFO
+      - DD_ENV=${DD_ENV:-prod}
+      - DD_SERVICE=cloud-advanced-analytics
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+    networks:
+      - farmiq-net
+    depends_on:
+      - postgres:
+          condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/api/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  farmiq-net:
+    external: true
+  
+  volumes:
+    dbt_project:
+    dbt_profiles:
+    metabase_data:

@@ -1,0 +1,149 @@
+extends: ["spectral:oas", "spectral:asyncapi"]
+rules:
+  # API Versioning
+  api-version-in-path:
+    description: "API endpoints must include version in path (/api/v1/...)"
+    severity: error
+    given: "$.paths[*]~"
+    then:
+      function: pattern
+      functionOptions:
+        match: "^/api/v[0-9]+/.*|^/api/health$|^/api/ready$|^/api-docs.*"
+
+  # Resource naming
+  plural-resource-names:
+    description: "Resource names in paths should be plural"
+    severity: warn
+    given: "$.paths[*]~"
+    then:
+      function: pattern
+      functionOptions:
+        match: "/(devices|farms|barns|batches|tenants|users|roles|sensors|stations|invoices|subscriptions|payments|usage|metrics)(/.*)?$"
+
+  # Error response format
+  error-response-format:
+    description: "Error responses must follow standard format with error.code and error.message"
+    severity: error
+    given: "$.paths[*][*].responses[4XX,5XX].content.application/json.schema"
+    then:
+      field: properties
+      function: truthy
+    then:
+      field: properties.error
+      function: truthy
+
+  # Required headers
+  correlation-headers:
+    description: "Endpoints should document x-request-id and x-trace-id headers"
+    severity: warn
+    given: "$.paths[*][*].parameters[*]"
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          anyOf:
+            - properties:
+                name:
+                  enum: ["x-request-id", "x-trace-id"]
+
+  # Pagination
+  pagination-parameters:
+    description: "List endpoints should include pagination parameters"
+    severity: warn
+    given: "$.paths[*].get.parameters[*]"
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          anyOf:
+            - properties:
+                name:
+                  enum: ["page", "pageSize"]
+
+  # OpenAPI info
+  api-info-required:
+    description: "OpenAPI info must include title, version, and description"
+    severity: error
+    given: "$.info"
+    then:
+      field: title
+      function: truthy
+    then:
+      field: version
+      function: truthy
+    then:
+      field: description
+      function: truthy
+
+  # Security schemes
+  bearer-auth-defined:
+    description: "Bearer authentication scheme must be defined"
+    severity: error
+    given: "$.components.securitySchemes"
+    then:
+      field: bearerAuth
+      function: truthy
+
+  # Deprecation
+  sunset-header-on-deprecated:
+    description: "Deprecated endpoints should include X-Sunset header"
+    severity: warn
+    given: "$.paths[*][*][?(@.deprecated == true)]"
+    then:
+      field: parameters
+      function: schema
+      functionOptions:
+        schema:
+          anyOf:
+            - properties:
+                name:
+                  enum: ["X-Sunset"]
+
+  # Field naming (snake_case)
+  snake-case-parameters:
+    description: "Query and path parameters should use snake_case"
+    severity: warn
+    given: "$.paths[*][*].parameters[*]"
+    then:
+      function: pattern
+      functionOptions:
+        match: "^[a-z][a-z0-9_]*$"
+
+  # Response status codes
+  standard-status-codes:
+    description: "Use standard HTTP status codes"
+    severity: error
+    given: "$.paths[*][*].responses[*]~"
+    then:
+      function: pattern
+      functionOptions:
+        match: "^(200|201|204|400|401|403|404|409|429|500|503)$"
+
+  # No operation-ids
+  operation-id-required:
+    description: "All operations must have operationId"
+    severity: error
+    given: "$.paths[*][*]"
+    then:
+      field: operationId
+      function: truthy
+
+  # Tags required
+  tags-required:
+    description: "All operations must have at least one tag"
+    severity: error
+    given: "$.paths[*][*]"
+    then:
+      field: tags
+      function: truthy
+
+  # Date formats
+  iso8601-dates:
+    description: "Date/time fields should use ISO 8601 format"
+    severity: warn
+    given: "$.components.schemas[*].properties[*][?(@.format == 'date' || @.format == 'date-time')]"
+    then:
+      field: format
+      function: enum
+      functionOptions:
+        values: ["date", "date-time"]

@@ -223,6 +223,40 @@ services:
     networks:
       - farmiq-net
 
+  prisma-studio-billing:
+    image: cloud-layer-cloud-billing-service
+    working_dir: /usr/src/app
+    ports:
+      - "5565:5555"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_billing
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    command: [ "sh", "-c", "npm_config_loglevel=error npm_config_fund=false npm_config_audit=false npx prisma@5.22.0 studio --schema prisma/schema.prisma --hostname 0.0.0.0 --port 5555" ]
+    volumes:
+      - ./cloud-billing-service/prisma:/usr/src/app/prisma:ro
+    networks:
+      - farmiq-net
+
+  prisma-studio-fleet-management:
+    image: node:20-alpine
+    working_dir: /usr/src/app
+    ports:
+      - "5566:5555"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_fleet_management
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    command: [ "sh", "-c", "npm_config_loglevel=error npm_config_fund=false npm_config_audit=false npx prisma@5.22.0 studio --schema prisma/schema.prisma --hostname 0.0.0.0 --port 5555" ]
+    volumes:
+      - ./cloud-fleet-management/prisma:/usr/src/app/prisma:ro
+    networks:
+      - farmiq-net
+
 networks:
   farmiq-net:
+    name: farmiq-net
     external: true
+

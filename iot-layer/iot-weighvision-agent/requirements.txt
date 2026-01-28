@@ -1,0 +1,21 @@
+# IoT WeighVision Agent Dependencies
+
+# MQTT client
+paho-mqtt==2.0.0
+
+# HTTP requests
+requests==2.31.0
+
+# Computer vision (camera capture)
+opencv-python-headless==4.8.1.78
+
+# Serial communication (scale reading)
+pyserial==3.5
+
+# Structured logging
+structlog==24.1.0
+
+# Testing dependencies (optional, for development)
+pytest==7.4.3
+pytest-cov==4.1.0
+pytest-mock==3.12.0

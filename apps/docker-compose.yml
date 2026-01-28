@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  admin-web:
+    build:
+      context: ..
+      dockerfile: apps/admin-web/Dockerfile
+      args:
+        - APP_NAME=admin-web
+    container_name: farmiq-admin-web
+    ports:
+      - "5143:80"
+    networks:
+      - farmiq-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+
+  dashboard-web:
+    build:
+      context: ..
+      dockerfile: apps/dashboard-web/Dockerfile
+      args:
+        - APP_NAME=dashboard-web
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    container_name: farmiq-dashboard-web
+    ports:
+      - "5135:8080"
+    networks:
+      - farmiq-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+
+networks:
+  farmiq-net:
+    driver: bridge

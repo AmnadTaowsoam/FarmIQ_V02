@@ -1,0 +1,13 @@
+apiVersion: v2
+name: cloud-api-gateway-bff
+description: FarmIQ Cloud API Gateway BFF - Backend for Frontend service
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - farmiq
+  - api
+  - gateway
+  - bff
+maintainers:
+  - name: FarmIQ Platform Team

@@ -1,0 +1,107 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloud-inference-server
+  namespace: farmiq-mlops
+  labels:
+    app: cloud-inference-server
+    project: farmiq
+    layer: cloud
+    component: mlops
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cloud-inference-server
+  template:
+    metadata:
+      labels:
+        app: cloud-inference-server
+        project: farmiq
+        layer: cloud
+        component: mlops
+    spec:
+      containers:
+      - name: inference-server
+        image: farmiq-inference-server:latest
+        ports:
+        - containerPort: 5139
+          name: http
+        - containerPort: 8000
+          name: triton-http
+        - containerPort: 8001
+          name: triton-grpc
+        - containerPort: 8002
+          name: triton-metrics
+        env:
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: PORT
+          value: "5139"
+        - name: DD_ENV
+          value: "prod"
+        - name: DD_SERVICE
+          value: "cloud-inference-server"
+        - name: DD_VERSION
+          value: "v1.0.0"
+        - name: DD_AGENT_HOST
+          value: "datadog"
+        - name: DD_TRACE_AGENT_PORT
+          value: "8126"
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+            nvidia.com/gpu: 1
+          limits:
+            memory: "8Gi"
+            cpu: "4000m"
+            nvidia.com/gpu: 1
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5139
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 5139
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloud-inference-server
+  namespace: farmiq-mlops
+  labels:
+    app: cloud-inference-server
+    project: farmiq
+    layer: cloud
+    component: mlops
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5139
+    targetPort: 5139
+    protocol: TCP
+    name: http
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: triton-http
+  - port: 8001
+    targetPort: 8001
+    protocol: TCP
+    name: triton-grpc
+  - port: 8002
+    targetPort: 8002
+    protocol: TCP
+    name: triton-metrics
+  selector:
+    app: cloud-inference-server

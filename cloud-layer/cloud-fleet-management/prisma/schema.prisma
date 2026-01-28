@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Firmware {
+  id          String   @id @default(uuid())
+  version     String   @unique // e.g., "1.0.1"
+  s3Key       String?  // Path to binary in S3/MinIO
+  checksum    String?  // SHA256
+  isCritical  Boolean  @default(false)
+  releaseNote String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  campaigns   Campaign[]
+
+  @@map("firmwares")
+}
+
+model Campaign {
+  id            String   @id @default(uuid())
+  name          String
+  targetVersion String
+  firmware      Firmware @relation(fields: [targetVersion], references: [version])
+  
+  status        String   @default("DRAFT") // DRAFT, RUNNING, PAUSED, COMPLETED, CANCELLED
+  type          String   @default("ROLLOUT") // ROLLOUT, URGENT
+  
+  targetGroup   String?  // e.g., "all-sensors", "region-th"
+  errorThreshold Int     @default(5) // Pause if error % > 5%
+
+  totalDevices  Int      @default(0)
+  updatedDevices Int     @default(0)
+  failedDevices Int      @default(0)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  rolloutGroups RolloutGroup[]
+  tasks         DeviceTask[]
+
+  @@map("campaigns")
+}
+
+model RolloutGroup {
+  id          String   @id @default(uuid())
+  campaignId  String
+  campaign    Campaign @relation(fields: [campaignId], references: [id])
+  
+  percentage  Int      // e.g., 1, 10, 100
+  status      String   @default("PENDING") // PENDING, ACTIVE, COMPLETED
+  
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  @@map("rollout_groups")
+}
+
+model DeviceTask {
+  id          String   @id @default(uuid())
+  campaignId  String
+  campaign    Campaign @relation(fields: [campaignId], references: [id])
+  
+  deviceId    String
+  status      String   @default("PENDING") // PENDING, QUEUED, IN_PROGRESS, SUCCESS, FAILED, ROLLED_BACK
+  retries     Int      @default(0)
+  
+  log         String?
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  @@unique([campaignId, deviceId])
+  @@map("device_tasks")
+}

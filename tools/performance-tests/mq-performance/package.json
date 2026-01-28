@@ -1,0 +1,12 @@
+{
+  "name": "@farmiq/mq-performance",
+  "version": "1.0.0",
+  "description": "RabbitMQ performance testing",
+  "main": "run-tests.js",
+  "scripts": {
+    "test": "node run-tests.js"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.3"
+  }
+}

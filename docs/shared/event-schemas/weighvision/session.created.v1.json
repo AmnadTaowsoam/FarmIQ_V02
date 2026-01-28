@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "WeighVision Session Created Event",
+  "description": "Event published when a WeighVision session is created",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "event_id",
+    "trace_id",
+    "tenant_id",
+    "event_type",
+    "ts",
+    "payload"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["1.0"],
+      "description": "Schema version"
+    },
+    "event_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique event identifier"
+    },
+    "trace_id": {
+      "type": "string",
+      "description": "Trace correlation ID"
+    },
+    "tenant_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Tenant identifier"
+    },
+    "device_id": {
+      "type": "string",
+      "description": "Device identifier"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": ["weighvision.session.created"],
+      "description": "Event type"
+    },
+    "ts": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Event timestamp (UTC)"
+    },
+    "payload": {
+      "type": "object",
+      "required": ["session_id", "batch_id"],
+      "properties": {
+        "session_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Session identifier"
+        },
+        "batch_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Batch identifier"
+        },
+        "initial_weight_kg": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Initial weight in kilograms"
+        },
+        "station_id": {
+          "type": "string",
+          "description": "Station identifier (optional)"
+        }
+      }
+    }
+  }
+}

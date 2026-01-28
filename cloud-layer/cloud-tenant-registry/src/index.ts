@@ -50,6 +50,11 @@ app.get('/api/health', (_req: Request, res: Response): void => {
 })
 
 // Define the ready-check route (recommended)
+// Provisioning Routes
+import { provisionDevice, decommissionDevice } from './controllers/provisioning'
+app.post('/api/devices/provision', provisionDevice)
+app.post('/api/devices/:deviceId/decommission', decommissionDevice)
+
 app.get('/api/ready', async (_req: Request, res: Response): Promise<void> => {
   try {
     // Verify database connectivity

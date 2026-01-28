@@ -15,7 +15,7 @@ RUN npm config set fetch-retries 5 && \
     npm config set maxsockets 5
 
 # Install dependencies (skip scripts to avoid Prisma postinstall network issues)
-RUN npm ci --ignore-scripts
+RUN npm install --legacy-peer-deps --ignore-scripts
 
 # Generate the Prisma client
 RUN npx prisma generate
@@ -94,7 +94,7 @@ RUN npm config set fetch-retries 5 && \
     npm config set maxsockets 5
 
 # Install only production dependencies
-RUN npm ci --only=production
+RUN npm install --legacy-peer-deps --only=production
 
 # Copy the built application and Prisma client from the build stage
 COPY --from=build /usr/src/app/dist ./dist

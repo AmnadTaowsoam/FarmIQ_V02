@@ -3,6 +3,8 @@ import express, { Request, Response, NextFunction } from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
 import { transactionIdMiddleware } from './middlewares/transactionId'
+import { apiRateLimiter } from './middlewares/rateLimiter'
+import { apiVersioningMiddleware } from './middlewares/apiVersioning'
 import { setupRoutes } from './routes'
 import { setupSwagger } from './utils/swagger'
 import { logger } from './utils/logger'
@@ -13,9 +15,9 @@ const port = process.env.APP_PORT || 3000
 // API responses should not be cached by browsers during dev; 304s break clients expecting JSON.
 app.set('etag', false)
 
-const allowedOrigins = new Set<string>(['http://localhost:3000'])
+const allowedOrigins = new Set<string>(['http://localhost:3000', 'http://localhost:5143', 'http://localhost:5135'])
 
-// In dev, allow any localhost/127.0.0.1 origin to avoid confusing "Network Error" in the browser.
+// In dev, allow any localhost/127.0.0.1 origin to avoid confusing "Network Error" in browser.
 // In production, keep CORS strict (only allow known origins).
 const isDev = process.env.NODE_ENV !== 'production'
 
@@ -37,6 +39,7 @@ const corsOptions: cors.CorsOptions = {
   allowedHeaders: [
     'authorization',
     'content-type',
+    'cache-control',
     'x-tenant-id',
     'x-request-id',
     'x-trace-id',
@@ -49,6 +52,7 @@ app.use(cors(corsOptions))
 
 // Use middlewares
 app.use(transactionIdMiddleware)
+app.use(apiVersioningMiddleware) // API versioning support
 app.use((req: Request, res: Response, next: NextFunction): void => {
   if (req.path.startsWith('/api/')) {
     res.setHeader('Cache-Control', 'no-store')
@@ -62,6 +66,7 @@ app.use((req: Request, res: Response, next: NextFunction): void => {
 })
 app.use(express.json())
 app.use(helmet())
+app.use('/api', apiRateLimiter) // Apply rate limiting to all API routes
 
 // Setup routes and swagger
 setupRoutes(app)
@@ -82,7 +87,7 @@ const server = app.listen(port, () => {
   logger.info(`cloud-api-gateway-bff running on port ${port}`)
 })
 
-server.on('error', (err: NodeJS.ErrnoException) => {
+server.on('error', (err: NodeJS.ErrnoException): void => {
   if (err.code === 'EADDRINUSE') {
     logger.error(`Port ${port} is already in use`)
   } else {
@@ -101,4 +106,3 @@ const gracefulShutdown = (): void => {
 
 process.on('SIGTERM', gracefulShutdown)
 process.on('SIGINT', gracefulShutdown)
-

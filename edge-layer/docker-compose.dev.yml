@@ -7,7 +7,7 @@ services:
   # ============================================
   postgres:
     image: postgres:16-alpine
-    container_name: farmiq-edge-postgres
+    # container_name: farmiq-edge-postgres
     ports:
       - "5141:5432" # Different port from cloud (5140)
     environment:
@@ -26,7 +26,7 @@ services:
 
   minio:
     image: minio/minio:latest
-    container_name: farmiq-edge-minio
+    #container_name: farmiq-edge-minio
     ports:
       - "9000:9000" # MinIO API
       - "9001:9001" # MinIO Console
@@ -111,6 +111,8 @@ services:
       - ./edge-telemetry-timeseries/openapi.yaml:/usr/src/app/openapi.yaml:ro
     environment:
       - NODE_ENV=development
+      # Prevent a single ts-node process from consuming all memory and getting OOM-killed under WSL/Docker Desktop.
+      - NODE_OPTIONS=--max-old-space-size=256
       - LOG_LEVEL=debug
       - APP_PORT=3000
       - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
@@ -222,6 +224,8 @@ services:
       - ./edge-observability-agent/openapi.yaml:/usr/src/app/openapi.yaml:ro
     environment:
       - NODE_ENV=development
+      # Prevent a single ts-node process from consuming all memory and getting OOM-killed under WSL/Docker Desktop.
+      - NODE_OPTIONS=--max-old-space-size=256
       - LOG_LEVEL=debug
       - APP_PORT=3000
       - DISK_PATH=/
@@ -247,6 +251,8 @@ services:
       - ./edge-policy-sync/openapi.yaml:/usr/src/app/openapi.yaml:ro
     environment:
       - NODE_ENV=development
+      # Prevent a single ts-node process from consuming all memory and getting OOM-killed under WSL/Docker Desktop.
+      - NODE_OPTIONS=--max-old-space-size=256
       - LOG_LEVEL=debug
       - APP_PORT=3000
       - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
@@ -268,6 +274,8 @@ services:
       - ./edge-retention-janitor/openapi.yaml:/usr/src/app/openapi.yaml:ro
     environment:
       - NODE_ENV=development
+      # Prevent a single ts-node process from consuming all memory and getting OOM-killed under WSL/Docker Desktop.
+      - NODE_OPTIONS=--max-old-space-size=256
       - LOG_LEVEL=debug
       - APP_PORT=3000
       - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/${POSTGRES_DB:-farmiq}
@@ -278,7 +286,7 @@ services:
     build:
       context: ./edge-ops-web
       dockerfile: Dockerfile
-    container_name: farmiq-edge-ops-web
+    # container_name: farmiq-edge-ops-web
     ports:
       - "5113:80"
     environment:
@@ -310,7 +318,7 @@ services:
     build:
       context: ./edge-feed-intake
       dockerfile: Dockerfile.dev
-    container_name: farmiq-edge-feed-intake
+    # container_name: farmiq-edge-feed-intake
     ports:
       - "5116:5109"
     environment:

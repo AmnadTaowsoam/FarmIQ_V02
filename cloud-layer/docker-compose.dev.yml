@@ -22,7 +22,33 @@ services:
     networks:
       - farmiq-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-farmiq}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-farmiq}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+
+  vault:
+    image: hashicorp/vault:1.13.3
+    container_name: farmiq-cloud-vault
+    ports:
+      - "8200:8200"
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: root
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+      VAULT_ADDR: http://127.0.0.1:8200
+    cap_add:
+      - IPC_LOCK
+    volumes:
+      - vault_data:/vault/file
+    networks:
+      - farmiq-net
+    healthcheck:
+      test: [ "CMD", "vault", "status" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -45,10 +71,15 @@ services:
     networks:
       - farmiq-net
     healthcheck:
-      test: ["CMD", "rabbitmqctl", "status"]
+      test: [ "CMD", "rabbitmqctl", "status" ]
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.30'
+          memory: 256M
 
   # Datadog Agent - Commented out until DD_API_KEY is configured
   # datadog:
@@ -104,6 +135,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          memory: 384M
 
   cloud-tenant-registry:
     build:
@@ -133,6 +169,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          memory: 384M
 
   cloud-standards-service:
     build:
@@ -148,6 +189,8 @@ services:
       - ./cloud-standards-service/openapi.yaml:/usr/src/app/openapi.yaml:ro
     environment:
       - NODE_ENV=development
+      # Prevent a single ts-node process from consuming all memory and getting OOM-killed under WSL/Docker Desktop.
+      - NODE_OPTIONS=--max-old-space-size=256
       - APP_PORT=3000
       - LOG_LEVEL=debug
       - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_standards_service
@@ -161,6 +204,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          memory: 384M
 
   cloud-ingestion:
     build:
@@ -194,6 +242,11 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          memory: 384M
 
   cloud-telemetry-service:
     build:
@@ -224,6 +277,11 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          memory: 384M
 
   cloud-analytics-service:
     build:
@@ -233,7 +291,7 @@ services:
       - "5124:8000"
     volumes:
       - ./cloud-analytics-service/app:/app/app:ro
-    command: ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    command: [ "python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000" ]
     environment:
       - LOG_LEVEL=DEBUG
       - PORT=8000
@@ -267,6 +325,11 @@ services:
         condition: service_healthy
       cloud-llm-insights-service:
         condition: service_started
+    deploy:
+      resources:
+        limits:
+          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          memory: 384M
 
   cloud-llm-insights-service:
     build:
@@ -276,7 +339,7 @@ services:
       - "5134:8000"
     volumes:
       - ./cloud-llm-insights-service/app:/app/app:ro
-    command: ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    command: [ "python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000" ]
     environment:
       - LOG_LEVEL=DEBUG
       - PORT=8000
@@ -296,6 +359,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          memory: 384M
 
   cloud-api-gateway-bff:
     build:
@@ -310,6 +378,8 @@ services:
       - ./cloud-api-gateway-bff/prisma:/usr/src/app/prisma:ro
     environment:
       - NODE_ENV=development
+      # Prevent a single ts-node process from consuming all memory and getting OOM-killed under WSL/Docker Desktop.
+      - NODE_OPTIONS=--max-old-space-size=256
       - APP_PORT=3000
       - LOG_LEVEL=debug
       - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_api_gateway_bff
@@ -327,6 +397,14 @@ services:
       - REPORTING_EXPORT_BASE_URL=http://cloud-reporting-export-service:3000
       - FEED_SERVICE_URL=http://cloud-feed-service:3000
       - BARN_RECORDS_SERVICE_URL=http://cloud-barn-records-service:3000
+      - BILLING_SERVICE_URL=http://cloud-billing-service:3000
+      - CLOUD_BILLING_SERVICE_URL=http://cloud-billing-service:3000
+      - ADVANCED_ANALYTICS_BASE_URL=http://cloud-advanced-analytics:8000
+      - CLOUD_ADVANCED_ANALYTICS_BASE_URL=http://cloud-advanced-analytics:8000
+      - DATA_PIPELINE_BASE_URL=http://cloud-data-pipeline:8000
+      - CLOUD_DATA_PIPELINE_BASE_URL=http://cloud-data-pipeline:8000
+      - BI_METABASE_BASE_URL=http://cloud-bi-metabase:3000
+      - CLOUD_BI_METABASE_BASE_URL=http://cloud-bi-metabase:3000
       - DD_ENV=${DD_ENV:-dev}
       - DD_SERVICE=cloud-api-gateway-bff
       - DD_VERSION=${DD_VERSION:-local}
@@ -337,6 +415,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          memory: 384M
 
   cloud-config-rules-service:
     build:
@@ -364,6 +447,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          memory: 384M
 
   cloud-audit-log-service:
     build:
@@ -391,6 +479,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          memory: 384M
 
   cloud-notification-service:
     build:
@@ -422,6 +515,11 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          memory: 384M
 
   cloud-reporting-export-service:
     build:
@@ -457,6 +555,11 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          memory: 384M
 
   cloud-feed-service:
     build:
@@ -488,6 +591,11 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          memory: 384M
 
   cloud-barn-records-service:
     build:
@@ -519,6 +627,11 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          memory: 384M
 
   cloud-weighvision-readmodel:
     build:
@@ -550,6 +663,134 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          memory: 384M
+
+  cloud-billing-service:
+    build:
+      context: ./cloud-billing-service
+      dockerfile: Dockerfile
+      target: development
+    ports:
+      - "5145:3000"
+    volumes:
+      - ./cloud-billing-service/src:/usr/src/app/src:ro
+      - ./cloud-billing-service/package.json:/usr/src/app/package.json:ro
+      - ./cloud-billing-service/prisma:/usr/src/app/prisma:ro
+    environment:
+      - NODE_ENV=development
+      - APP_PORT=3000
+      - LOG_LEVEL=debug
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_billing
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
+      - DD_ENV=${DD_ENV:-dev}
+      - DD_SERVICE=cloud-billing-service
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+    networks:
+      - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          memory: 384M
+
+  cloud-advanced-analytics:
+    build:
+      context: ./cloud-advanced-analytics
+      dockerfile: Dockerfile
+    ports:
+      - "5146:8000"
+    volumes:
+      - ./cloud-advanced-analytics/app:/app/app:ro
+    command: [ "python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000" ]
+    environment:
+      - LOG_LEVEL=DEBUG
+      - PORT=8000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_advanced_analytics
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
+      - DD_ENV=${DD_ENV:-dev}
+      - DD_SERVICE=cloud-advanced-analytics
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+    networks:
+      - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          memory: 384M
+
+  cloud-data-pipeline:
+    build:
+      context: ./cloud-data-pipeline
+      dockerfile: Dockerfile
+    ports:
+      - "5147:8000"
+    volumes:
+      - ./cloud-data-pipeline:/app:ro
+    environment:
+      - LOG_LEVEL=DEBUG
+      - PORT=8000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_data_pipeline
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-farmiq}:${RABBITMQ_PASS:-farmiq_dev}@rabbitmq:5672
+      - DD_ENV=${DD_ENV:-dev}
+      - DD_SERVICE=cloud-data-pipeline
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+    networks:
+      - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+
+  cloud-bi-metabase:
+    build:
+      context: ./cloud-bi-metabase
+      dockerfile: Dockerfile
+    ports:
+      - "5148:3000"
+    environment:
+      - MB_DB_FILE=/metabase-data/metabase.db
+      - MB_JETTY_HOST=0.0.0.0
+      - MB_JETTY_PORT=3000
+      - DD_ENV=${DD_ENV:-dev}
+      - DD_SERVICE=cloud-bi-metabase
+      - DD_VERSION=${DD_VERSION:-local}
+      - DD_AGENT_HOST=datadog
+      - DD_TRACE_AGENT_PORT=8126
+    volumes:
+      - metabase_data:/metabase-data
+    networks:
+      - farmiq-net
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'    # ให้เยอะหน่อยเพราะตอน Start-up หนักมาก
+          memory: 1024M  # Metabase มักไม่รันถ้า RAM ต่ำกว่า 1GB
 
 networks:
   farmiq-net:
@@ -558,4 +799,6 @@ networks:
 volumes:
   postgres_data:
   rabbitmq_data:
+  vault_data:
   report_exports_data:
+  metabase_data:

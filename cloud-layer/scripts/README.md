@@ -1,147 +1,243 @@
-# RabbitMQ Queue Fix Scripts
+# Cloud Layer Scripts - Execution Order
 
-This folder also contains helper scripts for database setup and seed/migration workflows.
+This folder contains helper scripts for database setup, seeding, and verification. **Run scripts in numerical order** (01, 02, 03...).
 
-## Quick start (Cloud dev)
+## 🏗️ Shared Modules
 
-### Build + start + seed (recommended)
+All scripts now use shared modules to eliminate code duplication and ensure consistency:
 
+### `Shared/Config.ps1`
+Centralized configuration module containing:
+- Docker Compose file paths
+- PostgreSQL, RabbitMQ, and Vault configuration
+- API endpoint URLs
+- Database and service lists
+- Default test IDs
+
+### `Shared/Utilities.ps1`
+Common utility functions:
+- `Test-Docker` - Check if Docker is running
+- `Test-DockerComposeServices` - Check if services are running
+- `Invoke-ContainerCommand` - Execute commands in containers
+- `Invoke-PrismaMigrations` - Apply migrations via psql
+- `Wait-RabbitMQReady` - Wait for RabbitMQ to be ready
+- `Wait-VaultReady` - Wait for Vault to be ready
+- `Test-PostgresDatabase` - Check if database exists
+- `New-PostgresDatabase` - Create a database
+- `Write-ComposeEvidence` - Write resolved config to evidence directory
+- `Get-IsoUtcTimestamp` - Get ISO 8601 UTC timestamp
+- `Test-HttpEndpoint` - Check HTTP endpoint status
+
+## 📋 Script Execution Order
+
+### 01. `01-create-databases.ps1` - Create Databases
+**When to run:** First, before starting any services
+**What it does:** Creates all required PostgreSQL databases for each service
+**Usage:**
 ```powershell
 cd cloud-layer
-.\scripts\dev-up-and-seed.ps1
+.\scripts\01-create-databases.ps1
 ```
+**Note:** This is only needed if databases weren't created automatically during first `docker compose up`.
 
-### Seed via docker-compose (no PowerShell required inside containers)
+---
 
+### 02. `02-vault-init.ps1` - Initialize Vault (Optional)
+**When to run:** If you're using HashiCorp Vault for secrets management
+**What it does:** Initializes Vault with required policies and secrets
+**Usage:**
 ```powershell
-cd cloud-layer
-docker compose -f docker-compose.dev.yml up -d --build
-docker compose -f docker-compose.dev.yml -f docker-compose.seed.yml --profile seed up --build cloud-seed
+.\scripts\02-vault-init.ps1
 ```
+**Note:** Only needed if you're using Vault. Skip if not using secrets management.
 
-If you have flaky DNS/network, run the seed compose *without* `--build` so it reuses already-built images:
+---
 
+### 03. `03-dev-up-and-seed.ps1` - Build, Start & Seed (Recommended)
+**When to run:** After databases are created (01)
+**What it does:**
+- Builds and starts all services
+- Runs Prisma migrations
+- Seeds initial data
+**Usage:**
 ```powershell
-docker compose -f docker-compose.dev.yml up -d --build
-docker compose -f docker-compose.dev.yml -f docker-compose.seed.yml --profile seed up cloud-seed
+.\scripts\03-dev-up-and-seed.ps1
+# Or with custom seed count:
+$env:SEED_COUNT=50; .\scripts\03-dev-up-and-seed.ps1
 ```
+**Note:** This is the **recommended** way to start the development environment.
 
-Scripts to fix RabbitMQ queue configuration issues, specifically the `PRECONDITION_FAILED` error when queue arguments don't match.
+---
 
-## Problem
-
-When a queue already exists in RabbitMQ with different arguments (e.g., `x-dead-letter-exchange`), attempting to declare it with new arguments will fail with:
-
-```
-PRECONDITION_FAILED - inequivalent arg 'x-dead-letter-exchange' for queue '...' in vhost '/': received '...' but current is '...'
-```
-
-## Solution
-
-These scripts:
-1. Delete the problematic queue from RabbitMQ
-2. Restart the affected services (which will recreate the queue with correct configuration)
-
-## Usage
-
-### Windows (PowerShell)
-
+### 04. `04-run-seeds.ps1` - Seed Data Only
+**When to run:** If services are already running and you only need to seed data
+**What it does:** Seeds initial data without rebuilding services
+**Usage:**
 ```powershell
-cd cloud-layer
-.\scripts\fix-rabbitmq-queue.ps1
+.\scripts\04-run-seeds.ps1
+# Or with custom seed count:
+$env:SEED_COUNT=50; .\scripts\04-run-seeds.ps1
+```
+**Note:** Use this if you've already run `03-dev-up-and-seed.ps1` and just need to re-seed.
+
+---
+
+### 05. `05-push-and-seed-all.ps1` - Push Prisma Schemas & Seed
+**When to run:** If you need to push Prisma schemas and seed all services manually
+**What it does:**
+- Pushes Prisma schemas to databases
+- Seeds data for all services
+**Usage:**
+```powershell
+.\scripts\05-push-and-seed-all.ps1
+# Skip schema push:
+.\scripts\05-push-and-seed-all.ps1 -SkipPush
+# Skip seeding:
+.\scripts\05-push-and-seed-all.ps1 -SkipSeed
+```
+**Note:** Usually not needed if you've run `03-dev-up-and-seed.ps1`.
+
+---
+
+### 06. `06-verify-compose.ps1` - Verify Docker Compose Configuration
+**When to run:** After services are started, to verify configuration
+**What it does:** Validates Docker Compose configuration and environment variables
+**Usage:**
+```powershell
+.\scripts\06-verify-compose.ps1
+# Or with custom compose file:
+.\scripts\06-verify-compose.ps1 -ComposeFile "docker-compose.yml"
 ```
 
-With custom parameters:
+---
+
+### 07. `07-verify-bff-tenants-route.ps1` - Verify BFF Tenants Route
+**When to run:** After services are running, to verify API endpoints
+**What it does:** Tests the BFF `/api/v1/tenants` route and related endpoints
+**Usage:**
 ```powershell
-.\scripts\fix-rabbitmq-queue.ps1 `
+.\scripts\07-verify-bff-tenants-route.ps1
+```
+
+---
+
+### 08. `08-verify-dashboard-pages.ps1` - Verify Dashboard Pages
+**When to run:** After services are running, to verify frontend pages
+**What it does:** Tests dashboard pages and API endpoints
+**Usage:**
+```powershell
+.\scripts\08-verify-dashboard-pages.ps1
+# Or with custom parameters:
+.\scripts\08-verify-dashboard-pages.ps1 -BffBaseUrl "http://localhost:5125" -TenantId "your-tenant-id"
+```
+
+---
+
+### 09. `09-fix-rabbitmq-queue.ps1` - Fix RabbitMQ Queue Issues
+**When to run:** Only when you encounter RabbitMQ `PRECONDITION_FAILED` errors
+**What it does:**
+- Deletes problematic RabbitMQ queues
+- Restarts affected services to recreate queues
+**Usage:**
+```powershell
+.\scripts\09-fix-rabbitmq-queue.ps1
+# Or with custom parameters:
+.\scripts\09-fix-rabbitmq-queue.ps1 `
     -ComposeFile "docker-compose.dev.yml" `
     -QueueName "farmiq.cloud-telemetry-service.ingest.queue" `
     -RabbitMQContainer "farmiq-cloud-rabbitmq"
 ```
+**Note:** Only run this if you're experiencing RabbitMQ queue configuration errors.
 
-### Linux/Mac (Bash)
+---
 
-```bash
+### 10. `10-diagnose-prisma-studio.ps1` - Diagnose Prisma Studio Issues
+**When to run:** When Prisma Studio containers are exiting or not working properly
+**What it does:**
+- Checks Docker status
+- Verifies network configuration
+- Tests PostgreSQL connection
+- Analyzes Prisma Studio container logs
+- Provides diagnostic information and next steps
+**Usage:**
+```powershell
+.\scripts\10-diagnose-prisma-studio.ps1
+```
+**Note:** Use this when troubleshooting Prisma Studio container issues. It helps identify common problems like database connection errors, schema issues, or network problems.
+
+---
+
+## 🚀 Quick Start Workflow
+
+### First Time Setup:
+```powershell
 cd cloud-layer
-chmod +x scripts/fix-rabbitmq-queue.sh
-./scripts/fix-rabbitmq-queue.sh
+
+# 1. Create databases
+.\scripts\01-create-databases.ps1
+
+# 2. Build, start, and seed everything (recommended)
+.\scripts\03-dev-up-and-seed.ps1
+
+# 3. Verify everything works
+.\scripts\06-verify-compose.ps1
+.\scripts\07-verify-bff-tenants-route.ps1
 ```
 
-With custom parameters:
-```bash
-./scripts/fix-rabbitmq-queue.sh \
-    docker-compose.dev.yml \
-    "farmiq.cloud-telemetry-service.ingest.queue" \
-    "farmiq-cloud-rabbitmq" \
-    "farmiq" \
-    "farmiq_dev" \
-    "/"
+### Daily Development:
+```powershell
+cd cloud-layer
+
+# Just start services (if already seeded)
+docker compose -f docker-compose.dev.yml up -d
+
+# Or rebuild and seed
+.\scripts\03-dev-up-and-seed.ps1
 ```
 
-## Parameters
+### Troubleshooting:
+```powershell
+# If RabbitMQ has issues:
+.\scripts\09-fix-rabbitmq-queue.ps1
 
-### PowerShell Script
+# If Prisma Studio containers are failing:
+.\scripts\10-diagnose-prisma-studio.ps1
 
-- `-ComposeFile`: Docker Compose file path (default: `docker-compose.dev.yml`)
-- `-QueueName`: Queue name to delete (default: `farmiq.cloud-telemetry-service.ingest.queue`)
-- `-RabbitMQContainer`: RabbitMQ container name (default: `farmiq-cloud-rabbitmq`)
-- `-RabbitMQUser`: RabbitMQ username (default: `farmiq`)
-- `-RabbitMQPass`: RabbitMQ password (default: `farmiq_dev`)
-- `-VHost`: RabbitMQ virtual host (default: `/`)
-
-### Bash Script
-
-Positional arguments (in order):
-1. Docker Compose file path (default: `docker-compose.dev.yml`)
-2. Queue name (default: `farmiq.cloud-telemetry-service.ingest.queue`)
-3. RabbitMQ container name (default: `farmiq-cloud-rabbitmq`)
-4. RabbitMQ username (default: `farmiq`)
-5. RabbitMQ password (default: `farmiq_dev`)
-6. Virtual host (default: `/`)
-
-## What It Does
-
-1. **Checks Docker**: Verifies Docker is running
-2. **Checks RabbitMQ**: Ensures RabbitMQ container is running (starts it if needed)
-3. **Waits for RabbitMQ**: Waits up to 60 seconds for RabbitMQ to be ready
-4. **Deletes Queue**: Deletes the problematic queue (if it exists)
-5. **Restarts Services**: Restarts `cloud-telemetry-service` and `cloud-ingestion`
-6. **Verifies**: Checks if queue was recreated correctly
-
-## Services Restarted
-
-- `cloud-telemetry-service` - Will recreate the queue with correct configuration
-- `cloud-ingestion` - Restarted to ensure clean state
-
-## Verification
-
-After running the script, check the service logs:
-
-```bash
-docker compose -f docker-compose.dev.yml logs -f cloud-telemetry-service
+# If you need to re-seed:
+.\scripts\04-run-seeds.ps1
 ```
 
-You should see:
-- No `PRECONDITION_FAILED` errors
-- `RabbitMQ consumer setup complete` message
-- `Telemetry consumer started` message
+---
 
-## Troubleshooting
+## 📝 Notes
 
-### Script fails with "Docker is not running"
-- Start Docker Desktop or Docker daemon
+- **Scripts 01-03** are essential for initial setup
+- **Scripts 04-05** are for specific scenarios (re-seeding, manual schema push)
+- **Scripts 06-08** are for verification/testing
+- **Scripts 09-10** are for troubleshooting (RabbitMQ and Prisma Studio issues)
+- **Shared modules** (`Shared/Config.ps1` and `Shared/Utilities.ps1`) provide centralized configuration and utilities to all scripts
 
-### Script fails with "RabbitMQ container is not running"
-- The script will attempt to start it automatically
-- If it still fails, manually start: `docker compose -f docker-compose.dev.yml up -d rabbitmq`
-
-### Queue still has errors after running script
-- Check if there are other queues with similar issues
-- Manually delete the queue via RabbitMQ Management UI: http://localhost:5151
-- Or use: `docker exec farmiq-cloud-rabbitmq rabbitmqctl delete_queue -p / farmiq.cloud-telemetry-service.ingest.queue`
+---
 
 ## Related Files
 
-- `cloud-layer/cloud-telemetry-service/src/utils/rabbitmq.ts` - Queue configuration
-- `cloud-layer/cloud-rabbitmq/definitions.json` - RabbitMQ definitions
+- `cloud-layer/docker-compose.dev.yml` - Development Docker Compose configuration
+- `cloud-layer/docker-compose.prisma.yml` - Prisma Studio Docker Compose configuration
+- `cloud-layer/postgres-init/01-create-cloud-dbs.sql` - Database initialization SQL
+- `cloud-layer/cloud-rabbitmq/definitions.json` - RabbitMQ queue definitions
 
+---
+
+## ➕ Adding a New Service
+
+เมื่อเพิ่ม service ใหม่เข้าไปใน `cloud-layer` คุณต้องอัปเดตไฟล์หลายไฟล์
+
+**📖 ดูรายละเอียดที่:** [`ADDING-NEW-SERVICE.md`](./ADDING-NEW-SERVICE.md)
+
+**สรุปสิ่งที่ต้องอัปเดต:**
+1. ✅ `Shared/Config.ps1` - เพิ่ม service ใน `$Script:PrismaServices`
+2. ✅ `postgres-init/01-create-cloud-dbs.sql` - เพิ่ม CREATE DATABASE
+3. ✅ `docker-compose.prisma.yml` - เพิ่ม Prisma Studio service (ถ้าใช้ Prisma)
+4. ✅ `docker-compose.dev.yml` / `docker-compose.yml` - ตรวจสอบ DATABASE_URL และ depends_on
+
+**หมายเหตุ:** หลังจากการ optimize แล้ว คุณไม่จำเป็นต้องอัปเดตไฟล์ script อื่นๆ เพราะทุก script ดึงข้อมูลจาก `Shared/Config.ps1` แล้ว

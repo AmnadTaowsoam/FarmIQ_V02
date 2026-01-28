@@ -1,0 +1,24 @@
+{
+    "nav": {
+        "dashboard": "Dashboard",
+        "farms": "Farms",
+        "barns": "Barns",
+        "settings": "Settings"
+    },
+    "actions": {
+        "save": "Save",
+        "cancel": "Cancel",
+        "delete": "Delete",
+        "edit": "Edit"
+    },
+    "status": {
+        "online": "Online",
+        "offline": "Offline",
+        "warning": "Warning"
+    },
+    "common": {
+        "loading": "Loading...",
+        "error": "Something went wrong",
+        "welcome": "Welcome back, {{name}}"
+    }
+}

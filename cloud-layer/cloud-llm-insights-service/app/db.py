@@ -175,6 +175,203 @@ class LlmInsightsDb:
                 """
             )
 
+            # Phase 8: LLM Production & AI Governance - Additional tables
+
+            # Prompt registry table for versioning and A/B testing
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS llm_prompt_registry (
+                    id TEXT PRIMARY KEY,
+                    prompt_type TEXT NOT NULL,
+                    version TEXT NOT NULL,
+                    template TEXT NOT NULL,
+                    variables JSONB NOT NULL DEFAULT '[]'::jsonb,
+                    description TEXT,
+                    status TEXT NOT NULL DEFAULT 'draft',
+                    is_default BOOLEAN NOT NULL DEFAULT FALSE,
+                    ab_test_group TEXT,
+                    performance_metrics JSONB NOT NULL DEFAULT '{}'::jsonb,
+                    created_by TEXT NOT NULL DEFAULT 'system',
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                );
+                """
+            )
+
+            await conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS llm_prompt_registry_type_version_idx
+                  ON llm_prompt_registry(prompt_type, version);
+                """
+            )
+
+            # Audit trail table for AI governance
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS llm_audit_trail (
+                    event_id TEXT PRIMARY KEY,
+                    event_type TEXT NOT NULL,
+                    timestamp TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    tenant_id TEXT,
+                    user_id TEXT,
+                    insight_id TEXT,
+                    model_provider TEXT,
+                    model_name TEXT,
+                    prompt_version TEXT,
+                    details JSONB NOT NULL DEFAULT '{}'::jsonb,
+                    metadata JSONB NOT NULL DEFAULT '{}'::jsonb
+                );
+                """
+            )
+
+            await conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS llm_audit_trail_tenant_time_idx
+                  ON llm_audit_trail(tenant_id, timestamp DESC);
+                """
+            )
+
+            # Explainability records table
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS llm_explainability (
+                    id TEXT PRIMARY KEY,
+                    insight_id TEXT NOT NULL,
+                    explanation TEXT NOT NULL,
+                    confidence_factors JSONB NOT NULL DEFAULT '{}'::jsonb,
+                    data_sources JSONB NOT NULL DEFAULT '[]'::jsonb,
+                    reasoning_steps JSONB NOT NULL DEFAULT '[]'::jsonb,
+                    limitations JSONB NOT NULL DEFAULT '[]'::jsonb,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                );
+                """
+            )
+
+            await conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS llm_explainability_insight_idx
+                  ON llm_explainability(insight_id);
+                """
+            )
+
+            # Human override requests table
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS llm_human_override (
+                    request_id TEXT PRIMARY KEY,
+                    insight_id TEXT NOT NULL,
+                    original_insight JSONB NOT NULL,
+                    override_reason TEXT NOT NULL,
+                    requested_by TEXT NOT NULL,
+                    requested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    reviewed_by TEXT,
+                    reviewed_at TIMESTAMPTZ,
+                    review_comments TEXT,
+                    modified_insight JSONB
+                );
+                """
+            )
+
+            await conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS llm_human_override_status_idx
+                  ON llm_human_override(status, requested_at DESC);
+                """
+            )
+
+            # Bias detection results table
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS llm_bias_detection (
+                    assessment_id TEXT PRIMARY KEY,
+                    insight_id TEXT NOT NULL,
+                    bias_type TEXT NOT NULL,
+                    severity TEXT NOT NULL,
+                    detected_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    affected_groups JSONB NOT NULL DEFAULT '[]'::jsonb,
+                    description TEXT,
+                    mitigation_suggestions JSONB NOT NULL DEFAULT '[]'::jsonb
+                );
+                """
+            )
+
+            await conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS llm_bias_detection_insight_idx
+                  ON llm_bias_detection(insight_id);
+                """
+            )
+
+            # Risk assessment table
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS llm_risk_assessment (
+                    assessment_id TEXT PRIMARY KEY,
+                    insight_id TEXT NOT NULL,
+                    risk_level TEXT NOT NULL,
+                    risk_factors JSONB NOT NULL DEFAULT '[]'::jsonb,
+                    mitigation_actions JSONB NOT NULL DEFAULT '[]'::jsonb,
+                    assessed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    assessed_by TEXT NOT NULL DEFAULT 'system'
+                );
+                """
+            )
+
+            await conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS llm_risk_assessment_insight_idx
+                  ON llm_risk_assessment(insight_id);
+                """
+            )
+
+            # Cost tracking with tenant attribution table
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS llm_tenant_cost (
+                    id TEXT PRIMARY KEY,
+                    tenant_id TEXT NOT NULL,
+                    provider TEXT NOT NULL,
+                    model TEXT NOT NULL,
+                    input_tokens INTEGER NOT NULL,
+                    output_tokens INTEGER NOT NULL,
+                    total_tokens INTEGER NOT NULL,
+                    cost_usd DOUBLE PRECISION NOT NULL,
+                    insight_id TEXT,
+                    timestamp TIMESTAMPTZ NOT NULL DEFAULT now()
+                );
+                """
+            )
+
+            await conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS llm_tenant_cost_tenant_time_idx
+                  ON llm_tenant_cost(tenant_id, timestamp DESC);
+                """
+            )
+
+            # Cost alerts table
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS llm_cost_alerts (
+                    alert_id TEXT PRIMARY KEY,
+                    tenant_id TEXT NOT NULL,
+                    alert_type TEXT NOT NULL,
+                    message TEXT NOT NULL,
+                    current_cost_usd DOUBLE PRECISION NOT NULL,
+                    budget_usd DOUBLE PRECISION NOT NULL,
+                    threshold_percent DOUBLE PRECISION NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                );
+                """
+            )
+
+            await conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS llm_cost_alerts_tenant_idx
+                  ON llm_cost_alerts(tenant_id, created_at DESC);
+                """
+            )
+
     async def insert_insight(
         self,
         *,

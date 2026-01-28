@@ -1,0 +1,38 @@
+# IoT Scale Test Scenarios
+
+scenarios:
+  - name: "Normal Operation"
+    description: "Normal operation with 1000 devices"
+    devices: 1000
+    messages_per_device_per_minute: 12  # every 5 seconds
+    total_messages_per_minute: 12000
+    duration: 1h
+    command: |
+      node index.js --devices=1000 --messages-per-minute=12 --scenario=normal
+
+  - name: "Peak Load"
+    description: "Peak load with 5000 devices"
+    devices: 5000
+    messages_per_device_per_minute: 12
+    total_messages_per_minute: 60000
+    duration: 15m
+    command: |
+      node index.js --devices=5000 --messages-per-minute=12 --scenario=peak
+
+  - name: "Reconnection Storm"
+    description: "Simulate simultaneous device reconnection"
+    devices: 1000
+    messages_per_device_per_minute: 12
+    simultaneous_reconnect: true
+    duration: 5m
+    command: |
+      node index.js --devices=1000 --messages-per-minute=12 --scenario=reconnection-storm
+
+  - name: "Scale Test - 10K Devices"
+    description: "Test with 10,000 devices (target capacity)"
+    devices: 10000
+    messages_per_device_per_minute: 12
+    total_messages_per_minute: 120000
+    duration: 30m
+    command: |
+      node index.js --devices=10000 --messages-per-minute=12 --scenario=scale

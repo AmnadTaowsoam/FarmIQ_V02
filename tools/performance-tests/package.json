@@ -1,0 +1,27 @@
+{
+  "name": "@farmiq/performance-tests",
+  "version": "1.0.0",
+  "description": "Performance and load testing tools for FarmIQ",
+  "scripts": {
+    "test:api": "k6 run k6/api-benchmark.js",
+    "test:api:login": "k6 run k6/api-login-flow.js",
+    "test:api:dashboard": "k6 run k6/api-dashboard.js",
+    "test:api:telemetry": "k6 run k6/api-telemetry.js",
+    "test:stress": "k6 run k6/stress-test.js",
+    "test:iot": "node iot-simulator/index.js",
+    "test:db": "node db-performance/run-tests.js",
+    "test:mq": "node mq-performance/run-tests.js",
+    "test:frontend": "node frontend-performance/run-lighthouse.js",
+    "test:all": "npm run test:api && npm run test:db && npm run test:mq"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.3",
+    "pg": "^8.11.3",
+    "puppeteer": "^21.6.1",
+    "lighthouse": "^11.4.0",
+    "mqtt": "^5.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.5"
+  }
+}

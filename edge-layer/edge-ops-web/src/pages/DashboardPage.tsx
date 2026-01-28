@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { 
-  Grid, 
-  Card, 
-  CardContent, 
-  Typography, 
-  Box, 
-  Chip, 
+import {
+  Grid,
+  CardContent,
+  Typography,
+  Box,
+  Chip,
   Stack,
   Skeleton,
   Alert,
@@ -23,6 +22,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { edgeOpsApi, TelemetryMetrics, TelemetryReadingsResponse } from '@/api/client';
 import { usePoll } from '@/hooks/usePoll';
 import { MetricCard } from '@/components/ui/MetricCard';
+import { PremiumCard } from '@/components';
 
 
 const MAX_SPARK_POINTS = 20;
@@ -165,7 +165,7 @@ export function DashboardPage() {
           />
         </Grid>
 
-        <Card variant="outlined">
+        <PremiumCard>
           <CardContent>
             <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>
               Latest Readings
@@ -213,7 +213,7 @@ export function DashboardPage() {
               </Table>
             </TableContainer>
           </CardContent>
-        </Card>
+        </PremiumCard>
       </Box>
 
       {/* Service Health */}
@@ -236,7 +236,7 @@ export function DashboardPage() {
 function ServiceCard({ service }: { service: any }) {
     const isUp = service.status === 'up';
     return (
-        <Card variant="outlined" sx={{ '&:hover': { borderColor: 'primary.main', transition: 'border-color 0.2s' } }}>
+        <PremiumCard sx={{ '&:hover': { borderColor: 'primary.main', transition: 'border-color 0.2s' } }}>
             <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
                 <Stack direction="row" alignItems="center" justifyContent="space-between">
                     <Stack direction="row" alignItems="center" spacing={2}>
@@ -278,7 +278,7 @@ function ServiceCard({ service }: { service: any }) {
                     </Stack>
                 </Stack>
             </CardContent>
-        </Card>
+        </PremiumCard>
     );
 }
 

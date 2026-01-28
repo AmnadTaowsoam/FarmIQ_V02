@@ -1,0 +1,122 @@
+name: Performance Tests
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'cloud-layer/**'
+      - 'edge-layer/**'
+      - 'tools/performance-tests/**'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'cloud-layer/**'
+      - 'edge-layer/**'
+      - 'tools/performance-tests/**'
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  api-performance:
+    name: API Performance Benchmarks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install k6
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D9
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install k6
+
+      - name: Start services
+        run: |
+          docker compose -f cloud-layer/docker-compose.dev.yml up -d
+          sleep 30 # Wait for services to be ready
+
+      - name: Run API benchmarks
+        working-directory: tools/performance-tests
+        run: |
+          npm install
+          npm run test:api:login || true
+          npm run test:api:dashboard || true
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: api-performance-results
+          path: tools/performance-tests/k6-results.json
+          if-no-files-found: ignore
+
+  database-performance:
+    name: Database Performance Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Start PostgreSQL
+        run: |
+          docker run -d --name postgres-test \
+            -e POSTGRES_USER=farmiq \
+            -e POSTGRES_PASSWORD=farmiq_dev \
+            -e POSTGRES_DB=farmiq \
+            -p 5432:5432 \
+            postgres:16
+          sleep 10
+
+      - name: Run database tests
+        working-directory: tools/performance-tests
+        env:
+          DATABASE_URL: postgresql://farmiq:farmiq_dev@localhost:5432/farmiq
+        run: |
+          npm install
+          npm run test:db || true
+
+  frontend-performance:
+    name: Frontend Performance Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: tools/performance-tests/frontend-performance
+        run: npm install
+
+      - name: Build frontend
+        working-directory: apps/dashboard-web
+        run: |
+          npm install
+          npm run build
+
+      - name: Start frontend server
+        working-directory: apps/dashboard-web
+        run: |
+          npm run preview &
+          sleep 10
+
+      - name: Run Lighthouse tests
+        working-directory: tools/performance-tests/frontend-performance
+        run: |
+          npm test || true
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: frontend-performance-results
+          path: tools/performance-tests/frontend-performance/lighthouse-results.json
+          if-no-files-found: ignore

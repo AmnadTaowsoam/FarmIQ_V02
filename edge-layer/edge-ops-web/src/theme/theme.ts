@@ -79,3 +79,61 @@ export const theme = createTheme({
         },
     },
 });
+
+// Agricultural Theme - FarmIQ specific
+export const farmTheme = createTheme({
+  palette: {
+    mode: 'dark',
+    primary: {
+      main: '#10b981', // Agricultural green
+      light: '#34d399',
+      dark: '#059669',
+    },
+    secondary: {
+      main: '#f59e0b', // Harvest gold
+      light: '#fbbf24',
+      dark: '#d97706',
+    },
+    background: {
+      default: '#0f172a', // Dark slate
+      paper: '#1e293b',
+    },
+    text: {
+      primary: '#f1f5f9',
+      secondary: '#cbd5e1',
+    },
+  },
+  typography: {
+    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+    h1: {
+      fontWeight: 700,
+    },
+    h2: {
+      fontWeight: 600,
+    },
+    button: {
+      fontWeight: 600,
+      textTransform: 'none',
+    },
+  },
+  shape: {
+    borderRadius: 12,
+  },
+  components: {
+    MuiCssBaseline: {
+        styleOverrides: {
+            body: {
+                scrollbarColor: "#334155 #0f172a",
+                "&::-webkit-scrollbar, & *::-webkit-scrollbar": {
+                    width: "8px",
+                    height: "8px",
+                },
+                "&::-webkit-scrollbar-thumb, & *::-webkit-scrollbar-thumb": {
+                    backgroundColor: "#334155",
+                    borderRadius: "4px",
+                },
+            },
+        },
+    },
+  },
+});

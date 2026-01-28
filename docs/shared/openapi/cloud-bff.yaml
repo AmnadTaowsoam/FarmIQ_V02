@@ -434,6 +434,46 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  # ============================================
+  # BILLING
+  # ============================================
+  /api/v1/billing/subscriptions:
+    $ref: './billing.yaml#/paths/~1api~1v1~1billing~1subscriptions'
+  /api/v1/billing/invoices:
+    $ref: './billing.yaml#/paths/~1api~1v1~1billing~1invoices'
+  /api/v1/billing/usage:
+    $ref: './billing.yaml#/paths/~1api~1v1~1billing~1usage'
+
+  # ============================================
+  # FLEET
+  # ============================================
+  /api/v1/fleet/firmwares:
+    $ref: './fleet.yaml#/paths/~1api~1v1~1fleet~1firmwares'
+  /api/v1/fleet/campaigns:
+    $ref: './fleet.yaml#/paths/~1api~1v1~1fleet~1campaigns'
+  /api/v1/fleet/devices/status:
+    $ref: './fleet.yaml#/paths/~1api~1v1~1fleet~1devices~1status'
+
+  # ============================================
+  # INFERENCE
+  # ============================================
+  /api/v1/inference/predict:
+    $ref: './inference.yaml#/paths/~1api~1v1~1inference~1predict'
+  /api/v1/inference/models:
+    $ref: './inference.yaml#/paths/~1api~1v1~1inference~1models'
+  /api/v1/inference/drift/alerts:
+    $ref: './inference.yaml#/paths/~1api~1v1~1inference~1drift~1alerts'
+
+  # ============================================
+  # ANALYTICS
+  # ============================================
+  /api/v1/analytics/cohorts:
+    $ref: './advanced-analytics.yaml#/paths/~1api~1v1~1analytics~1cohorts'
+  /api/v1/analytics/forecasts/weight:
+    $ref: './advanced-analytics.yaml#/paths/~1api~1v1~1analytics~1forecasts~1weight'
+  /api/v1/analytics/anomalies:
+    $ref: './advanced-analytics.yaml#/paths/~1api~1v1~1analytics~1anomalies'
+
 components:
   securitySchemes:
     bearerAuth:

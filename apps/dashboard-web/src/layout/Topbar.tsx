@@ -11,6 +11,7 @@ import {
   Toolbar,
   Tooltip,
   Typography,
+  alpha,
 } from '@mui/material';
 import { HelpCircle, Menu as MenuIcon, Monitor, Moon, Sun, BookOpen, Keyboard, Bug, MessageCircle, FileText } from 'lucide-react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
@@ -30,7 +31,7 @@ interface TopbarProps {
   isCollapsed: boolean;
 }
 
-export const Topbar: React.FC<TopbarProps> = ({ onMenuClick, onSupportOpen, isCollapsed }) => {
+export const Topbar: React.FC<TopbarProps> = ({ onMenuClick, isCollapsed }) => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { themeMode, setThemeMode, resolvedMode } = useThemeMode();
@@ -82,7 +83,8 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuClick, onSupportOpen, isCo
       position="fixed"
       elevation={0}
       sx={{
-        bgcolor: 'background.paper',
+        bgcolor: (theme) => alpha(theme.palette.background.paper, 0.8),
+        backdropFilter: 'blur(12px)',
         borderBottom: '1px solid',
         borderColor: 'divider',
         color: 'text.primary',

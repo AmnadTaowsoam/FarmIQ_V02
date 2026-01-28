@@ -1,6 +1,32 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import fs from 'fs';
+
+// #region agent log
+const logPath = '/app/.cursor/debug.log';
+const logToFile = (data: any) => {
+  try {
+    const logDir = path.dirname(logPath);
+    if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
+    fs.appendFileSync(logPath, JSON.stringify({...data, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1'}) + '\n');
+  } catch (e) {}
+};
+// #endregion
+
+// #region agent log
+try {
+  const packageJsonPath = '/app/package.json';
+  const nodeModulesPath = '/app/node_modules';
+  const packageJson = fs.existsSync(packageJsonPath) ? JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8')) : null;
+  const hasNodeModules = fs.existsSync(nodeModulesPath);
+  const deps = packageJson?.dependencies || {};
+  const hasI18nextBrowser = deps['i18next-browser-languagedetector'] || fs.existsSync(path.join(nodeModulesPath, 'i18next-browser-languagedetector'));
+  logToFile({location: 'vite.config.ts:init', message: 'Vite config initialization', data: {hasPackageJson: !!packageJson, hasNodeModules, hasI18nextBrowser, depsCount: Object.keys(deps).length}, hypothesisId: 'A'});
+} catch (e) {
+  logToFile({location: 'vite.config.ts:init', message: 'Vite config init error', data: {error: String(e)}, hypothesisId: 'A'});
+}
+// #endregion
 
 export default defineConfig({
   plugins: [react()],

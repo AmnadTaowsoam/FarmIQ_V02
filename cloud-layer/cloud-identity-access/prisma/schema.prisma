@@ -5,7 +5,7 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
@@ -15,21 +15,182 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  tenantId  String?  @map("tenant_id") // Optional for platform_admin
-  roles     Role[]
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id          String          @id @default(uuid())
+  email       String          @unique
+  password    String?
+  tenantId    String?         @map("tenant_id") // Optional for platform_admin
+  roles       Role[]
+  customRoles CustomRole[]
+  ssoSessions SsoSession[]
+  attributes  UserAttribute[]
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  consents UserConsent[]
 
   @@map("users")
 }
 
+model UserConsent {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id])
+  type      String // e.g., "PDPA_MARKETING", "GDPR_ANALYTICS"
+  version   String // e.g., "1.0"
+  granted   Boolean
+  ipAddress String?  @map("ip_address")
+  timestamp DateTime @default(now())
+
+  @@map("user_consents")
+}
+
 model Role {
-  id    String @id @default(uuid())
-  name  String @unique // platform_admin, tenant_admin, farm_manager, house_operator, viewer, device_agent
-  users User[]
+  id                 String             @id @default(uuid())
+  name               String             @unique // platform_admin, tenant_admin, farm_manager, house_operator, viewer, device_agent
+  users              User[]
+  permissions        RolePermission[]
+  customRoles        CustomRole[]
+  defaultRoleForIdps IdentityProvider[] @relation("IdentityProviderDefaultRole")
+  scimGroupMappings  ScimGroupMapping[] @relation("ScimGroupMappingRole")
 
   @@map("roles")
+}
+
+// Phase 3: SSO Identity Provider Configuration
+model IdentityProvider {
+  id            String       @id @default(uuid())
+  tenantId      String?      @map("tenant_id") // null = platform-wide
+  name          String // Display name
+  type          String // "saml" | "oidc"
+  enabled       Boolean      @default(true)
+  metadata      Json // IdP metadata (SAML XML or OIDC discovery)
+  config        Json // Provider-specific config (certificates, endpoints, etc.)
+  jitEnabled    Boolean      @default(true) @map("jit_enabled") // Just-In-Time provisioning
+  defaultRoleId String?      @map("default_role_id") // Default role for JIT users
+  defaultRole   Role?        @relation("IdentityProviderDefaultRole", fields: [defaultRoleId], references: [id])
+  sessions      SsoSession[] @relation("IdpSessions")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  @@index([tenantId])
+  @@index([type])
+  @@map("identity_providers")
+}
+
+// Phase 3: SCIM Configuration
+model ScimConfig {
+  id          String   @id @default(uuid())
+  tenantId    String   @unique @map("tenant_id")
+  bearerToken String   @map("bearer_token") // SCIM bearer token
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("scim_configs")
+}
+
+// Phase 3: SCIM Group to Role Mapping
+model ScimGroupMapping {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  scimGroupId String   @map("scim_group_id") // External SCIM group ID
+  roleId      String   @map("role_id")
+  role        Role     @relation("ScimGroupMappingRole", fields: [roleId], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, scimGroupId])
+  @@index([tenantId])
+  @@map("scim_group_mappings")
+}
+
+// Phase 3: SSO Sessions
+model SsoSession {
+  id        String           @id @default(uuid())
+  userId    String           @map("user_id")
+  user      User             @relation(fields: [userId], references: [id])
+  idpId     String           @map("idp_id")
+  idp       IdentityProvider @relation("IdpSessions", fields: [idpId], references: [id])
+  sessionId String           @unique @map("session_id") // External session ID
+  expiresAt DateTime         @map("expires_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([idpId])
+  @@index([expiresAt])
+  @@map("sso_sessions")
+}
+
+// Phase 3: Permissions (granular permissions)
+model Permission {
+  id                String                @id @default(uuid())
+  name              String                @unique // e.g., "tenants:read", "devices:write"
+  category          String                // e.g., "governance", "identity", "fleet"
+  description       String?
+  roles             RolePermission[]
+  customRolePermissions CustomRolePermission[]
+
+  @@map("permissions")
+}
+
+// Phase 3: Role-Permission Mapping
+model RolePermission {
+  id           String     @id @default(uuid())
+  roleId       String     @map("role_id")
+  role         Role       @relation(fields: [roleId], references: [id])
+  permissionId String     @map("permission_id")
+  permission   Permission @relation(fields: [permissionId], references: [id])
+  scope        String?    // "global" | "tenant" | "farm" | "barn" | null = all
+
+  @@unique([roleId, permissionId, scope])
+  @@index([roleId])
+  @@map("role_permissions")
+}
+
+// Phase 3: Custom Roles (tenant-specific)
+model CustomRole {
+  id          String                @id @default(uuid())
+  tenantId    String                @map("tenant_id")
+  name        String
+  description String?
+  baseRoleId  String?               @map("base_role_id") // Inherits from system role
+  baseRole    Role?                 @relation(fields: [baseRoleId], references: [id])
+  permissions CustomRolePermission[]
+  users       User[]
+  createdAt   DateTime              @default(now()) @map("created_at")
+  updatedAt   DateTime              @updatedAt @map("updated_at")
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("custom_roles")
+}
+
+// Phase 3: Custom Role Permissions (junction table for custom roles)
+model CustomRolePermission {
+  id           String     @id @default(uuid())
+  customRoleId String     @map("custom_role_id")
+  customRole   CustomRole @relation(fields: [customRoleId], references: [id], onDelete: Cascade)
+  permissionId String     @map("permission_id")
+  permission   Permission @relation(fields: [permissionId], references: [id])
+  scope        String?    // "global" | "tenant" | "farm" | "barn" | null = all
+
+  @@unique([customRoleId, permissionId, scope])
+  @@index([customRoleId])
+  @@index([permissionId])
+  @@map("custom_role_permissions")
+}
+
+// Phase 3: User Attributes for ABAC
+model UserAttribute {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id])
+  key       String // e.g., "department", "region"
+  value     String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, key])
+  @@index([userId])
+  @@map("user_attributes")
 }

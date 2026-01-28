@@ -16,6 +16,13 @@ import notificationRoutes from './notificationRoutes'
 import dashboardNotificationRoutes from './dashboardNotificationRoutes'
 import identityRoutes from './identityRoutes'
 import authProxyRoutes from './authProxyRoutes'
+import billingRoutes from './billingRoutes'
+import fleetRoutes from './fleetRoutes'
+import inferenceRoutes from './inferenceRoutes'
+import advancedAnalyticsRoutes from './advancedAnalyticsRoutes'
+import adminRoutes from './adminRoutes'
+import identityProxyRoutes from './identityProxyRoutes'
+import quotaRoutes from './quotaRoutes'
 
 /**
  *
@@ -30,6 +37,9 @@ export function setupRoutes(app: Express): void {
 
   // BFF dashboard routes
   app.use('/api/v1/dashboard', dashboardRoutes)
+
+  // Admin routes (Overview)
+  app.use('/api/v1/admin', adminRoutes)
 
   // Config routes
   app.use('/api/v1/config', configRoutes)
@@ -46,8 +56,14 @@ export function setupRoutes(app: Express): void {
   // Tenant registry service proxy routes
   app.use('/api/v1', tenantRegistryRoutes)
 
+  // Quota routes (must be registered along with tenant routes)
+  app.use('/api/v1', quotaRoutes)
+
   // Identity access admin proxy routes
   app.use('/api/v1', identityRoutes)
+
+  // New Identity Proxy Routes (RBAC, SCIM, SSO)
+  app.use('/api/v1/identity', identityProxyRoutes)
 
   // Sensor module proxy routes (part of tenant-registry)
   app.use('/api/v1', sensorsRoutes)
@@ -72,4 +88,10 @@ export function setupRoutes(app: Express): void {
 
   // Keep existing public variable route for frontend config
   app.use('/api/public-variable-frontend', publicVariableRoutes)
+
+  // NEW ROUTES
+  app.use('/api/v1/billing', billingRoutes)
+  app.use('/api/v1/fleet', fleetRoutes)
+  app.use('/api/v1/inference', inferenceRoutes)
+  app.use('/api/v1/analytics', advancedAnalyticsRoutes)
 }

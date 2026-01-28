@@ -1,28 +1,27 @@
 import { useState } from 'react';
-import { 
-    Grid, 
-    Card, 
-    CardContent, 
-    Typography, 
-    Box, 
-    Chip, 
-    Stack, 
+import {
+    Grid,
+    CardContent,
+    Typography,
+    Box,
+    Chip,
+    Stack,
     Button,
     ToggleButton,
     ToggleButtonGroup,
     Tooltip,
     Skeleton,
-    CircularProgress, 
+    CircularProgress,
     CircularProgressProps,
     Alert
 } from '@mui/material';
-import { 
-    FileText, 
-    Download, 
-    ClipboardCopy, 
-    Cpu, 
-    HardDrive, 
-    Activity, 
+import {
+    FileText,
+    Download,
+    ClipboardCopy,
+    Cpu,
+    HardDrive,
+    Activity,
     RefreshCw
 } from 'lucide-react';
 import { useQueries, useQuery } from '@tanstack/react-query';
@@ -30,6 +29,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { edgeOpsApi } from '@/api/client';
 import { SERVICE_REGISTRY, ServiceDef } from '@/config/services';
 import { MetricCard } from '@/components/ui/MetricCard';
+import { PremiumCard, PremiumButton, PremiumButtonOutline } from '@/components';
 
 export function OverviewTab() {
     // 1. Context & State
@@ -277,23 +277,21 @@ export function OverviewTab() {
                 
                 <Stack direction="row" spacing={2}>
                     <Tooltip title="Copy text report for support">
-                        <Button 
-                            variant="outlined" 
+                        <PremiumButtonOutline
                             startIcon={<ClipboardCopy size={16} />}
                             onClick={handleCopySupportText}
                         >
                             Copy Status
-                        </Button>
+                        </PremiumButtonOutline>
                     </Tooltip>
                     <Tooltip title="Download comprehensive JSON bundle">
-                        <Button 
-                            variant="contained" 
+                        <PremiumButton
                             startIcon={diagLoading ? <Skeleton width={20} /> : <Download size={16} />}
                             onClick={handleExportDiagnostics}
                             disabled={diagLoading}
                         >
                             Export Diagnostics
-                        </Button>
+                        </PremiumButton>
                     </Tooltip>
                 </Stack>
             </Stack>
@@ -371,13 +369,13 @@ function ServiceRegistryCard({ def, status, error, loading }: { def: ServiceDef,
     };
     
     return (
-        <Card variant="outlined" sx={{ 
-            height: '100%', 
+        <PremiumCard sx={{
+            height: '100%',
             transition: 'border-color 0.2s',
             borderColor: isUp ? 'success.light' : (loading ? 'divider' : 'error.main'),
             position: 'relative',
             overflow: 'visible',
-            '&:hover': { borderColor: 'primary.main', boxShadow: 1 } 
+            '&:hover': { borderColor: 'primary.main', boxShadow: 1 }
         }}>
             <CardContent>
                 <Stack spacing={2}>
@@ -473,6 +471,6 @@ function ServiceRegistryCard({ def, status, error, loading }: { def: ServiceDef,
                     </Stack>
                 </Stack>
             </CardContent>
-        </Card>
+        </PremiumCard>
     );
 }

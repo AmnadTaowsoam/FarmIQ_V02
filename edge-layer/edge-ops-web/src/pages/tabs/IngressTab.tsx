@@ -1,30 +1,29 @@
 import { useState, useEffect } from 'react';
-import { 
-  Grid, 
-  Card, 
-  CardContent, 
-  Typography, 
-  Button, 
-  Stack, 
+import {
+  Grid,
+  CardContent,
+  Typography,
+  Button,
+  Stack,
   Box,
   Alert,
   AlertTitle
 } from '@mui/material';
-import { 
-  Inbox, 
-  AlertTriangle, 
-  Filter, 
+import {
+  Inbox,
+  AlertTriangle,
+  Filter,
   Copy,
   Terminal,
   Clock
 } from 'lucide-react';
-import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip as ChartTooltip, 
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as ChartTooltip,
   ResponsiveContainer,
   Legend
 } from 'recharts';
@@ -32,6 +31,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { usePoll } from '@/hooks/usePoll';
 import { edgeOpsApi } from '@/api/client';
 import { MetricCard } from '@/components/ui/MetricCard';
+import { PremiumCard, PremiumButtonOutline } from '@/components';
 
 interface DataPoint {
     time: string;
@@ -126,7 +126,7 @@ export function IngressTab() {
                     loading={isLoading && !stats}
                 />
                 <Grid item xs={12} sm={6} lg={3}>
-                    <Card sx={{ height: '100%', bgcolor: 'background.paper' }}>
+                    <PremiumCard sx={{ height: '100%' }}>
                         <CardContent>
                              <Stack spacing={1}>
                                 <Stack direction="row" alignItems="center" spacing={1} color="text.secondary" mb={1}>
@@ -141,14 +141,14 @@ export function IngressTab() {
                                 </Typography>
                              </Stack>
                         </CardContent>
-                    </Card>
+                    </PremiumCard>
                 </Grid>
             </Grid>
 
             {/* Charts & Tools */}
             <Grid container spacing={3}>
                 <Grid item xs={12} lg={8}>
-                    <Card sx={{ height: 400 }}>
+                    <PremiumCard sx={{ height: 400 }}>
                         <CardContent sx={{ height: '100%' }}>
                             <Typography variant="subtitle1" fontWeight="bold" mb={2}>Traffic Session Trend</Typography>
                             {!hasTraffic && !isLoading && !isError && (
@@ -173,11 +173,11 @@ export function IngressTab() {
                                 </LineChart>
                             </ResponsiveContainer>
                         </CardContent>
-                    </Card>
+                    </PremiumCard>
                 </Grid>
 
                 <Grid item xs={12} lg={4}>
-                    <Card sx={{ height: '100%' }}>
+                    <PremiumCard sx={{ height: '100%' }}>
                         <CardContent>
                             <Stack direction="row" alignItems="center" spacing={1} mb={2}>
                                 <Terminal size={20} />
@@ -201,16 +201,15 @@ export function IngressTab() {
                                 curl -X GET "{getServiceUrl('EDGE_INGRESS_GATEWAY')}/api/v1/ingress/stats" ...
                             </Box>
 
-                            <Button 
-                                variant="outlined" 
-                                startIcon={<Copy size={16} />} 
+                            <PremiumButtonOutline
+                                startIcon={<Copy size={16} />}
                                 fullWidth
                                 onClick={handleCopyCurl}
                             >
                                 Copy Curl Command
-                            </Button>
+                            </PremiumButtonOutline>
                         </CardContent>
-                    </Card>
+                    </PremiumCard>
                 </Grid>
             </Grid>
         </Stack>

@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: farmiq-mlops
+  labels:
+    name: farmiq-mlops
+    project: farmiq
+    layer: cloud
+    component: mlops

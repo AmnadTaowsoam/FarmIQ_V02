@@ -6,6 +6,7 @@ import {
   adjustSet,
   cloneSet,
   createSet,
+  deleteSet,
   getImportJob,
   getSet,
   getGeneticLineByCode,
@@ -26,6 +27,11 @@ import {
   upsertRows,
 } from '../services/standardsService'
 import { importCsv } from '../services/importService'
+import {
+  publishStandardCreated,
+  publishStandardUpdated,
+  publishStandardDeleted,
+} from '../utils/rabbitmq'
 
 const paginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -200,6 +206,64 @@ export async function createSetHandler(req: Request, res: Response) {
   })
 
   return res.status(201).json({ data: created })
+}
+
+export async function deleteSetHandler(req: Request, res: Response) {
+  const setId = req.params.setId
+  const tenantId = getTenantIdFromRequest(res, req.body?.tenantId)
+
+  try {
+    await deleteSet(setId, tenantId)
+
+    // Publish RabbitMQ event
+    if (tenantId) {
+      await publishStandardDeleted(tenantId, setId)
+    }
+
+    return res.status(204).send()
+  } catch (error: any) {
+    logger.error('Failed to delete standard set', { error })
+    return res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: error?.message || 'Failed to delete standard set',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+  }
+}
+
+export async function exportStandardsHandler(req: Request, res: Response) {
+  const tenantId = getTenantIdFromRequest(res, req.query.tenantId as string | undefined)
+
+  try {
+    const standards = await listSets({
+      page: 1,
+      pageSize: 1000,
+      filters: {},
+    })
+
+    // Format as JSON for export
+    const exportData = {
+      tenant_id: tenantId,
+      exported_at: new Date().toISOString(),
+      count: standards.total,
+      standards: standards.items,
+    }
+
+    res.setHeader('Content-Type', 'application/json')
+    res.setHeader('Content-Disposition', `attachment; filename="standards_export_${Date.now()}.json"`)
+    return res.json(exportData)
+  } catch (error: any) {
+    logger.error('Failed to export standards', { error })
+    return res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: error?.message || 'Failed to export standards',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+  }
 }
 
 const patchSetSchema = z.object({

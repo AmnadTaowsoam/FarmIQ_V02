@@ -1,0 +1,37 @@
+{
+    "name": "cloud-fleet-management",
+    "type": "commonjs",
+    "version": "1.0.0",
+    "description": "FarmIQ Cloud Fleet Management Service - OTA Campaigns and Firmware Registry",
+    "main": "index.js",
+    "scripts": {
+        "dev": "nodemon --watch src --ext ts --exec ts-node src/index.ts",
+        "start": "nyc ts-node src/index.ts",
+        "build": "tsc",
+        "serve": "node dist/index.js",
+        "prisma:generate": "npx prisma generate",
+        "migrate:dev": "npx prisma migrate dev",
+        "migrate:deploy": "npx prisma migrate deploy"
+    },
+    "dependencies": {
+        "@prisma/client": "^5.16.1",
+        "express": "^4.21.0",
+        "cors": "^2.8.5",
+        "helmet": "^7.0.0",
+        "winston": "^3.10.0",
+        "zod": "^3.21.4",
+        "uuid": "^9.0.0",
+        "node-vault": "^0.10.2",
+        "ts-dotenv": "^0.9.1"
+    },
+    "devDependencies": {
+        "@types/express": "^4.17.17",
+        "@types/node": "^20.16.5",
+        "@types/cors": "^2.8.13",
+        "@types/uuid": "^9.0.8",
+        "typescript": "^5.4.5",
+        "ts-node": "^10.9.2",
+        "nodemon": "^3.0.1",
+        "prisma": "^5.16.1"
+    }
+}

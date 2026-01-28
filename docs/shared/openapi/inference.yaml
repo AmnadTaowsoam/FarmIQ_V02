@@ -1,0 +1,49 @@
+openapi: 3.0.0
+info:
+  title: FarmIQ Inference Service API
+  version: 1.0.0
+  description: API for ML inference and model management
+paths:
+  /api/v1/inference/predict:
+    post:
+      summary: Run inference prediction
+      tags: [Inference]
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                modelName:
+                  type: string
+                input:
+                  type: object
+      responses:
+        '200':
+          description: Prediction result
+  /api/v1/inference/models:
+    get:
+      summary: List models
+      tags: [Inference]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of models
+  /api/v1/inference/drift/alerts:
+    get:
+      summary: Get drift alerts
+      tags: [Inference]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of drift alerts
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

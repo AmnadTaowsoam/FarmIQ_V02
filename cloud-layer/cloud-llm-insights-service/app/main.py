@@ -6,7 +6,7 @@ import time
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, status
 from fastapi import HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,6 +16,18 @@ from app.config import Settings
 from app.db import InMemoryLlmInsightsDb, LlmInsightsDb
 from app.logging_ import configure_logging, request_id_ctx, tenant_id_ctx, trace_id_ctx
 from app.routes import router as llm_router
+from app.llm.health_monitor import get_health_monitor
+from app.governance import get_audit_trail
+
+# Rate limiting
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
+logger = logging.getLogger(__name__)
+
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +50,40 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.db = db
         app.state.settings = settings
 
+        # Initialize health monitor
+        health_monitor = get_health_monitor()
+        # Register providers for health monitoring
+        if settings.llm_provider == "openai":
+            from app.llm.provider import OpenAIProvider
+            provider = OpenAIProvider(
+                model_name=settings.llm_model,
+                prompt_version=settings.prompt_version
+            )
+            health_monitor.register_provider(
+                provider_name="openai",
+                model_name=settings.llm_model,
+                health_checker=provider._health_check,
+            )
+        elif settings.llm_provider == "anthropic":
+            from app.llm.provider import AnthropicProvider
+            provider = AnthropicProvider(
+                model_name=settings.llm_model,
+                prompt_version=settings.prompt_version
+            )
+            health_monitor.register_provider(
+                provider_name="anthropic",
+                model_name=settings.llm_model,
+                health_checker=provider._health_check,
+            )
+
+        # Start health monitoring
+        await health_monitor.start()
+
         try:
             yield
         finally:
+            # Stop health monitoring
+            await health_monitor.stop()
             with contextlib.suppress(Exception):
                 await db.close()
 
@@ -53,6 +96,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
 
+    # Add rate limiter state to app
+    app.state.limiter = limiter
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -60,6 +106,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Register rate limit exception handler
+    @app.exception_handler(RateLimitExceeded)
+    async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content={
+                "error": {
+                    "code": "RATE_LIMIT_EXCEEDED",
+                    "message": "Too many requests. Please try again later.",
+                    "traceId": trace_id_ctx.get(),
+                }
+            },
+        )
 
     @app.middleware("http")
     async def request_context(request: Request, call_next):

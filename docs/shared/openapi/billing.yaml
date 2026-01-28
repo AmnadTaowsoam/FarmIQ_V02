@@ -1,0 +1,47 @@
+openapi: 3.0.0
+info:
+  title: FarmIQ Billing Service API
+  version: 1.0.0
+  description: API for managing subscriptions, invoices, and billing
+paths:
+  /api/v1/billing/subscriptions:
+    get:
+      summary: List subscriptions
+      tags: [Billing]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of subscriptions
+    post:
+      summary: Create subscription
+      tags: [Billing]
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Subscription created
+  /api/v1/billing/invoices:
+    get:
+      summary: List invoices
+      tags: [Billing]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of invoices
+  /api/v1/billing/usage:
+    get:
+      summary: Get usage summary
+      tags: [Billing]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Usage summary
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

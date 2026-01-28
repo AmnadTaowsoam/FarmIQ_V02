@@ -1,0 +1,24 @@
+{
+    "nav": {
+        "dashboard": "แดชบอร์ด",
+        "farms": "ฟาร์ม",
+        "barns": "โรงเรือน",
+        "settings": "ตั้งค่า"
+    },
+    "actions": {
+        "save": "บันทึก",
+        "cancel": "ยกเลิก",
+        "delete": "ลบ",
+        "edit": "แก้ไข"
+    },
+    "status": {
+        "online": "ออนไลน์",
+        "offline": "ออฟไลน์",
+        "warning": "ผิดปกติ"
+    },
+    "common": {
+        "loading": "กำลังโหลด...",
+        "error": "เกิดข้อผิดพลาด",
+        "welcome": "ยินดีต้อนรับกลับ, {{name}}"
+    }
+}

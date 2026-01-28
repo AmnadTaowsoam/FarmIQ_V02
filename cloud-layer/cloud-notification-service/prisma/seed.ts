@@ -134,7 +134,17 @@ async function main() {
 
 main()
   .catch((e) => {
-    console.error('Error during seed:', e)
+    console.error('Error during seed:')
+    if (e instanceof Error) {
+      console.error('  Message:', e.message)
+      console.error('  Code:', (e as any).code || 'N/A')
+      console.error('  Meta:', JSON.stringify((e as any).meta || {}, null, 2))
+      if (e.stack) {
+        console.error('  Stack:', e.stack)
+      }
+    } else {
+      console.error('  Error object:', JSON.stringify(e, null, 2))
+    }
     process.exit(1)
   })
   .finally(async () => {

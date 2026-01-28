@@ -59,37 +59,138 @@ async function main() {
     { id: SEED_IDS.DEVICE_SENSOR_5, farmId: SEED_IDS.FARM_2B, barnId: SEED_IDS.BARN_2B_1, tenantId: SEED_IDS.TENANT_2 },
   ]
 
-  // Generate at least SEED_COUNT raw records
-  const rawCount = Math.max(SEED_COUNT, 30)
-  for (let i = 0; i < rawCount; i++) {
-    const config = deviceConfig[i % deviceConfig.length]
-    const metric = metrics[i % metrics.length]
-    const hoursAgo = Math.floor(i / deviceConfig.length)
-    const minutesOffset = (i % deviceConfig.length) * 10
+  // Generate 30 days of historical telemetry data
+  // Pattern: Temperature every 5 minutes, Humidity every 5 minutes, Ammonia every 15 minutes, Weight daily
+  const DAYS_TO_GENERATE = 30
+  const MINUTES_PER_DAY = 24 * 60
+  const TEMP_INTERVAL_MINUTES = 5
+  const HUMIDITY_INTERVAL_MINUTES = 5
+  const AMMONIA_INTERVAL_MINUTES = 15
+  const WEIGHT_INTERVAL_DAYS = 1
 
-    rawRecords.push({
-      tenantId: config.tenantId,
-      farmId: config.farmId,
-      barnId: config.barnId,
-      deviceId: config.id,
-      batchId: SEED_IDS.BATCH_1A_1,
-      metric,
-      value: new Prisma.Decimal(
-        metric === 'temperature' ? 25 + (i % 10) * 0.5 :
-        metric === 'humidity' ? 60 + (i % 15) :
-        metric === 'weight' ? 1.2 + (i % 20) * 0.1 :
-        metric === 'co2' ? 800 + (i % 200) :
-        metric === 'ammonia' ? 10 + (i % 5) : 0
-      ),
-      unit: units[metric] || null,
-      occurredAt: new Date(now.getTime() - (hoursAgo * 60 + minutesOffset) * 60 * 1000), // Spread over 7 days
-      traceId: `trace-${i.toString().padStart(6, '0')}`,
-      eventId: `event-${i.toString().padStart(6, '0')}`,
-    })
+  // Generate realistic temperature with daily pattern
+  function generateTemperature(hour: number, day: number): number {
+    const baseTemp = 25 // base temperature
+    const dailyVariation = Math.sin((hour * Math.PI) / 12) * 3 // day/night cycle
+    const noise = (Math.random() - 0.5) * 2 // random noise
+    return Math.round((baseTemp + dailyVariation + noise) * 10) / 10
+  }
+
+  // Generate realistic humidity with daily pattern
+  function generateHumidity(hour: number, day: number): number {
+    const baseHumidity = 60 // base humidity
+    const dailyVariation = Math.sin((hour * Math.PI) / 12) * 10 // day/night cycle
+    const noise = (Math.random() - 0.5) * 5 // random noise
+    return Math.round((baseHumidity + dailyVariation + noise) * 10) / 10
+  }
+
+  // Generate realistic ammonia
+  function generateAmmonia(hour: number, day: number): number {
+    const baseAmmonia = 10
+    const noise = (Math.random() - 0.5) * 3
+    return Math.round((baseAmmonia + noise) * 10) / 10
+  }
+
+  // Generate realistic weight (daily growth)
+  function generateWeight(day: number): number {
+    const startingWeight = 0.04 // 40g on day 1
+    const dailyGain = 0.055 // 55g/day ADG
+    const weight = startingWeight + (day * dailyGain)
+    return Math.round(weight * 100) / 100
+  }
+
+  let recordIndex = 0
+  for (let day = 0; day < DAYS_TO_GENERATE; day++) {
+    for (const config of deviceConfig) {
+      // Temperature readings (every 5 minutes)
+      for (let hour = 0; hour < 24; hour++) {
+        for (let minute = 0; minute < 60; minute += TEMP_INTERVAL_MINUTES) {
+          const occurredAt = new Date(now.getTime() - (day * 24 * 60 * 60 * 1000) - (hour * 60 * 60 * 1000) - (minute * 60 * 1000))
+          rawRecords.push({
+            tenantId: config.tenantId,
+            farmId: config.farmId,
+            barnId: config.barnId,
+            deviceId: config.id,
+            batchId: SEED_IDS.BATCH_1A_1,
+            metric: 'temperature',
+            value: new Prisma.Decimal(generateTemperature(hour, day)),
+            unit: 'C',
+            occurredAt,
+            traceId: `trace-temp-${recordIndex.toString().padStart(6, '0')}`,
+            eventId: `event-temp-${recordIndex.toString().padStart(6, '0')}`,
+          })
+          recordIndex++
+
+          // Humidity readings (every 5 minutes, same interval as temperature)
+          rawRecords.push({
+            tenantId: config.tenantId,
+            farmId: config.farmId,
+            barnId: config.barnId,
+            deviceId: config.id,
+            batchId: SEED_IDS.BATCH_1A_1,
+            metric: 'humidity',
+            value: new Prisma.Decimal(generateHumidity(hour, day)),
+            unit: '%',
+            occurredAt,
+            traceId: `trace-hum-${recordIndex.toString().padStart(6, '0')}`,
+            eventId: `event-hum-${recordIndex.toString().padStart(6, '0')}`,
+          })
+          recordIndex++
+
+          // Ammonia readings (every 15 minutes)
+          if (minute % AMMONIA_INTERVAL_MINUTES === 0) {
+            rawRecords.push({
+              tenantId: config.tenantId,
+              farmId: config.farmId,
+              barnId: config.barnId,
+              deviceId: config.id,
+              batchId: SEED_IDS.BATCH_1A_1,
+              metric: 'ammonia',
+              value: new Prisma.Decimal(generateAmmonia(hour, day)),
+              unit: 'ppm',
+              occurredAt,
+              traceId: `trace-amm-${recordIndex.toString().padStart(6, '0')}`,
+              eventId: `event-amm-${recordIndex.toString().padStart(6, '0')}`,
+            })
+            recordIndex++
+          }
+        }
+      }
+
+      // Weight readings (daily)
+      if (config.id.includes('WEIGH')) {
+        const occurredAt = new Date(now.getTime() - (day * 24 * 60 * 60 * 1000))
+        rawRecords.push({
+          tenantId: config.tenantId,
+          farmId: config.farmId,
+          barnId: config.barnId,
+          deviceId: config.id,
+          batchId: SEED_IDS.BATCH_1A_1,
+          metric: 'weight',
+          value: new Prisma.Decimal(generateWeight(day)),
+          unit: 'kg',
+          occurredAt,
+          traceId: `trace-weight-${recordIndex.toString().padStart(6, '0')}`,
+          eventId: `event-weight-${recordIndex.toString().padStart(6, '0')}`,
+        })
+        recordIndex++
+      }
+    }
+  }
+
+  // Limit records based on SEED_COUNT
+  // For full 30-day data, use SEED_COUNT >= 1000
+  // For quick testing, use smaller SEED_COUNT (default: 30)
+  let finalRecords = rawRecords
+  if (SEED_COUNT < 100) {
+    // Quick mode: Sample data across 30 days
+    const sampleSize = Math.max(SEED_COUNT, 30)
+    const step = Math.floor(rawRecords.length / sampleSize)
+    finalRecords = rawRecords.filter((_, i) => i % step === 0).slice(0, sampleSize)
   }
 
   // Upsert raw records (idempotent by unique constraint tenantId + eventId)
-  for (const record of rawRecords) {
+  for (const record of finalRecords) {
     await prisma.telemetryRaw.upsert({
       where: {
         tenantId_eventId: {
@@ -104,7 +205,7 @@ async function main() {
       create: record,
     })
   }
-  console.log(`Upserted ${rawRecords.length} telemetry_raw records`)
+  console.log(`Upserted ${finalRecords.length} telemetry_raw records`)
 
   // Create TelemetryAgg records (aggregated data)
   const aggRecords: Array<{
@@ -225,12 +326,22 @@ async function main() {
   console.log(`Upserted ${validAggRecords.length} telemetry_agg records`)
 
   console.log('Seed completed successfully!')
-  console.log(`Summary: ${rawRecords.length} raw records, ${validAggRecords.length} aggregate records`)
+  console.log(`Summary: ${finalRecords.length} raw records, ${validAggRecords.length} aggregate records`)
 }
 
 main()
   .catch((e) => {
-    console.error('Error during seed:', e)
+    console.error('Error during seed:')
+    if (e instanceof Error) {
+      console.error('  Message:', e.message)
+      console.error('  Code:', (e as any).code || 'N/A')
+      console.error('  Meta:', JSON.stringify((e as any).meta || {}, null, 2))
+      if (e.stack) {
+        console.error('  Stack:', e.stack)
+      }
+    } else {
+      console.error('  Error object:', JSON.stringify(e, null, 2))
+    }
     process.exit(1)
   })
   .finally(async () => {

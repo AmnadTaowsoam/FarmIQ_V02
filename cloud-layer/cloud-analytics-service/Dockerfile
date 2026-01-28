@@ -8,7 +8,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Upgrade pip with timeout handling (non-blocking if it fails - pip 24.0 is already recent)
+RUN pip install --upgrade pip --timeout=120 || echo "pip upgrade failed, continuing with existing version"
+RUN pip install --no-cache-dir --timeout=300 -r requirements.txt
 
 COPY . .
 
