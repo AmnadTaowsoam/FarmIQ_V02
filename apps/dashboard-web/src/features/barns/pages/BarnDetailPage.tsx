@@ -49,11 +49,18 @@ export const BarnDetailPage: React.FC = () => {
   }, [tenantId, barnId, timeRange.start, timeRange.end]);
 
   const chartData = useMemo(() => {
-    return readings.map((r) => ({
-      timestamp: r.timestamp || '',
-      temperature: r.metric_type === 'temperature' ? (r.metric_value ?? 0) : 0,
-      humidity: r.metric_type === 'humidity' ? (r.metric_value ?? 0) : 0,
-    }));
+    const grouped = new Map<string, { timestamp: string; temperature?: number; humidity?: number }>();
+
+    readings.forEach(r => {
+      if (!r.timestamp) return; // Skip readings without timestamp
+      const existing = grouped.get(r.timestamp) || { timestamp: r.timestamp };
+      if (r.metric_type === 'temperature') existing.temperature = r.metric_value;
+      if (r.metric_type === 'humidity') existing.humidity = r.metric_value;
+      grouped.set(r.timestamp, existing);
+    });
+
+    return Array.from(grouped.values())
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   }, [readings]);
 
   const latestTemperature = readings.find((r) => r.metric_type === 'temperature')?.metric_value;
@@ -94,9 +101,9 @@ export const BarnDetailPage: React.FC = () => {
 
       <Grid container spacing={3} mt={1}>
         {[
-          { label: 'Current Temp', value: latestTemperature ? `${latestTemperature}°C` : '—', icon: <Thermometer size={24} />, color: 'error.main' },
-          { label: 'Humidity', value: latestHumidity ? `${latestHumidity}%` : '—', icon: <Droplets size={24} />, color: 'primary.main' },
-          { label: 'Active Devices', value: barn.device_count || 0, icon: <Activity size={24} />, color: 'secondary.main' },
+          { label: 'Current Temp', value: `${latestTemperature ?? '—'}°C`, icon: <Thermometer size={24} />, color: 'error.main' },
+          { label: 'Humidity', value: `${latestHumidity ?? '—'}%`, icon: <Droplets size={24} />, color: 'primary.main' },
+          { label: 'Active Devices', value: barn.device_count ?? 0, icon: <Activity size={24} />, color: 'secondary.main' },
         ].map((stat, idx) => (
           <Grid item xs={12} md={4} key={idx} sx={{ animation: `fadeIn 0.4s ease-out ${idx * 0.1}s both` }}>
             <PremiumCard sx={{ p: 1, bgcolor: alpha(theme.palette.background.paper, 0.4), backdropFilter: 'blur(10px)' }}>

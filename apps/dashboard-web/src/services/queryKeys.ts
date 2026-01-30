@@ -85,6 +85,20 @@ export const queryKeys = {
         programs: (params?: any) => ['feeding', 'programs', params] as const,
     },
 
+    // Analytics
+    analytics: {
+        anomalies: (params?: { tenantId?: string; farmId?: string; barnId?: string; startTime?: string; endTime?: string }) =>
+            ['analytics', 'anomalies', params] as const,
+        recommendations: (params?: { tenantId?: string; farmId?: string; barnId?: string }) =>
+            ['analytics', 'recommendations', params] as const,
+    },
+
+    // Insights
+    insights: {
+        all: (params?: { tenantId?: string }) => ['insights', params] as const,
+        detail: (id: string) => ['insights', id] as const,
+    },
+
     // Barn Records
     barnRecords: {
         dailyCounts: (params?: any) => ['barn-records', 'daily-counts', params] as const,

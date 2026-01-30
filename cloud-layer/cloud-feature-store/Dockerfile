@@ -26,12 +26,12 @@ RUN mkdir -p /data/features /data/registry
 ENV FEAST_REGISTRY_PATH=/data/registry
 ENV FEAST_DATA_PATH=/data/features
 
-# Expose Feast UI port
-EXPOSE 6566
+# Expose Feast UI port (matching docker-compose.yml)
+EXPOSE 5137
 
-# Health check
+# Health check - use curl instead of Python requests
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:6566/health')"
+    CMD curl -f http://localhost:5137/health || exit 1
 
-# Start Feast UI server
-CMD ["python", "-m", "feast", "ui", "--host", "0.0.0.0", "--port", "6566"]
+# Start Feast UI server with correct port
+CMD ["python", "-m", "feast", "ui", "--host", "0.0.0.0", "--port", "5137"]

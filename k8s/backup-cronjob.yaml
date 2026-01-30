@@ -1,0 +1,65 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+  namespace: farmiq-cloud-prod
+  labels:
+    app: farmiq
+    environment: production
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM UTC
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: backup
+            image: postgres:16-alpine
+            command:
+              - /bin/sh
+              - -c
+              - |
+                apk add --no-cache postgresql-client
+                BACKUP_DIR="/backups/postgres"
+                TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+                DATABASES=("cloud_identity_access" "cloud_tenant_registry" "cloud_ingestion" "cloud_telemetry")
+                
+                for DB in "${DATABASES[@]}"; do
+                  DB_BACKUP_FILE="$BACKUP_DIR/${DB}_${TIMESTAMP}.sql.gz"
+                  echo "Backing up $DB..."
+                  PGPASSWORD="$DB_PASSWORD" pg_dump -h "$POSTGRES_HOST:-postgres" -p "$POSTGRES_PORT:-5432" -U "$DB_USER:-farmiq" -d "$DB" | gzip > "$DB_BACKUP_FILE"
+                  
+                  if [ $? -eq 0 ]; then
+                      echo "Successfully backed up $DB to $DB_BACKUP_FILE"
+                      SIZE=$(du -h "$DB_BACKUP_FILE" | cut -f1)
+                      echo "Backup size: $SIZE bytes"
+                  else
+                      echo "Failed to backup $DB"
+                      exit 1
+                done
+                
+                # Upload to GCS (if configured)
+                if [ -n "$GCS_BUCKET" ]; then
+                  echo "GCS_BUCKET not configured, skipping upload"
+                else
+                  for BACKUP_FILE in "$BACKUP_DIR"/*_${TIMESTAMP}.sql.gz; do
+                      gsutil cp "$BACKUP_FILE" "gs://$GCS_BUCKET/daily/"
+                      if [ $? -eq 0 ]; then
+                          echo "Uploaded $BACKUP_FILE"
+                      else
+                          echo "Failed to upload $BACKUP_FILE"
+                          exit 1
+                  done
+                  
+                # Cleanup old local backups (keep 7 days)
+                echo "Cleaning up old local backups (older than 7 days)..."
+                find "$BACKUP_DIR" -name "*.sql.gz" -type f -mtime +7 -delete
+                echo "Backup completed at $TIMESTAMP"
+          restartPolicy: OnFailure
+          backoffLimit: 4
+          activeDeadlineSeconds: 3600  # 1 hour timeout
+      volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: backup-pvc
+      restartPolicy: OnFailure

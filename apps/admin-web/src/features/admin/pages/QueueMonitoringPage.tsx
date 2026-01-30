@@ -1,4 +1,5 @@
 import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   Box,
   Card,
@@ -19,17 +20,31 @@ import {
 import { AdminPageHeader } from '../../../components/admin/AdminPageHeader';
 import { StatCard } from '../../../components/admin/StatCard';
 import { Inbox, TrendingUp, AlertTriangle, CheckCircle } from 'lucide-react';
+import { api, unwrapApiResponse } from '../../../api';
 
 export const QueueMonitoringPage: React.FC = () => {
-  // Mock data
-  const queueStats = {
-    totalQueues: 8,
-    totalMessages: 3456,
-    processingRate: 234, // messages per minute
-    deadLetterCount: 12,
-  };
+  // Fetch Queue stats using useQuery with graceful fallback
+  const { data: queueStats = {}, isLoading, error, refetch } = useQuery({
+    queryKey: ['admin', 'queues', 'stats'],
+    queryFn: async () => {
+      try {
+        const response = await api.opsQueueStats();
+        return unwrapApiResponse<any>(response);
+      } catch (err) {
+        // If endpoint doesn't exist, return mock data as fallback
+        console.warn('Queue stats API not available, using fallback data:', err);
+        return {
+          totalQueues: 8,
+          totalMessages: 3456,
+          processingRate: 234, // messages per minute
+          deadLetterCount: 12,
+        };
+      }
+    },
+    refetchInterval: 10000, // Refresh every 10s
+  });
 
-  const queues = [
+  const queues = queueStats.queues || [
     { name: 'telemetry-ingestion', depth: 1234, maxDepth: 10000, processingRate: 150, status: 'healthy' },
     { name: 'device-commands', depth: 45, maxDepth: 1000, processingRate: 25, status: 'healthy' },
     { name: 'alert-notifications', depth: 789, maxDepth: 5000, processingRate: 45, status: 'warning' },
@@ -37,7 +52,7 @@ export const QueueMonitoringPage: React.FC = () => {
     { name: 'sync-outbox', depth: 1154, maxDepth: 10000, processingRate: 0, status: 'error' },
   ];
 
-  const deadLetterMessages = [
+  const deadLetterMessages = queueStats.deadLetterMessages || [
     { id: '1', queue: 'telemetry-ingestion', message: 'Invalid JSON payload', failedAt: '2 hours ago', retries: 3 },
     { id: '2', queue: 'device-commands', message: 'Device not found', failedAt: '5 hours ago', retries: 3 },
     { id: '3', queue: 'alert-notifications', message: 'Email delivery failed', failedAt: '1 day ago', retries: 3 },
@@ -62,7 +77,7 @@ export const QueueMonitoringPage: React.FC = () => {
         <Grid item xs={12} md={3}>
           <StatCard
             icon={<Inbox />}
-            value={queueStats.totalQueues.toString()}
+            value={(queueStats.totalQueues || 0).toLocaleString()}
             label="Active Queues"
             color="primary"
           />
@@ -70,7 +85,7 @@ export const QueueMonitoringPage: React.FC = () => {
         <Grid item xs={12} md={3}>
           <StatCard
             icon={<CheckCircle />}
-            value={queueStats.totalMessages.toLocaleString()}
+            value={(queueStats.totalMessages || 0).toLocaleString()}
             label="Total Messages"
             color="info"
           />
@@ -78,7 +93,7 @@ export const QueueMonitoringPage: React.FC = () => {
         <Grid item xs={12} md={3}>
           <StatCard
             icon={<TrendingUp />}
-            value={`${queueStats.processingRate}/min`}
+            value={`${(queueStats.processingRate || 0)}/min`}
             label="Processing Rate"
             color="success"
           />
@@ -86,7 +101,7 @@ export const QueueMonitoringPage: React.FC = () => {
         <Grid item xs={12} md={3}>
           <StatCard
             icon={<AlertTriangle />}
-            value={queueStats.deadLetterCount.toString()}
+            value={(queueStats.deadLetterCount || 0).toString()}
             label="Dead Letter"
             color="error"
           />

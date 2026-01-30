@@ -6,28 +6,43 @@ const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://localhost';
 let connection: amqp.Connection | null = null;
 let channel: amqp.Channel | null = null;
 
-export async function connectRabbitMQ() {
-    try {
-        const conn = await amqp.connect(RABBITMQ_URL) as any;
-        connection = conn as amqp.Connection;
-        if (!connection) {
-            throw new Error('Failed to establish RabbitMQ connection');
+export async function connectRabbitMQ(maxRetries = 10, initialDelay = 1000) {
+    let attempt = 0;
+
+    while (attempt < maxRetries) {
+        try {
+            logger.info(`Attempting to connect to RabbitMQ (attempt ${attempt + 1}/${maxRetries})...`);
+            const conn = await amqp.connect(RABBITMQ_URL) as any;
+            connection = conn as amqp.Connection;
+            if (!connection) {
+                throw new Error('Failed to establish RabbitMQ connection');
+            }
+            channel = await (connection as any).createChannel();
+            logger.info('Connected to RabbitMQ successfully');
+
+            (connection as any).on('error', (err: Error) => {
+                logger.error('RabbitMQ connection error', err);
+            });
+
+            (connection as any).on('close', () => {
+                logger.warn('RabbitMQ connection closed');
+                connection = null;
+                channel = null;
+            });
+
+            return; // Success, exit the function
+        } catch (error) {
+            attempt++;
+            if (attempt >= maxRetries) {
+                logger.error('Failed to connect to RabbitMQ after maximum retries', error);
+                throw error;
+            }
+
+            // Exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s (capped)
+            const delay = Math.min(initialDelay * Math.pow(2, attempt - 1), 30000);
+            logger.warn(`Failed to connect to RabbitMQ (attempt ${attempt}/${maxRetries}). Retrying in ${delay}ms...`, error);
+            await new Promise(resolve => setTimeout(resolve, delay));
         }
-        channel = await (connection as any).createChannel();
-        logger.info('Connected to RabbitMQ');
-
-        (connection as any).on('error', (err: Error) => {
-            logger.error('RabbitMQ connection error', err);
-        });
-
-        (connection as any).on('close', () => {
-            logger.warn('RabbitMQ connection closed');
-            connection = null;
-            channel = null;
-        });
-    } catch (error) {
-        logger.error('Failed to connect to RabbitMQ', error);
-        throw error;
     }
 }
 

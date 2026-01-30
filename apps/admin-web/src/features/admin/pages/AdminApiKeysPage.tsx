@@ -51,6 +51,7 @@ interface ApiKey {
   status: 'active' | 'revoked';
 }
 
+
 const mockApiKeys: ApiKey[] = [
   {
     id: '1',
@@ -75,7 +76,7 @@ const mockApiKeys: ApiKey[] = [
   {
     id: '3',
     name: 'Legacy Key',
-    key: 'sk_old_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+    key: 'sk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
     prefix: 'sk_old_',
     permissions: ['read', 'write', 'delete'],
     createdAt: new Date('2023-12-01'),

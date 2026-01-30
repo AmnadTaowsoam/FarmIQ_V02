@@ -70,8 +70,16 @@ async function startServer() {
     await prismaConnect()
     logger.info('Database connection has been established successfully.')
 
-    await connectRabbitMQ()
-    await startNotificationJobConsumer()
+    // Attempt RabbitMQ connection in background - don't block server startup
+    connectRabbitMQ()
+      .then(async () => {
+        logger.info('RabbitMQ connection established. Starting notification job consumer...');
+        await startNotificationJobConsumer();
+      })
+      .catch((err) => {
+        logger.error('Failed to establish initial RabbitMQ connection. Service will continue without RabbitMQ.', err);
+        logger.warn('RabbitMQ-dependent features may not work until connection is established.');
+      });
 
     server = app.listen(port, () => {
       logger.info(`cloud-notification-service running on port ${port}`)

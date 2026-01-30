@@ -47,4 +47,7 @@ export const api = {
     // ==================== Ops ====================
     opsHealth: (params?: any) => httpClient.get<ApiResponse<any>>(OPS_ENDPOINTS.HEALTH, { params }),
     opsDataQuality: (params?: any) => httpClient.get<ApiResponse<any>>(OPS_ENDPOINTS.DATA_QUALITY, { params }),
+    opsMqttStats: (params?: any) => httpClient.get<ApiResponse<any>>(OPS_ENDPOINTS.MQTT_STATS, { params }),
+    opsQueueStats: (params?: any) => httpClient.get<ApiResponse<any>>(OPS_ENDPOINTS.QUEUE_STATS, { params }),
+    opsSyncTrigger: (params?: any) => httpClient.post<ApiResponse<any>>(OPS_ENDPOINTS.SYNC_TRIGGER, { params }),
 };

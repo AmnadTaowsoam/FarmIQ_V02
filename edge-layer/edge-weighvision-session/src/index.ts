@@ -15,8 +15,31 @@ const port = process.env.APP_PORT || 3000
 const prisma = new PrismaClient()
 let server: Server | undefined
 
+// Configure CORS with explicit origin whitelist
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
+  'http://localhost:5135',  // dashboard-web
+  'http://localhost:5143',  // admin-web
+  'http://localhost:3000',  // development
+]
+
 app.use(helmet())
-app.use(cors())
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) {
+      return callback(null, true)
+    }
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true)
+    } else {
+      callback(new Error('Not allowed by CORS'))
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id', 'x-request-id'],
+}))
 app.use(express.json())
 app.use(requestContextMiddleware)
 

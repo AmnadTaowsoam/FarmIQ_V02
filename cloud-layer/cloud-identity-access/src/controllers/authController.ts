@@ -1,13 +1,24 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 
 const prisma = new PrismaClient();
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-const JWT_EXPIRES_IN = '1h';
-const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || 'your-refresh-secret-key';
-const REFRESH_TOKEN_EXPIRES_IN = '7d';
+
+// JWT Configuration - Secrets are required for security
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
+const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
+const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
+
+// Validate required environment variables
+if (!JWT_SECRET) {
+    throw new Error('JWT_SECRET environment variable is required');
+}
+
+if (!REFRESH_TOKEN_SECRET) {
+    throw new Error('REFRESH_TOKEN_SECRET environment variable is required');
+}
 
 export const login = async (req: Request, res: Response) => {
     const { email, password } = req.body;
@@ -34,8 +45,12 @@ export const login = async (req: Request, res: Response) => {
             tenant_id: user.tenantId,
         };
 
-        const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
-        const refreshToken = jwt.sign(payload, REFRESH_TOKEN_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRES_IN });
+        const accessToken = jwt.sign(payload, JWT_SECRET, {
+            expiresIn: JWT_EXPIRES_IN,
+            issuer: 'farmiq',
+            audience: 'farmiq-api'
+        } as SignOptions);
+        const refreshToken = jwt.sign(payload, REFRESH_TOKEN_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRES_IN } as SignOptions);
 
         return res.status(200).json({
             access_token: accessToken,
@@ -90,7 +105,7 @@ export const refresh = async (req: Request, res: Response) => {
             tenant_id: user.tenantId,
         };
 
-        const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+        const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN } as SignOptions);
 
         return res.status(200).json({
             access_token: accessToken,

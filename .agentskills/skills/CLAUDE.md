@@ -2,6 +2,29 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⚡ Fast Skill Loading (IMPORTANT)
+
+**DO NOT read `SKILL_INDEX.md` directly - it's 3000+ lines!**
+
+### Skill Lookup Order:
+1. **First:** Read `SKILL_ROUTER.md` (~100 lines) - decision tree & keyword matching
+2. **Find:** Identify the specific skill you need
+3. **Then:** Read only that skill's `SKILL.md`
+
+### When to Read Full SKILL.md:
+- ✅ User asks for implementation code
+- ✅ Need specific configuration examples
+- ✅ Troubleshooting or debugging
+- ✅ Writing production code
+
+### When SKILL_ROUTER.md is Enough:
+- ✅ Deciding which technology to use
+- ✅ Quick concept explanation
+- ✅ Comparing options
+- ✅ Answering "what should I use for X?"
+
+---
+
 ## Repository Purpose
 
 This is a collection of Claude Code skills documentation organized by technical domain. Each skill provides reference material, code patterns, and best practices for specific technologies or patterns.
@@ -10,38 +33,45 @@ This is a collection of Claude Code skills documentation organized by technical 
 
 Skills are organized in numbered directories by domain:
 
-- `01-foundations/` - Core standards (API design, code review, git, Python/TypeScript standards)
-- `02-frontend/` - React, Next.js, state management, UI libraries (MUI, shadcn, Tailwind)
-- `03-backend-api/` - Express, FastAPI, Node.js, error handling, validation
-- `04-database/` - Prisma, MongoDB, Redis, TimescaleDB, vector databases, migrations
-- `05-ai-ml-core/` - Data preprocessing, model training, YOLO, PyTorch, Label Studio
-- `06-ai-ml-production/` - LLM integration, RAG, embeddings, prompt engineering, guardrails
-- `07-document-processing/` - OCR (Tesseract, PaddleOCR), PDF processing, image preprocessing
-- `08-messaging-queue/` - Kafka, RabbitMQ, Redis queues, MQTT
-- `09-microservices/` - Service design, API gateway, circuit breaker, service mesh
-- `10-authentication-authorization/` - JWT, OAuth2, RBAC, session management
-- `11-billing-subscription/` - Stripe, subscriptions, usage metering, invoicing
-- `12-compliance-governance/` - GDPR, PDPA, audit logging, data privacy
-- `13-file-storage/` - S3, CDN, multipart uploads, image optimization
-- `14-monitoring-observability/` - Prometheus, Grafana, ELK stack, distributed tracing
-- `15-devops-infrastructure/` - Docker, Kubernetes, Helm, Terraform, GitHub Actions
-- `16-testing/` - Jest, Pytest, Playwright, integration/load testing
-- `17-domain-specific/` - Multi-tenancy, feature flags, rate limiting, notifications
-
-Each skill directory contains a `SKILL.md` file with the skill documentation.
+```
+00-meta-skills/       - Architecture, decisions, system thinking
+01-foundations/       - API design, code review, git, standards
+02-frontend/          - React, Next.js, state, UI libraries
+03-backend-api/       - Express, FastAPI, NestJS, tRPC
+04-database/          - Prisma, MongoDB, Redis, Supabase, vectors
+05-ai-ml-core/        - Training, preprocessing, YOLO, PyTorch
+06-ai-ml-production/  - LLM, RAG, LangChain, agents, guardrails
+07-document-processing/ - OCR, PDF, image processing
+08-messaging-queue/   - Kafka, RabbitMQ, Redis, MQTT
+09-microservices/     - Saga, CQRS, Temporal, service mesh
+10-authentication/    - JWT, OAuth2, RBAC, SSO
+11-billing/           - Stripe, subscriptions, usage metering
+12-compliance/        - GDPR, PDPA, audit logging
+13-file-storage/      - S3, CDN, uploads, optimization
+14-monitoring/        - OpenTelemetry, Prometheus, Grafana
+15-devops/            - Docker, K8s, Terraform, GitHub Actions
+16-testing/           - Vitest, Jest, Playwright, Pytest
+17-domain-specific/   - Multi-tenancy, feature flags
+53-data-engineering/  - Dagster, CDC, Medallion, Data Mesh
+77-mlops/             - MLflow, feature stores, model serving
+90-thai-integrations/ - PromptPay, LINE, Thai banks, Lazada
+```
 
 ## Skill File Format
 
-Each `SKILL.md` typically contains:
-- Overview section describing the skill's purpose
-- Key topics covered
-- Code examples with TypeScript or Python patterns
-- Best practices checklists where applicable
+Each `SKILL.md` contains:
+- Overview and purpose
+- Core concepts with code examples
+- Quick start guide
+- Production checklist
+- Anti-patterns to avoid
+- Integration points
 
 ## Working with This Repository
 
 When adding or modifying skills:
-- Place new skills in the appropriate numbered domain directory
-- Create a subdirectory with a descriptive kebab-case name
-- Include a `SKILL.md` file following the established format
-- Skills may contain bilingual content (English and Thai)
+1. Place in appropriate numbered directory
+2. Use kebab-case subdirectory name
+3. Include `SKILL.md` following established format
+4. Update `SKILL_ROUTER.md` if adding new skill
+5. Skills may contain bilingual content (English/Thai)

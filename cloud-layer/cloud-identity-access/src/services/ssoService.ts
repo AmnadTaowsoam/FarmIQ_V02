@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import * as oidc from 'openid-client';
 import { Strategy as SamlStrategy } from 'passport-saml';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import { logger } from '../utils/logger';
 
 const prisma = new PrismaClient();
@@ -180,10 +180,10 @@ export async function handleOidcCallback(
       tenant_id: user.tenantId,
     };
 
-    const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+    const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN } as SignOptions);
     const refreshToken = jwt.sign(payload, REFRESH_TOKEN_SECRET, {
       expiresIn: REFRESH_TOKEN_EXPIRES_IN,
-    });
+    } as SignOptions);
 
     return { accessToken, refreshToken };
   } catch (error) {
@@ -354,10 +354,10 @@ export async function handleSamlCallback(
       tenant_id: user.tenantId,
     };
 
-    const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+    const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN } as SignOptions);
     const refreshToken = jwt.sign(payload, REFRESH_TOKEN_SECRET, {
       expiresIn: REFRESH_TOKEN_EXPIRES_IN,
-    });
+    } as SignOptions);
 
     return { accessToken, refreshToken };
   } catch (error) {

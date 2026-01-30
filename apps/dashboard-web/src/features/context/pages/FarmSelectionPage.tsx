@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Box, Typography, Grid, Button, alpha, useTheme, Stack, TextField } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { PremiumCard } from '../../../components/common/PremiumCard';
@@ -10,6 +11,7 @@ import { LoadingCard } from '../../../components/LoadingCard';
 import { ErrorState } from '../../../components/feedback/ErrorState';
 import { PageHeader } from '../../../components/PageHeader';
 import { EmptyState } from '../../../components/EmptyState';
+import { queryKeys } from '../../../services/queryKeys';
 import type { components } from '@farmiq/api-client';
 
 type Farm = components['schemas']['Farm'];
@@ -18,45 +20,34 @@ export const FarmSelectionPage: React.FC = () => {
     const theme = useTheme();
     const navigate = useNavigate();
     const { tenantId, setFarmId } = useActiveContext();
-    const [farms, setFarms] = useState<Farm[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<Error | null>(null);
-    const [overrideFarmId, setOverrideFarmId] = useState<string>(
+    const [overrideFarmId, setOverrideFarmId] = React.useState<string>(
         import.meta.env.VITE_DEFAULT_FARM_ID || ''
     );
     const isDev = import.meta.env.DEV;
 
+    const { data: farmsResponse = [], isLoading, error, refetch } = useQuery({
+        queryKey: tenantId ? queryKeys.farms.byTenant(tenantId) : ['farms', 'by-tenant'],
+        queryFn: async () => {
+            if (!tenantId) return [];
+            const response = await api.farms.list({ tenantId, page: 1, pageSize: 100 });
+            const farms = unwrapApiResponse<any[]>(response) || [];
+            const normalized = farms.map((farm) => ({
+                ...farm,
+                farm_id: farm.farm_id || (farm as any).id,
+            }));
+            return normalized;
+        },
+        enabled: !!tenantId,
+        retry: 1,
+    });
+
+    const farms = farmsResponse || [];
+    
     const handleSelect = (farmId: string) => {
         setFarmId(farmId);
         navigate('/overview');
     };
-
-    useEffect(() => {
-        const fetchFarms = async () => {
-            if (!tenantId) {
-                setLoading(false);
-                return;
-            }
-            setLoading(true);
-            try {
-                const response = await api.farms.list({ tenantId, page: 1, pageSize: 100 });
-                const farmsResponse = unwrapApiResponse<any[]>(response) || [];
-                const normalized = farmsResponse.map((farm) => ({
-                    ...farm,
-                    farm_id: farm.farm_id || (farm as any).id,
-                }));
-                setFarms(normalized);
-                setError(null);
-            } catch (err) {
-                setError(err as Error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchFarms();
-    }, [tenantId]);
-
+    
     if (!tenantId) {
         return (
             <Box>
@@ -70,8 +61,8 @@ export const FarmSelectionPage: React.FC = () => {
             </Box>
         );
     }
-
-    if (loading) {
+    
+    if (isLoading) {
         return (
             <Box>
                 <PageHeader title="Select Farm" subtitle="Choose the farm you wish to monitor" />
@@ -79,12 +70,12 @@ export const FarmSelectionPage: React.FC = () => {
             </Box>
         );
     }
-
+    
     if (error) {
         return (
             <Box>
                 <PageHeader title="Select Farm" subtitle="Choose the farm you wish to monitor" />
-                <ErrorState title="Failed to load farms" message={error.message} />
+                <ErrorState title="Failed to load farms" message={error instanceof Error ? error.message : 'Unknown error'} onRetry={() => refetch()} />
                 {isDev ? (
                     <PremiumCard sx={{ mt: 3 }}>
                         <Typography variant="h6" fontWeight="700" gutterBottom>
@@ -97,7 +88,7 @@ export const FarmSelectionPage: React.FC = () => {
                             <TextField
                                 label="Developer farm ID"
                                 value={overrideFarmId}
-                                onChange={(event) => setOverrideFarmId(event.target.value)}
+                                onChange={(event: React.ChangeEvent<HTMLInputElement>) => setOverrideFarmId(event.target.value)}
                                 placeholder="farm-id"
                                 fullWidth
                             />
@@ -120,23 +111,23 @@ export const FarmSelectionPage: React.FC = () => {
             </Box>
         );
     }
-
+    
     if (!farms.length) {
         return (
             <Box>
                 <PageHeader title="Select Farm" subtitle="Choose the farm you wish to monitor" />
-                <EmptyState title="No farms available" description="Register a farm to get started." />
+                <EmptyState title="No farms available" description="Register a farm to get started." actionLabel="Retry" onAction={() => refetch()} />
             </Box>
         );
     }
-
+    
     return (
         <Box>
             <PageHeader
                 title="Select Farm"
                 subtitle={`Choose the farm you wish to monitor for ${tenantId || 'selected tenant'}`}
             />
-
+            
             <Grid container spacing={3} sx={{ animation: 'fadeIn 0.6s ease-out' }}>
                 {farms.map((farm, index) => (
                     <Grid item xs={12} sm={6} md={4} key={farm.farm_id || farm.name} sx={{ animation: `fadeIn 0.4s ease-out ${index * 0.1}s both` }}>
@@ -160,11 +151,11 @@ export const FarmSelectionPage: React.FC = () => {
                                         label={(farm.status || 'Active').toUpperCase()}
                                     />
                                 </Box>
-
+                                
                                 <Typography variant="h5" fontWeight="700" gutterBottom>
                                     {farm.name || farm.farm_id}
                                 </Typography>
-
+                                
                                 <Stack spacing={1.5} sx={{ mt: 2 }}>
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, color: 'text.secondary' }}>
                                         <MapPin size={18} />

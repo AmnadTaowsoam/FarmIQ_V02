@@ -1061,7 +1061,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 <!-- SKILLS-START -->
 ## Skills Overview
 
-**Total Skills:** 556
+**Total Skills:** 566
 
 
 ### 00. Meta Skills
@@ -1114,7 +1114,9 @@ MIT License - see [LICENSE](LICENSE) file for details.
 | [graphql-best-practices](03-backend-api/graphql-best-practices/SKILL.md) | GraphQL Best Practices |
 | [grpc-integration](03-backend-api/grpc-integration/SKILL.md) | gRPC Integration |
 | [middleware](03-backend-api/middleware/SKILL.md) | Backend Middleware Patterns |
+| [nestjs-patterns](03-backend-api/nestjs-patterns/SKILL.md) | NestJS Patterns |
 | [nodejs-api](03-backend-api/nodejs-api/SKILL.md) | Node.js REST API Patterns |
+| [trpc-patterns](03-backend-api/trpc-patterns/SKILL.md) | tRPC Patterns |
 | [validation](03-backend-api/validation/SKILL.md) | API Request Validation |
 | [websocket-patterns](03-backend-api/websocket-patterns/SKILL.md) | WebSocket Patterns |
 
@@ -1131,6 +1133,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 | [mongodb-patterns](04-database/mongodb-patterns/SKILL.md) | MongoDB Patterns and Best Practices |
 | [prisma-guide](04-database/prisma-guide/SKILL.md) | Prisma ORM Guide |
 | [redis-caching](04-database/redis-caching/SKILL.md) | Redis Caching Patterns |
+| [supabase-patterns](04-database/supabase-patterns/SKILL.md) | Supabase Patterns |
 | [timescaledb](04-database/timescaledb/SKILL.md) | TimescaleDB (Time-Series Database) Patterns |
 | [vector-database](04-database/vector-database/SKILL.md) | Vector Database Patterns |
 
@@ -1154,6 +1157,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 | [agent-patterns](06-ai-ml-production/agent-patterns/SKILL.md) | AI Agent Patterns |
 | [ai-observability](06-ai-ml-production/ai-observability/SKILL.md) | AI/ML Observability and Monitoring |
 | [embedding-models](06-ai-ml-production/embedding-models/SKILL.md) | Embedding Models |
+| [langchain-patterns](06-ai-ml-production/langchain-patterns/SKILL.md) | LangChain Patterns |
 | [llm-function-calling](06-ai-ml-production/llm-function-calling/SKILL.md) | LLM Function Calling |
 | [llm-guardrails](06-ai-ml-production/llm-guardrails/SKILL.md) | LLM Guardrails |
 | [llm-integration](06-ai-ml-production/llm-integration/SKILL.md) | LLM Integration |
@@ -1201,6 +1205,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 | [service-design](09-microservices/service-design/SKILL.md) | Service Design |
 | [service-discovery](09-microservices/service-discovery/SKILL.md) | Service Discovery |
 | [service-mesh](09-microservices/service-mesh/SKILL.md) | Service Mesh |
+| [temporal-workflow](09-microservices/temporal-workflow/SKILL.md) | Temporal Workflow |
 
 ### 10. Authentication Authorization
 
@@ -1253,6 +1258,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 | [elk-stack](14-monitoring-observability/elk-stack/SKILL.md) | ELK Stack |
 | [error-tracking](14-monitoring-observability/error-tracking/SKILL.md) | Error Tracking |
 | [grafana-dashboards](14-monitoring-observability/grafana-dashboards/SKILL.md) | Grafana Dashboards |
+| [opentelemetry-patterns](14-monitoring-observability/opentelemetry-patterns/SKILL.md) | OpenTelemetry Patterns |
 | [performance-monitoring](14-monitoring-observability/performance-monitoring/SKILL.md) | Performance Monitoring |
 | [prometheus-metrics](14-monitoring-observability/prometheus-metrics/SKILL.md) | Prometheus Metrics |
 
@@ -1268,7 +1274,6 @@ MIT License - see [LICENSE](LICENSE) file for details.
 | [kubernetes-deployment](15-devops-infrastructure/kubernetes-deployment/SKILL.md) | Kubernetes Deployment |
 | [load-balancing](15-devops-infrastructure/load-balancing/SKILL.md) | Load Balancing Strategies |
 | [multi-cloud-patterns](15-devops-infrastructure/multi-cloud-patterns/SKILL.md) | Multi-Cloud Patterns |
-| [secrets-management](15-devops-infrastructure/secrets-management/SKILL.md) | Secrets Management |
 | [service-orchestration](15-devops-infrastructure/service-orchestration/SKILL.md) | Service Orchestration |
 | [terraform-infrastructure](15-devops-infrastructure/terraform-infrastructure/SKILL.md) | Terraform Infrastructure |
 
@@ -1286,6 +1291,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 | [pytest-patterns](16-testing/pytest-patterns/SKILL.md) | Pytest Patterns |
 | [test-data-factory](16-testing/test-data-factory/SKILL.md) | Test Data Factory |
 | [test-driven-development-agentic](16-testing/test-driven-development-agentic/SKILL.md) | Test-Driven Development for Agents |
+| [vitest-patterns](16-testing/vitest-patterns/SKILL.md) | Vitest Patterns |
 
 ### 17. Domain Specific
 
@@ -1495,7 +1501,6 @@ MIT License - see [LICENSE](LICENSE) file for details.
 | [presence-detection](34-real-time-features/presence-detection/SKILL.md) | Presence Detection |
 | [real-time-dashboard](34-real-time-features/real-time-dashboard/SKILL.md) | Real-time Dashboard |
 | [server-sent-events](34-real-time-features/server-sent-events/SKILL.md) | Server-Sent Events (SSE) |
-| [websocket-patterns](34-real-time-features/websocket-patterns/SKILL.md) | WebSocket Patterns |
 
 ### 35. Blockchain Web3
 
@@ -1596,7 +1601,6 @@ MIT License - see [LICENSE](LICENSE) file for details.
 | [llm-token-optimization](42-cost-engineering/llm-token-optimization/SKILL.md) | LLM Token Optimization |
 | [pricing-and-usage-meters](42-cost-engineering/pricing-and-usage-meters/SKILL.md) | Pricing and Usage Meters |
 | [storage-egress-optimization](42-cost-engineering/storage-egress-optimization/SKILL.md) | Storage and Egress Optimization |
-| [usage-based-pricing](42-cost-engineering/usage-based-pricing/SKILL.md) | Usage-Based Pricing (Consumption Billing) |
 
 ### 43. Data Reliability
 
@@ -1723,11 +1727,14 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 | Skill | Description |
 |-------|-------------|
-| [data-quality-checks](53-data-engineering/data-quality-checks/SKILL.md) | Data Quality Checks |
+| [change-data-capture](53-data-engineering/change-data-capture/SKILL.md) | Change Data Capture (CDC) |
+| [dagster-patterns](53-data-engineering/dagster-patterns/SKILL.md) | Dagster Patterns |
+| [data-mesh-architecture](53-data-engineering/data-mesh-architecture/SKILL.md) | Data Mesh Architecture |
 | [dbt-patterns](53-data-engineering/dbt-patterns/SKILL.md) | dbt Patterns |
 | [elt-modeling](53-data-engineering/elt-modeling/SKILL.md) | ELT Modeling |
 | [kafka-streaming](53-data-engineering/kafka-streaming/SKILL.md) | Kafka Streaming |
 | [lakehouse-patterns](53-data-engineering/lakehouse-patterns/SKILL.md) | Lakehouse Patterns |
+| [medallion-architecture](53-data-engineering/medallion-architecture/SKILL.md) | Medallion Architecture |
 
 ### 54. Agentops
 
@@ -1910,8 +1917,6 @@ MIT License - see [LICENSE](LICENSE) file for details.
 | Skill | Description |
 |-------|-------------|
 | [backfill-and-reconciliation-playbook](70-data-platform-governance/backfill-and-reconciliation-playbook/SKILL.md) | Backfill and Reconciliation Playbook |
-| [data-contracts](70-data-platform-governance/data-contracts/SKILL.md) | Data Contracts |
-| [lineage-and-provenance](70-data-platform-governance/lineage-and-provenance/SKILL.md) | Lineage and Provenance |
 | [pii-policy-enforcement](70-data-platform-governance/pii-policy-enforcement/SKILL.md) | PII Policy Enforcement |
 | [retention-archival](70-data-platform-governance/retention-archival/SKILL.md) | Retention and Archival |
 
@@ -1920,7 +1925,6 @@ MIT License - see [LICENSE](LICENSE) file for details.
 | Skill | Description |
 |-------|-------------|
 | [api-design-contracts](71-infrastructure-patterns/api-design-contracts/SKILL.md) | API Design Contracts |
-| [caching-strategies](71-infrastructure-patterns/caching-strategies/SKILL.md) | Caching Strategies |
 | [secrets-key-management](71-infrastructure-patterns/secrets-key-management/SKILL.md) | Secrets & Key Management |
 | [thai-payment-integration](71-infrastructure-patterns/thai-payment-integration/SKILL.md) | Thai Payment Integration |
 
@@ -1972,6 +1976,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 |-------|-------------|
 | [drift-detection-retraining](77-mlops-data-engineering/drift-detection-retraining/SKILL.md) | Drift Detection and Retraining |
 | [feature-store-implementation](77-mlops-data-engineering/feature-store-implementation/SKILL.md) | Feature Store Implementation |
+| [mlflow-patterns](77-mlops-data-engineering/mlflow-patterns/SKILL.md) | MLflow Patterns |
 | [model-registry-versioning](77-mlops-data-engineering/model-registry-versioning/SKILL.md) | Model Registry and Versioning |
 
 ### 78. Inference Model Serving
@@ -2069,4 +2074,14 @@ MIT License - see [LICENSE](LICENSE) file for details.
 | Skill | Description |
 |-------|-------------|
 | [pqc-for-iot](89-post-quantum-cryptography/pqc-for-iot/SKILL.md) | Post-Quantum Cryptography (PQC) for IoT |
+
+### 90. Thai Integrations
+
+| Skill | Description |
+|-------|-------------|
+| [lazada-shopee-integration](90-thai-integrations/lazada-shopee-integration/SKILL.md) | Lazada & Shopee Integration |
+| [line-liff-patterns](90-thai-integrations/line-liff-patterns/SKILL.md) | LINE LIFF Patterns |
+| [promptpay-integration](90-thai-integrations/promptpay-integration/SKILL.md) | PromptPay Integration |
+| [thai-bank-apis](90-thai-integrations/thai-bank-apis/SKILL.md) | Thai Bank APIs |
+| [thai-sms-providers](90-thai-integrations/thai-sms-providers/SKILL.md) | Thai SMS Providers |
 <!-- SKILLS-END -->

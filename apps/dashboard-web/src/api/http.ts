@@ -17,7 +17,7 @@ export const API_BASE_URL = normalizeBaseUrl(RAW_BASE_URL);
 // Create axios instance
 const httpClient: AxiosInstance = axios.create({
     baseURL: API_BASE_URL,
-    timeout: 30000,
+    timeout: 60000,
     headers: {
         'Content-Type': 'application/json',
     },
@@ -57,7 +57,7 @@ httpClient.interceptors.request.use(
         const urlPath = config.url || '';
         const isTenantsListEndpoint = urlPath.endsWith('/tenants') && !urlPath.match(/\/tenants\/[^/]+/);
         const shouldSkipTenantContext = isAuthEndpoint || isTenantsListEndpoint;
-        
+
         if (!shouldSkipTenantContext) {
             const tenantIdFromParams =
                 (config.params as any)?.tenantId ||

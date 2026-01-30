@@ -28,7 +28,7 @@ WITH batch_periods AS (
         SUM(mortality_count) as total_mortality,
         SUM(cull_count) as total_culls,
         -- Calculate survival rate
-        1.0 - (SUM(mortality_count + cull_count)::FLOAT / NULLIF(SUM(animal_count), 0) as survival_rate,
+        1.0 - (SUM(mortality_count + cull_count)::FLOAT / NULLIF(SUM(animal_count), 0)) as survival_rate,
         -- Calculate feed efficiency
         CASE
             WHEN SUM(total_feed_kg) > 0 AND SUM(weight_gain_kg) > 0
@@ -45,7 +45,7 @@ batch_metrics AS (
     SELECT
         bp.*,
         -- Calculate batch age in days
-        DATEDIFF('day', batch_start_date, batch_end_date) as batch_age_days,
+        EXTRACT(day FROM (batch_end_date - batch_start_date)) as batch_age_days,
         -- Calculate mortality rate
         CASE
             WHEN avg_animal_count > 0

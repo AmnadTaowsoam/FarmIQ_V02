@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { Prisma, PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
+import crypto from 'crypto'
 import { logger } from '../utils/logger'
 
 const prisma = new PrismaClient()
@@ -13,7 +14,13 @@ const formatDisplayName = (email: string): string => {
     .join(' ')
 }
 
-const DEFAULT_PASSWORD = 'password123'
+/**
+ * Generate a secure random password for new users
+ * Password will be 16 characters, base64url encoded
+ */
+const generateSecurePassword = (): string => {
+  return crypto.randomBytes(16).toString('base64url');
+}
 
 const resolveRoleIds = async (roleNames?: string[]) => {
   if (!roleNames || roleNames.length === 0) {
@@ -166,7 +173,10 @@ export async function createAdminUser(req: Request, res: Response) {
     }
 
     const resolvedRoleIds = await resolveRoleIds(Array.isArray(roles) ? roles : undefined)
-    const hashedPassword = await bcrypt.hash(password || DEFAULT_PASSWORD, 10)
+    
+    // Generate secure password if not provided
+    const tempPassword = password || generateSecurePassword();
+    const hashedPassword = await bcrypt.hash(tempPassword, 12)
 
     const user = await prisma.user.create({
       data: {
@@ -180,7 +190,8 @@ export async function createAdminUser(req: Request, res: Response) {
       include: { roles: true },
     })
 
-    return res.status(201).json({
+    // Return temporary password if generated (for initial setup)
+    const responseData = {
       id: user.id,
       name: formatDisplayName(user.email),
       email: user.email,
@@ -191,7 +202,15 @@ export async function createAdminUser(req: Request, res: Response) {
       lastLogin: null,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
-    })
+    };
+
+    // Only include temporary password if it was auto-generated
+    if (!password) {
+      (responseData as any).temporaryPassword = tempPassword;
+      logger.info(`Generated temporary password for user ${user.email}`);
+    }
+
+    return res.status(201).json(responseData)
   } catch (error: any) {
     logger.error('Error in createAdminUser:', error)
     if (error.code === 'P2002') {

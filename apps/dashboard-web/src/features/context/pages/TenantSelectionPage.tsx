@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Box, Typography, Grid, Button, Avatar, TextField, useTheme, alpha } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { PremiumCard } from '../../../components/common/PremiumCard';
@@ -9,6 +10,7 @@ import { LoadingCard } from '../../../components/LoadingCard';
 import { ErrorState } from '../../../components/feedback/ErrorState';
 import { PageHeader } from '../../../components/PageHeader';
 import { EmptyState } from '../../../components/EmptyState';
+import { queryKeys } from '../../../services/queryKeys';
 import type { components } from '@farmiq/api-client';
 
 type Tenant = components['schemas']['Tenant'];
@@ -17,55 +19,46 @@ export const TenantSelectionPage: React.FC = () => {
     const theme = useTheme();
     const navigate = useNavigate();
     const { setTenantId } = useActiveContext();
-    const [tenants, setTenants] = useState<Tenant[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<Error | null>(null);
-    const [overrideTenantId, setOverrideTenantId] = useState<string>(
+    const [overrideTenantId, setOverrideTenantId] = React.useState<string>(
         import.meta.env.VITE_DEFAULT_TENANT_ID || ''
     );
     const isDev = import.meta.env.DEV;
 
+    const { data: tenantsResponse = [], isLoading, error, refetch } = useQuery({
+        queryKey: queryKeys.tenants.all,
+        queryFn: async () => {
+            const response = await api.tenants.list();
+            const tenants = unwrapApiResponse<any[]>(response) || [];
+            const normalized = tenants.map((tenant) => ({
+                ...tenant,
+                tenant_id: tenant.tenant_id || (tenant as any).id,
+            }));
+            return normalized;
+        },
+        retry: 1,
+    });
+
+    const tenants = tenantsResponse || [];
+    
     const handleSelect = (tenantId: string) => {
         setTenantId(tenantId);
         navigate('/select-farm');
     };
-
-    useEffect(() => {
-        const fetchTenants = async () => {
-            setLoading(true);
-            try {
-                const response = await api.tenants.list();
-                const tenantsResponse = unwrapApiResponse<any[]>(response) || [];
-                const normalized = tenantsResponse.map((tenant) => ({
-                    ...tenant,
-                    tenant_id: tenant.tenant_id || (tenant as any).id,
-                }));
-                setTenants(normalized);
-                setError(null);
-            } catch (err) {
-                setError(err as Error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchTenants();
-    }, []);
-
-    if (loading) {
+    
+    if (isLoading) {
         return (
             <Box>
-                <PageHeader title="Select Organization" subtitle="Choose the tenant organization you wish to manage" />
+                <PageHeader title="Select Organization" subtitle="Choose tenant organization you wish to manage" />
                 <LoadingCard title="Loading tenants" lines={3} />
             </Box>
         );
     }
-
+    
     if (error) {
         return (
             <Box>
-                <PageHeader title="Select Organization" subtitle="Choose the tenant organization you wish to manage" />
-                <ErrorState title="Failed to load tenants" message={error.message} />
+                <PageHeader title="Select Organization" subtitle="Choose tenant organization you wish to manage" />
+                <ErrorState title="Failed to load tenants" message={error instanceof Error ? error.message : 'Unknown error'} onRetry={() => refetch()} />
                 {isDev ? (
                     <PremiumCard sx={{ mt: 3 }}>
                         <Typography variant="h6" fontWeight="700" gutterBottom>
@@ -101,23 +94,25 @@ export const TenantSelectionPage: React.FC = () => {
             </Box>
         );
     }
-
+    
     if (!tenants.length) {
         return (
             <Box>
-                <PageHeader title="Select Organization" subtitle="Choose the tenant organization you wish to manage" />
+                <PageHeader title="Select Organization" subtitle="Choose tenant organization you wish to manage" />
                 <EmptyState
                     title="No tenants available"
                     description="Your account is not linked to any tenant workspace yet."
+                    actionLabel="Retry"
+                    onAction={() => refetch()}
                 />
             </Box>
         );
     }
-
+    
     return (
         <Box>
-            <PageHeader title="Select Organization" subtitle="Choose the tenant organization you wish to manage" />
-
+            <PageHeader title="Select Organization" subtitle="Choose tenant organization you wish to manage" />
+            
             <Grid container spacing={4} sx={{ animation: 'fadeIn 0.6s ease-out' }}>
                 {tenants.map((tenant) => {
                     const tenantId = tenant.tenant_id || '';

@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import logging
+import os
 import time
 from contextlib import asynccontextmanager
 from typing import Any
@@ -11,6 +12,8 @@ from fastapi import HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 
 from app.config import Settings
 from app.db import AnalyticsDb, InMemoryAnalyticsDb
@@ -19,6 +22,9 @@ from app.logging_ import configure_logging, request_id_ctx, tenant_id_ctx, trace
 from app.rabbitmq import RabbitConsumer
 from app.routes import router as analytics_router
 from app.routes import router as kpi_router
+
+# CORS Configuration
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5135,http://localhost:5143").split(",")
 
 logger = logging.getLogger(__name__)
 
@@ -74,9 +80,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=ALLOWED_ORIGINS,  # Explicit whitelist from environment
         allow_credentials=True,
-        allow_methods=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["*"],
     )
 

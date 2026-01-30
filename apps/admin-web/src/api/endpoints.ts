@@ -11,7 +11,7 @@ export const AUTH_ENDPOINTS = {
     LOGIN: `${BASE_PATH}/auth/login`,
     REFRESH: `${BASE_PATH}/auth/refresh`,
     LOGOUT: `${BASE_PATH}/auth/logout`,
-    ME: `${BASE_PATH}/users/me`,
+    ME: `${BASE_PATH}/auth/me`,
 } as const;
 
 // Registry endpoints (tenant-registry service via BFF)
@@ -120,6 +120,9 @@ export const ANALYTICS_ENDPOINTS = {
 export const OPS_ENDPOINTS = {
     DATA_QUALITY: `${BASE_PATH}/ops/data-quality`,
     HEALTH: `${BASE_PATH}/ops/health`,
+    MQTT_STATS: `${BASE_PATH}/ops/mqtt/stats`,
+    QUEUE_STATS: `${BASE_PATH}/ops/queues/stats`,
+    SYNC_TRIGGER: `${BASE_PATH}/ops/sync/trigger`,
 } as const;
 
 // Admin endpoints

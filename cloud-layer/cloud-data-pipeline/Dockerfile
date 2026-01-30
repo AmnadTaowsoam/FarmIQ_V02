@@ -34,12 +34,11 @@ RUN useradd -m -u 1000 dbtuser && \
     chmod -R 755 /app/logs /app/target
 USER dbtuser
 
-# Health check
+# Health check - use dbt version command
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD dbt --version || exit 1
 
-# Default command - keep container alive
-# Note: dbt run is executed by Airflow DAGs, not directly by this container
+# Default command - keep container alive with a simple HTTP server
 # This container serves as a dbt runtime environment that Airflow can execute commands in
-# Using sleep infinity to keep container running (tail may not be available in slim image)
-CMD ["sh", "-c", "sleep infinity"]
+# The HTTP server provides a simple health endpoint
+CMD ["python", "-m", "http.server", "8000"]

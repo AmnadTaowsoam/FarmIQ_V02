@@ -5,6 +5,7 @@ Provides REST API for model inference with dynamic batching and GPU optimization
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import Dict, Any, List, Optional
 from datetime import datetime
@@ -13,12 +14,17 @@ from enum import Enum
 
 from fastapi import FastAPI, HTTPException, status, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 from pydantic import BaseModel, Field
 import numpy as np
 import tritonclient.grpc as grpc_client
 import tritonclient.http as http_client
 
 from app.config import settings
+
+# CORS Configuration
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5135,http://localhost:5143").split(",")
 
 # Configure logging
 logging.basicConfig(level=settings.log_level, format=settings.log_format)
@@ -113,9 +119,9 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,  # Explicit whitelist from environment
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 

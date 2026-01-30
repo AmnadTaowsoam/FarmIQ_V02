@@ -4,12 +4,30 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 
 from app.config import Config
 from app.db import InferenceDb
 from app.inference_service import InferenceService
 from app.job_service import JobService
 from app.api.v1.endpoints import router as api_router
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Security headers middleware for FastAPI."""
+
+    async def dispatch(self, request: Request, call_next):
+        response: Response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
+
+# CORS Configuration
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5135,http://localhost:5143").split(",")
 
 # Configure logging
 logging.basicConfig(
@@ -55,12 +73,15 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Add security headers middleware
+app.add_middleware(SecurityHeadersMiddleware)
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify exact origins
+    allow_origins=ALLOWED_ORIGINS,  # Explicit whitelist from environment
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 

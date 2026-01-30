@@ -112,7 +112,12 @@ export async function callDownstreamJson<T>(
     })
 
     if (!response.ok) {
-      logger.warn('Downstream call failed', { url, status: response.status })
+      // 401 is expected in dev mode when no auth token is provided
+      if (response.status === 401) {
+        logger.debug('Downstream call returned 401 (expected in dev mode)', { url, status: response.status })
+      } else {
+        logger.warn('Downstream call failed', { url, status: response.status })
+      }
       return { ok: false, status: response.status }
     }
 
@@ -186,8 +191,7 @@ export async function fetchOverview(params: {
   const aggregatesPromise = callDownstreamJson<any>(
     `${bases.telemetryBaseUrl}/api/v1/telemetry/aggregates?tenantId=${encodeURIComponent(
       params.tenantId
-    )}&from=${encodeURIComponent(params.from)}&to=${encodeURIComponent(params.to)}&bucket=${
-      params.bucket
+    )}&from=${encodeURIComponent(params.from)}&to=${encodeURIComponent(params.to)}&bucket=${params.bucket
     }`,
     { headers: params.headers }
   )
@@ -204,13 +208,12 @@ export async function fetchOverview(params: {
   const analyticsScopedPromise =
     params.farmId || params.barnId
       ? callDownstreamJson<any>(
-          `${bases.analyticsBaseUrl}/api/v1/anomalies?tenantId=${encodeURIComponent(
-            params.tenantId
-          )}&limit=25${
-            params.farmId ? `&farmId=${encodeURIComponent(params.farmId)}` : ''
-          }${params.barnId ? `&barnId=${encodeURIComponent(params.barnId)}` : ''}`,
-          { headers: params.headers }
-        )
+        `${bases.analyticsBaseUrl}/api/v1/anomalies?tenantId=${encodeURIComponent(
+          params.tenantId
+        )}&limit=25${params.farmId ? `&farmId=${encodeURIComponent(params.farmId)}` : ''
+        }${params.barnId ? `&barnId=${encodeURIComponent(params.barnId)}` : ''}`,
+        { headers: params.headers }
+      )
       : Promise.resolve(null as any)
 
   const buildWeightAggUrl = (filters?: { farmId?: string; barnId?: string; batchId?: string }) => {

@@ -8,6 +8,9 @@ ENV MB_JETTY_PORT=3000
 # Create data directory
 RUN mkdir -p /metabase-data
 
+# Install curl for healthcheck (base image may not have wget)
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+
 # Override entrypoint to avoid BusyBox su command issues
 # The base image entrypoint may use 'su -j' which BusyBox doesn't support
 ENTRYPOINT []
@@ -15,9 +18,9 @@ ENTRYPOINT []
 # Expose port
 EXPOSE 3000
 
-# Health check
+# Health check - use curl instead of wget
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://localhost:3000/api/health || exit 1
+  CMD curl -f http://localhost:3000/api/health || exit 1
 
 # Run Metabase directly with Java
 CMD ["java", "-jar", "/app/metabase.jar"]

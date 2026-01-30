@@ -329,12 +329,12 @@ export const OverviewPage: React.FC = () => {
                     <FadeIn delay={800}>
                         <PremiumCard title="Feed Efficiency" subtitle="Current FCR Performance">
                              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', py: 2 }}>
-                                <GaugeChart 
-                                    value={1.45} 
-                                    min={1.0} 
-                                    max={2.0} 
-                                    label="FCR" 
-                                    height={200} 
+                                <GaugeChart
+                                    value={kpis.fcr ?? 1.45}
+                                    min={1.0}
+                                    max={2.0}
+                                    label="FCR"
+                                    height={200}
                                     formatValue={(v) => v.toFixed(2)}
                                     color={theme.palette.accent.teal}
                                 />

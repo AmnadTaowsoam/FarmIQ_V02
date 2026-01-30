@@ -22,7 +22,7 @@ export type BarnRecordsError = {
   isServiceUnavailable?: boolean;
 };
 
-const API_PREFIX = '/v1/barn-records';
+const API_PREFIX = '/api/v1/barn-records';
 
 const buildParams = (context: BarnRecordsContext, params?: Record<string, string | number | boolean | null | undefined>) => ({
   tenantId: context.tenantId,

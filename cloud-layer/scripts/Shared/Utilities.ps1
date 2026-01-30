@@ -351,8 +351,18 @@ function Test-PostgresDatabase {
 
     $checkQuery = "SELECT 1 FROM pg_database WHERE datname = '$DbName';"
     $checkResult = docker compose -f $composePath exec -T postgres psql -U $Script:PostgresUser -d postgres -tc $checkQuery 2>&1
+    
+    # Convert to string if it's an ErrorRecord
+    $resultText = ""
+    if ($checkResult -is [System.Management.Automation.ErrorRecord]) {
+        $resultText = $checkResult.ToString()
+    } elseif ($checkResult -is [array]) {
+        $resultText = ($checkResult | ForEach-Object { $_.ToString() }) -join "`n"
+    } else {
+        $resultText = $checkResult.ToString()
+    }
 
-    return $checkResult.Trim() -eq "1"
+    return $resultText.Trim() -eq "1"
 }
 
 <#

@@ -1,8 +1,15 @@
-# High-Performance Inference Server (Triton)
-FROM nvcr.io/nvidia/tritonserver:24.08-py3
+# High-Performance Inference Server (CPU-only version for Docker compatibility)
+FROM python:3.11-slim
 
 # Set working directory
 WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
 COPY requirements.txt .
@@ -14,18 +21,12 @@ COPY app/ ./app/
 # Create directories for models and artifacts
 RUN mkdir -p /models /artifacts /metrics
 
-# Expose Triton ports
-EXPOSE 8000 8001 8002
+# Expose HTTP port (gRPC and metrics ports can be added if needed)
+EXPOSE 5139
 
-# Health check
+# Health check - use curl
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8000/v2/health/ready
+    CMD curl -f http://localhost:5139/health || exit 1
 
-# Start Triton Inference Server
-CMD ["tritonserver", \
-     "--model-repository=/models", \
-     "--http-port=8000", \
-     "--grpc-port=8001", \
-     "--metrics-port=8002", \
-     "--log-verbose=1", \
-     "--exit-on-error=false"]
+# Start inference server (CPU mode)
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "5139"]

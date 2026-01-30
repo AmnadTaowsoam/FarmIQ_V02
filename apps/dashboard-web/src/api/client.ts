@@ -60,7 +60,7 @@ apiClient.interceptors.request.use(async (config) => {
         }
     } catch (error) {
         // Token refresh failed - will be handled by response interceptor
-        console.warn('Failed to get valid token', error);
+        console.warn('⚠️ [DEBUG] Failed to get valid token', error);
     }
 
     // 2. Inject Request ID (Tracing)
@@ -72,6 +72,17 @@ apiClient.interceptors.request.use(async (config) => {
         (window as any).__lastRequestId = requestId;
     }
 
+    // 🔍 DIAGNOSTIC LOG: Log outgoing requests
+    const fullUrl = config.baseURL ? `${config.baseURL}${url}` : url;
+    console.log('🔍 [DEBUG] API Request:', {
+        method: config.method?.toUpperCase(),
+        url: fullUrl,
+        baseURL: config.baseURL,
+        path: url,
+        hasAuth: !!config.headers.Authorization,
+        requestId
+    });
+
     // 3. Context should be sent via query params (not headers)
     // This is handled by individual API calls, not here
 
@@ -80,9 +91,30 @@ apiClient.interceptors.request.use(async (config) => {
 
 // Response Interceptor: Error Standardization & Refresh
 apiClient.interceptors.response.use(
-    (response) => response,
+    (response) => {
+        // 🔍 DIAGNOSTIC LOG: Log successful responses
+        console.log('✅ [DEBUG] API Response:', {
+            status: response.status,
+            url: response.config.url,
+            baseURL: response.config.baseURL,
+            hasData: !!response.data
+        });
+        return response;
+    },
     async (error: AxiosError) => {
         const originalRequest = error.config;
+
+        // 🔍 DIAGNOSTIC LOG: Log API errors
+        console.error('❌ [DEBUG] API Error:', {
+            status: error.response?.status,
+            statusText: error.response?.statusText,
+            url: originalRequest?.url,
+            baseURL: originalRequest?.baseURL,
+            message: error.message,
+            code: error.code,
+            hasResponse: !!error.response,
+            responseData: error.response?.data
+        });
 
         // 1. Handle 401 (Unauthorized) - Refresh Logic
         if (error.response?.status === 401 && originalRequest && !(originalRequest as any)._retry) {

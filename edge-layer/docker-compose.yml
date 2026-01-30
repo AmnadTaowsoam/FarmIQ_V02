@@ -17,26 +17,30 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
+  
   edge-mqtt-broker:
     build:
       context: ./edge-mqtt-broker
       dockerfile: Dockerfile
     container_name: farmiq-edge-mqtt
     ports:
-      - "5100:1883"
+      - "5100:1883"   # Plain MQTT (dev only)
+      - "5101:8883"   # TLS MQTT (production)
     volumes:
       - ./edge-mqtt-broker/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./edge-mqtt-broker/certs:/mosquitto/config/certs:ro  # TLS certificates
       - mqtt_data:/mosquitto/data
       - mqtt_log:/mosquitto/log
+    environment:
+      - MQTT_TLS_ENABLED=${MQTT_TLS_ENABLED:-false}
     networks:
       - farmiq-net
     healthcheck:
-      test: ["CMD", "mosquitto_sub", "-h", "localhost", "-t", "$$SYS/health", "-C", "1"]
+      test: ["CMD", "mosquitto_sub", "-h", "localhost", "-t", "$SYS/health", "-C", "1"]
       interval: 10s
       timeout: 5s
       retries: 5
-
+  
   edge-ingress-gateway:
     build:
       context: ./edge-ingress-gateway
@@ -72,7 +76,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
+  
   edge-telemetry-timeseries:
     build:
       context: ./edge-telemetry-timeseries
@@ -96,7 +100,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
+  
   edge-weighvision-session:
     build:
       context: ./edge-weighvision-session
@@ -120,7 +124,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
+  
   edge-media-store:
     build:
       context: ./edge-media-store
@@ -147,7 +151,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
+  
   edge-vision-inference:
     build:
       context: ./edge-vision-inference
@@ -173,7 +177,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
+  
   edge-sync-forwarder:
     build:
       context: ./edge-sync-forwarder
@@ -205,7 +209,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
+  
   edge-policy-sync:
     build:
       context: ./edge-policy-sync
@@ -235,7 +239,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
+  
   edge-retention-janitor:
     build:
       context: ./edge-retention-janitor
@@ -266,7 +270,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
+  
   edge-observability-agent:
     build:
       context: ./edge-observability-agent
@@ -294,7 +298,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
+  
   edge-feed-intake:
     build:
       context: ./edge-feed-intake
@@ -325,7 +329,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
+  
   edge-ops-web:
     build:
       context: ./edge-ops-web
@@ -342,11 +346,15 @@ services:
       - edge-telemetry-timeseries
       - edge-weighvision-session
       - edge-media-store
-
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  
 networks:
   farmiq-net:
     driver: bridge
-
+  
 volumes:
   mqtt_data:
-  mqtt_log:

@@ -270,7 +270,7 @@ async def update_model(
     )
 
 
-@router.delete("/models/{model_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/models/{model_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_model(
     model_id: str,
     tenant_id: str = Depends(verify_tenant),
@@ -498,7 +498,7 @@ async def update_deployment(
     )
 
 
-@router.delete("/deployments/{deployment_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/deployments/{deployment_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_deployment(
     deployment_id: str,
     tenant_id: str = Depends(verify_tenant),

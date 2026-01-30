@@ -108,6 +108,8 @@ services:
       - NODE_ENV=production
       - APP_PORT=3000
       - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_identity_access
+      - JWT_SECRET=super-secret-jwt-key-change-in-production
+      - REFRESH_TOKEN_SECRET=super-secret-refresh-key-change-in-production
       - DD_ENV=${DD_ENV:-prod}
       - DD_SERVICE=cloud-identity-access
       - DD_VERSION=${DD_VERSION:-local}
@@ -689,13 +691,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
 
   cloud-hybrid-router:
     build:
@@ -703,7 +698,7 @@ services:
       dockerfile: Dockerfile
     container_name: farmiq-cloud-hybrid-router
     ports:
-      - "5140:5140"
+      - "5141:5140"
     environment:
       - LOG_LEVEL=INFO
       - PORT=5140
@@ -712,8 +707,7 @@ services:
       - DD_VERSION=${DD_VERSION:-local}
       - DD_AGENT_HOST=datadog
       - DD_TRACE_AGENT_PORT=8126
-      - EDGE_MCU_ENDPOINT=http://edge-mcu:8080
-      - EDGE_GPU_ENDPOINT=http://edge-gpu:8081
+- EDGE_GPU_ENDPOINT=http://edge-gpu:8081
       - CLOUD_GPU_ENDPOINT=http://cloud-inference-server:5139
     networks:
       - farmiq-net
@@ -769,6 +763,7 @@ services:
       - NODE_ENV=production
       - APP_PORT=3000
       - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_api_gateway_bff
+      - JWT_SECRET=${JWT_SECRET}
       - IDENTITY_BASE_URL=http://cloud-identity-access:3000
       - REGISTRY_BASE_URL=http://cloud-tenant-registry:3000
       - TELEMETRY_BASE_URL=http://cloud-telemetry-service:3000
@@ -806,32 +801,6 @@ services:
       cloud-identity-access:
         condition: service_healthy
       cloud-tenant-registry:
-        condition: service_healthy
-      cloud-telemetry-service:
-        condition: service_healthy
-      cloud-analytics-service:
-        condition: service_healthy
-      cloud-config-rules-service:
-        condition: service_healthy
-      cloud-audit-log-service:
-        condition: service_healthy
-      cloud-feed-service:
-        condition: service_healthy
-      cloud-barn-records-service:
-        condition: service_healthy
-      cloud-llm-insights-service:
-        condition: service_healthy
-      cloud-ml-model-service:
-        condition: service_healthy
-      cloud-standards-service:
-        condition: service_healthy
-      cloud-billing-service:
-        condition: service_healthy
-      cloud-advanced-analytics:
-        condition: service_healthy
-      cloud-data-pipeline:
-        condition: service_healthy
-      cloud-bi-metabase:
         condition: service_healthy
     networks:
       - farmiq-net

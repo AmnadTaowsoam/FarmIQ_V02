@@ -8,6 +8,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
@@ -29,9 +30,9 @@ ENV MLFLOW_DEFAULT_ARTIFACT_ROOT=s3://mlflow-artifacts
 # Expose MLflow UI port
 EXPOSE 5000
 
-# Health check
+# Health check - use curl instead of Python requests
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:5000/health')"
+    CMD curl -f http://localhost:5000/health || exit 1
 
 # Start MLflow server
 CMD ["mlflow", "server", \

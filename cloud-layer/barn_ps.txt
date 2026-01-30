@@ -1,0 +1,2 @@
+CONTAINER ID   IMAGE                                    COMMAND                  CREATED          STATUS                    PORTS                                         NAMES
+96cca72caa7b   cloud-layer-cloud-barn-records-service   "docker-entrypoint.s…"   19 minutes ago   Up 17 minutes (healthy)   0.0.0.0:5131->3000/tcp, [::]:5131->3000/tcp   cloud-layer-cloud-barn-records-service-1

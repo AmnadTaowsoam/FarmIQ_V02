@@ -19,8 +19,31 @@ export function createApp(params: {
 }): Express {
   const app = express()
   const now = params.now ?? (() => new Date())
+  
+  // Configure CORS with explicit origin whitelist
+  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
+    'http://localhost:5135',  // dashboard-web
+    'http://localhost:5143',  // admin-web
+    'http://localhost:3000',  // development
+  ]
 
-  app.use(cors())
+  app.use(cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) {
+        return callback(null, true)
+      }
+      
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true)
+      } else {
+        callback(new Error('Not allowed by CORS'))
+      }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id', 'x-request-id'],
+  }))
   app.use(helmet())
   app.use(express.json({ limit: '1mb' }))
   app.use(requestContextMiddleware)

@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express'
+import jwt from 'jsonwebtoken'
 import { logger } from '../utils/logger'
 
 /**
@@ -8,6 +9,7 @@ import { logger } from '../utils/logger'
  * - Requires Authorization: Bearer <JWT> in production
  * - In dev, allows missing token but still parses if present
  * - Extracts tenant scope and roles into res.locals
+ * - Verifies JWT signature using jsonwebtoken library
  */
 export function jwtAuthMiddleware(
   req: Request,
@@ -39,31 +41,53 @@ export function jwtAuthMiddleware(
 
     if (process.env.JWT_SECRET) {
       try {
-        // Basic base64 decode of payload (NOT secure, MVP only)
-        const parts = token.split('.')
-        if (parts.length === 3) {
-          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString())
+        // Verify JWT signature with proper validation
+        const decoded = jwt.verify(token, process.env.JWT_SECRET, {
+          algorithms: ['HS256'],
+          issuer: 'farmiq',
+          audience: 'farmiq-api',
+        }) as any
 
-          const roles = payload.roles || payload.role || []
-          const rolesArray = Array.isArray(roles) ? roles : [roles]
-          res.locals.roles = rolesArray
+        const roles = decoded.roles || decoded.role || []
+        const rolesArray = Array.isArray(roles) ? roles : [roles]
+        res.locals.roles = rolesArray
 
-          if (payload.tenant_id) {
-            res.locals.tenantId = payload.tenant_id
-            logger.debug(`Extracted tenantId from JWT: ${payload.tenant_id}`)
-          }
-
-          if (rolesArray.includes('platform_admin')) {
-            res.locals.isPlatformAdmin = true
-            logger.debug('User has platform_admin role - can query any tenant')
-          }
-
-          res.locals.userId = payload.sub || payload.user_id
+        if (decoded.tenant_id) {
+          res.locals.tenantId = decoded.tenant_id
+          logger.debug(`Extracted tenantId from JWT: ${decoded.tenant_id}`)
         }
-      } catch (parseError) {
-        logger.warn('Failed to parse JWT token in cloud-api-gateway-bff', {
-          error: (parseError as Error).message,
-        })
+
+        if (rolesArray.includes('platform_admin')) {
+          res.locals.isPlatformAdmin = true
+          logger.debug('User has platform_admin role - can query any tenant')
+        }
+
+        res.locals.userId = decoded.sub || decoded.user_id
+      } catch (verifyError) {
+        if (verifyError instanceof jwt.TokenExpiredError) {
+          logger.warn('JWT token expired')
+          res.status(401).json({
+            error: {
+              code: 'TOKEN_EXPIRED',
+              message: 'Token has expired',
+              traceId: res.locals.traceId || 'unknown',
+            },
+          })
+          return
+        } else if (verifyError instanceof jwt.JsonWebTokenError) {
+          logger.warn('Invalid JWT token', {
+            error: (verifyError as Error).message,
+          })
+          res.status(401).json({
+            error: {
+              code: 'INVALID_TOKEN',
+              message: 'Invalid token',
+              traceId: res.locals.traceId || 'unknown',
+            },
+          })
+          return
+        }
+        throw verifyError
       }
     } else {
       logger.warn('JWT_SECRET not set - JWT validation disabled (dev mode)')

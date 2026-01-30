@@ -27,10 +27,18 @@ function handleDownstreamResponse(
   if (result.ok && result.data !== undefined) {
     res.status(result.status).json(result.data)
   } else {
-    logger.warn('Downstream service error', {
-      status: result.status,
-      traceId: res.locals.traceId,
-    })
+    // 401 is expected in dev mode when no auth token is provided
+    if (result.status === 401) {
+      logger.debug('Downstream service returned 401 (expected in dev mode)', {
+        status: result.status,
+        traceId: res.locals.traceId,
+      })
+    } else {
+      logger.warn('Downstream service error', {
+        status: result.status,
+        traceId: res.locals.traceId,
+      })
+    }
 
     const status = result.status >= 400 && result.status < 600 ? result.status : 502
     res.status(status).json({

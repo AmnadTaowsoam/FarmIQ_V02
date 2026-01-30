@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Paper, Typography, TextField, Button, Stack, alpha, useTheme } from '@mui/material';
+import { Box, Paper, Typography, TextField, Button, Stack, alpha, useTheme, IconButton, InputAdornment } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
-import { LogIn, ShieldCheck } from 'lucide-react';
+import { LogIn, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 
 interface LocationState {
   from?: { pathname: string };
@@ -18,6 +18,7 @@ export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('admin@farmiq.com');
   const [password, setPassword] = useState('password123');
   const [loginAttempted, setLoginAttempted] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Handle redirect after successful login
   useEffect(() => {
@@ -122,10 +123,24 @@ export const LoginPage: React.FC = () => {
               <TextField
                 fullWidth
                 label="Password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={() => setShowPassword(!showPassword)}
+                        edge="end"
+                        size="small"
+                        sx={{ color: 'text.secondary' }}
+                      >
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
                 sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1.5 } }}
               />
 

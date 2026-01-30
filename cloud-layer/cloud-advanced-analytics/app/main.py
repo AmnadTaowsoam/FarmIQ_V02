@@ -5,6 +5,7 @@ Provides forecasting, anomaly detection, and cohort analysis APIs
 
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import Any, List, Optional
 
@@ -12,6 +13,8 @@ import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 from pydantic import BaseModel, Field
 
 from app.config import Settings
@@ -20,6 +23,9 @@ from app.forecasting import Forecaster
 from app.anomaly_detection import AnomalyDetector
 from app.cohort_analysis import CohortAnalyzer
 from app.logging_ import configure_logging, request_id_ctx, trace_id_ctx
+
+# CORS Configuration
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5135,http://localhost:5143").split(",")
 
 logger = logging.getLogger(__name__)
 
@@ -125,9 +131,9 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,  # Explicit whitelist from environment
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 

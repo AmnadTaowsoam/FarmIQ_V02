@@ -11,7 +11,7 @@ export const AUTH_ENDPOINTS = {
     LOGIN: `${BASE_PATH}/auth/login`,
     REFRESH: `${BASE_PATH}/auth/refresh`,
     LOGOUT: `${BASE_PATH}/auth/logout`,
-    ME: `${BASE_PATH}/users/me`,
+    ME: `${BASE_PATH}/auth/me`,
 } as const;
 
 // Registry endpoints (tenant-registry service via BFF)

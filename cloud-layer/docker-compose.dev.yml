@@ -125,6 +125,8 @@ services:
       - APP_PORT=3000
       - LOG_LEVEL=debug
       - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_identity_access
+      - JWT_SECRET=${JWT_SECRET:-dev-jwt-secret-change-in-production}
+      - REFRESH_TOKEN_SECRET=${REFRESH_TOKEN_SECRET:-dev-refresh-secret-change-in-production}
       - DD_ENV=${DD_ENV:-dev}
       - DD_SERVICE=cloud-identity-access
       - DD_VERSION=${DD_VERSION:-local}
@@ -349,6 +351,7 @@ services:
       - LLM_MAX_TOKENS=${LLM_MAX_TOKENS:-1024}
       - LLM_MODEL=${LLM_MODEL:-gpt-4.1-mini}
       - PROMPT_VERSION=${PROMPT_VERSION:-v1}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-mock-key-for-development}
       - DD_ENV=${DD_ENV:-dev}
       - DD_SERVICE=cloud-llm-insights-service
       - DD_VERSION=${DD_VERSION:-local}

@@ -114,7 +114,7 @@ class AuthService {
     const normalizedEmail = email === 'admin' ? 'admin@farmiq.com' : email;
     const isMockEmail = ['admin@farmiq.com', 'admin@farmiq.com'].includes(normalizedEmail);
     const isMockPassword = password === 'password' || password === 'password123';
-    if (import.meta.env.VITE_MOCK_MODE === 'true' || import.meta.env.VITE_MOCK_MODE === true && isMockEmail && isMockPassword) {
+    if ((import.meta.env.VITE_MOCK_MODE === 'true' || import.meta.env.VITE_MOCK_MODE === true) && isMockEmail && isMockPassword) {
       const mockUser: UserProfile = {
         id: '1',
         email: normalizedEmail,
@@ -354,12 +354,10 @@ class AuthService {
       const payload = JSON.parse(atob(token.split('.')[1]));
       const exp = (payload.exp || 0) * 1000;
       const now = Date.now();
-      console.log('Token Expiry Check:', { 
-        exp: new Date(exp).toISOString(), 
-        now: new Date(now).toISOString(), 
-        diff: exp - now,
-        isValid: exp > now
-      });
+      // Only log in development mode for security
+      if (import.meta.env.DEV) {
+        console.debug('Token expiry:', { isValid: exp > now });
+      }
       return exp; // Convert to milliseconds
     } catch (e) {
       console.warn('Failed to decode token expiry', e);

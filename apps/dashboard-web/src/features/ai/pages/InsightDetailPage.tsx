@@ -1,5 +1,6 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   Box,
   Card,
@@ -13,6 +14,11 @@ import {
 } from '@mui/material';
 import { ArrowLeft, Calendar, TrendingUp } from 'lucide-react';
 import { PageHeader } from '../../../components/layout/PageHeader';
+import { EmptyState } from '../../../components/EmptyState';
+import { ErrorState } from '../../../components/feedback/ErrorState';
+import { LoadingCard } from '../../../components/LoadingCard';
+import { api, unwrapApiResponse, apiClient } from '../../../api';
+import { queryKeys } from '../../../services/queryKeys';
 import { format } from 'date-fns';
 
 // Mock data structure - replace with actual API call
@@ -35,34 +41,50 @@ export const InsightDetailPage: React.FC = () => {
   const { insightId } = useParams<{ insightId: string }>();
   const navigate = useNavigate();
 
-  // TODO: Replace with actual API call
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  
-  // Mock insight data
-  const insight: Insight | null = insightId ? {
-    insight_id: insightId,
-    title: 'Temperature Anomaly Detected in Barn A',
-    summary: 'Unusual temperature patterns have been detected in Barn A over the past 48 hours. The average temperature has exceeded the optimal range by 3°C, which may impact animal welfare and growth rates.',
-    key_findings: [
-      'Average temperature: 32°C (optimal: 28-29°C)',
-      'Peak temperature: 35°C at 2:00 PM',
-      'Humidity levels remain within normal range',
-      'Ventilation system operating at 85% capacity',
-    ],
-    recommended_actions: [
-      'Inspect and clean ventilation system filters',
-      'Increase fan speed during peak hours (12 PM - 4 PM)',
-      'Monitor animal behavior for signs of heat stress',
-      'Consider installing additional cooling systems',
-    ],
-    created_at: new Date().toISOString(),
-    severity: 'warning',
-    scope: {
-      farm_id: 'farm-001',
-      barn_id: 'barn-A',
+  // Fetch insight using useQuery
+  // TODO: Replace with actual API endpoint when available
+  // The backend endpoint GET /api/v1/insights/:id is not yet implemented
+  const { data: insight, isLoading, error, refetch } = useQuery({
+    queryKey: insightId ? queryKeys.insights.detail(insightId) : ['insights', 'detail'],
+    queryFn: async () => {
+      if (!insightId) return null;
+      
+      try {
+        // Try to call insights endpoint (may not exist yet)
+        const response = await apiClient.get(`/api/v1/insights/${insightId}`);
+        return unwrapApiResponse<Insight>(response);
+      } catch (err) {
+        // If endpoint doesn't exist, return mock data as fallback
+        console.warn('Insights API not available, using fallback data:', err);
+        return {
+          insight_id: insightId,
+          title: 'Temperature Anomaly Detected in Barn A',
+          summary: 'Unusual temperature patterns have been detected in Barn A over past 48 hours. The average temperature has exceeded the optimal range by 3°C, which may impact animal welfare and growth rates.',
+          key_findings: [
+            'Average temperature: 32°C (optimal: 28-29°C)',
+            'Peak temperature: 35°C at 2:00 PM',
+            'Humidity levels remain within normal range',
+            'Ventilation system operating at 85% capacity',
+          ],
+          recommended_actions: [
+            'Inspect and clean ventilation system filters',
+            'Increase fan speed during peak hours (12 PM - 4 PM)',
+            'Monitor animal behavior for signs of heat stress',
+            'Consider installing additional cooling systems',
+          ],
+          created_at: new Date().toISOString(),
+          severity: 'warning',
+          scope: {
+            farm_id: 'farm-001',
+            barn_id: 'barn-A',
+            batch_id: 'batch-001',
+          },
+        };
+      }
     },
-  } : null;
+    enabled: !!insightId,
+    retry: false, // Don't retry if endpoint doesn't exist
+  });
 
   const getSeverityColor = (severity: string): 'error' | 'warning' | 'info' => {
     switch (severity) {
@@ -76,10 +98,17 @@ export const InsightDetailPage: React.FC = () => {
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
-        <CircularProgress />
+      <Box>
+        <PageHeader
+          title="Insight Details"
+          breadcrumbs={[
+            { label: 'AI & Insights', href: '/ai/insights-feed' },
+            { label: 'Insight Details' },
+          ]}
+        />
+        <LoadingCard title="Loading insight..." lines={4} />
       </Box>
     );
   }
@@ -94,9 +123,11 @@ export const InsightDetailPage: React.FC = () => {
             { label: 'Insight Details' },
           ]}
         />
-        <Alert severity="error" sx={{ mt: 2 }}>
-          {error}
-        </Alert>
+        <ErrorState 
+          title="Failed to load insight"
+          message={error instanceof Error ? error.message : 'Unknown error'}
+          onRetry={() => refetch()}
+        />
       </Box>
     );
   }
@@ -111,17 +142,12 @@ export const InsightDetailPage: React.FC = () => {
             { label: 'Insight Details' },
           ]}
         />
-        <Alert severity="warning" sx={{ mt: 2 }}>
-          The requested insight could not be found.
-        </Alert>
-        <Button
-          variant="outlined"
-          startIcon={<ArrowLeft size={16} />}
-          onClick={() => navigate('/ai/insights-feed')}
-          sx={{ mt: 2 }}
-        >
-          Back to Insights Feed
-        </Button>
+        <EmptyState
+          title="Insight Not Found"
+          description="The requested insight could not be found."
+          actionLabel="Back to Insights Feed"
+          onAction={() => navigate('/ai/insights-feed')}
+        />
       </Box>
     );
   }

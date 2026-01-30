@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Box, Paper, Typography, TextField, Button, Checkbox, FormControlLabel, Link, Stack, alpha, useTheme } from '@mui/material';
+import { Box, Paper, Typography, TextField, Button, Checkbox, FormControlLabel, Link, Stack, alpha, useTheme, IconButton, InputAdornment } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useForm } from 'react-hook-form';
-import { LogIn, ShieldCheck } from 'lucide-react';
+import { LogIn, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
     const theme = useTheme();
@@ -11,6 +11,7 @@ export const LoginPage: React.FC = () => {
     const { login } = useAuth();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [showPassword, setShowPassword] = useState(false);
 
     const { register, handleSubmit, formState: { errors } } = useForm({
         defaultValues: {
@@ -112,10 +113,24 @@ export const LoginPage: React.FC = () => {
                                 <TextField
                                     fullWidth
                                     label="Password"
-                                    type="password"
+                                    type={showPassword ? "text" : "password"}
                                     {...register('password', { required: 'Password is required' })}
                                     error={!!errors.password}
                                     helperText={errors.password?.message}
+                                    InputProps={{
+                                        endAdornment: (
+                                            <InputAdornment position="end">
+                                                <IconButton
+                                                    onClick={() => setShowPassword(!showPassword)}
+                                                    edge="end"
+                                                    size="small"
+                                                    sx={{ color: 'text.secondary' }}
+                                                >
+                                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                                </IconButton>
+                                            </InputAdornment>
+                                        ),
+                                    }}
                                     sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1.5 } }}
                                 />
                                 <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>

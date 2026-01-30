@@ -42,7 +42,7 @@ app.use(
   express.json({
     limit: '10mb',
     verify: (req, _res, buf) => {
-      ;(req as Request & { rawBody?: string }).rawBody = buf.toString('utf8')
+      ; (req as Request & { rawBody?: string }).rawBody = buf.toString('utf8')
     },
   })
 )
@@ -78,8 +78,15 @@ async function startServer() {
     await prisma.$connect()
     logger.info('Database connection has been established successfully.')
 
-    await connectRabbitMQ()
-    logger.info('RabbitMQ connection established.')
+    // Attempt RabbitMQ connection in background - don't block server startup
+    connectRabbitMQ()
+      .then(() => {
+        logger.info('RabbitMQ connection established.')
+      })
+      .catch((err) => {
+        logger.error('Failed to establish initial RabbitMQ connection. Service will continue without RabbitMQ.', err)
+        logger.warn('RabbitMQ-dependent features may not work until connection is established.')
+      })
 
     server = app.listen(port, () => {
       logger.info(`App running on port ${port}`)

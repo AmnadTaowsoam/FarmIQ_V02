@@ -24,9 +24,9 @@ RUN mkdir -p /data/drift /data/reports /data/alerts
 # Expose service port
 EXPOSE 5138
 
-# Health check
+# Health check - use curl instead of Python requests
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:5138/health')"
+    CMD curl -f http://localhost:5138/health || exit 1
 
 # Start drift detection service
 CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "5138"]

@@ -9,9 +9,17 @@ export const provisionDevice = async (req: Request, res: Response) => {
     try {
         const { serialNo, claimCode, tenantId } = req.body
 
-        // In a real ZTP, claimCode is verified against a manufacturing DB
-        if (claimCode !== 'FACTORY-SECRET') {
-            return res.status(403).json({ error: 'Invalid claim code' })
+        // Factory secret from environment variable
+        const FACTORY_SECRET = process.env.DEVICE_FACTORY_SECRET;
+
+        if (!FACTORY_SECRET) {
+            console.error('DEVICE_FACTORY_SECRET not configured');
+            return res.status(500).json({ error: { code: 'CONFIG_ERROR' } });
+        }
+
+        // Verify claim code against factory secret
+        if (claimCode !== FACTORY_SECRET) {
+            return res.status(401).json({ error: { code: 'INVALID_CLAIM_CODE' } });
         }
 
         const device = await prisma.device.upsert({

@@ -1,6 +1,29 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: farmiq-cloud-postgres
+    ports:
+      - "5140:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-farmiq}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-farmiq_dev}
+      - POSTGRES_DB=${POSTGRES_DB:-farmiq}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - farmiq-net
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-farmiq}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   prisma-studio-identity-access:
-    image: cloud-layer-cloud-identity-access
+    build:
+      context: ./cloud-identity-access
+      dockerfile: Dockerfile
+      target: production
     working_dir: /usr/src/app
     ports:
       - "5551:5555"
@@ -14,9 +37,15 @@ services:
       - ./cloud-identity-access/prisma:/usr/src/app/prisma:ro
     networks:
       - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   prisma-studio-tenant-registry:
-    image: cloud-layer-cloud-tenant-registry
+    build:
+      context: ./cloud-tenant-registry
+      dockerfile: Dockerfile
+      target: production
     working_dir: /usr/src/app
     ports:
       - "5552:5555"
@@ -30,9 +59,15 @@ services:
       - ./cloud-tenant-registry/prisma:/usr/src/app/prisma:ro
     networks:
       - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   prisma-studio-standards:
-    image: cloud-layer-cloud-standards-service
+    build:
+      context: ./cloud-standards-service
+      dockerfile: Dockerfile
+      target: production
     working_dir: /usr/src/app
     ports:
       - "5553:5555"
@@ -46,9 +81,15 @@ services:
       - ./cloud-standards-service/prisma:/usr/src/app/prisma:ro
     networks:
       - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   prisma-studio-ingestion:
-    image: cloud-layer-cloud-ingestion
+    build:
+      context: ./cloud-ingestion
+      dockerfile: Dockerfile
+      target: production
     working_dir: /usr/src/app
     ports:
       - "5554:5555"
@@ -62,9 +103,15 @@ services:
       - ./cloud-ingestion/prisma:/usr/src/app/prisma:ro
     networks:
       - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   prisma-studio-telemetry:
-    image: cloud-layer-cloud-telemetry-service
+    build:
+      context: ./cloud-telemetry-service
+      dockerfile: Dockerfile
+      target: production
     working_dir: /usr/src/app
     ports:
       - "5555:5555"
@@ -78,9 +125,15 @@ services:
       - ./cloud-telemetry-service/prisma:/usr/src/app/prisma:ro
     networks:
       - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   prisma-studio-api-gateway-bff:
-    image: cloud-layer-cloud-api-gateway-bff
+    build:
+      context: ./cloud-api-gateway-bff
+      dockerfile: Dockerfile
+      target: production
     working_dir: /usr/src/app
     ports:
       - "5556:5555"
@@ -94,9 +147,15 @@ services:
       - ./cloud-api-gateway-bff/prisma:/usr/src/app/prisma:ro
     networks:
       - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   prisma-studio-config-rules:
-    image: cloud-layer-cloud-config-rules-service
+    build:
+      context: ./cloud-config-rules-service
+      dockerfile: Dockerfile
+      target: production
     working_dir: /usr/src/app
     ports:
       - "5557:5555"
@@ -110,9 +169,15 @@ services:
       - ./cloud-config-rules-service/prisma:/usr/src/app/prisma:ro
     networks:
       - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   prisma-studio-audit-log:
-    image: cloud-layer-cloud-audit-log-service
+    build:
+      context: ./cloud-audit-log-service
+      dockerfile: Dockerfile
+      target: production
     working_dir: /usr/src/app
     ports:
       - "5558:5555"
@@ -126,9 +191,15 @@ services:
       - ./cloud-audit-log-service/prisma:/usr/src/app/prisma:ro
     networks:
       - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   prisma-studio-notification:
-    image: cloud-layer-cloud-notification-service
+    build:
+      context: ./cloud-notification-service
+      dockerfile: Dockerfile
+      target: production
     working_dir: /usr/src/app
     ports:
       - "5559:5555"
@@ -142,9 +213,15 @@ services:
       - ./cloud-notification-service/prisma:/usr/src/app/prisma:ro
     networks:
       - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   prisma-studio-reporting-export:
-    image: cloud-layer-cloud-reporting-export-service
+    build:
+      context: ./cloud-reporting-export-service
+      dockerfile: Dockerfile
+      target: production
     working_dir: /usr/src/app
     ports:
       - "5560:5555"
@@ -158,9 +235,15 @@ services:
       - ./cloud-reporting-export-service/prisma:/usr/src/app/prisma:ro
     networks:
       - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   prisma-studio-feed:
-    image: cloud-layer-cloud-feed-service
+    build:
+      context: ./cloud-feed-service
+      dockerfile: Dockerfile
+      target: production
     working_dir: /usr/src/app
     ports:
       - "5561:5555"
@@ -174,9 +257,15 @@ services:
       - ./cloud-feed-service/prisma:/usr/src/app/prisma:ro
     networks:
       - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   prisma-studio-barn-records:
-    image: cloud-layer-cloud-barn-records-service
+    build:
+      context: ./cloud-barn-records-service
+      dockerfile: Dockerfile
+      target: production
     working_dir: /usr/src/app
     ports:
       - "5562:5555"
@@ -190,9 +279,15 @@ services:
       - ./cloud-barn-records-service/prisma:/usr/src/app/prisma:ro
     networks:
       - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   prisma-studio-weighvision-readmodel:
-    image: cloud-layer-cloud-weighvision-readmodel
+    build:
+      context: ./cloud-weighvision-readmodel
+      dockerfile: Dockerfile
+      target: production
     working_dir: /usr/src/app
     ports:
       - "5563:5555"
@@ -206,6 +301,9 @@ services:
       - ./cloud-weighvision-readmodel/prisma:/usr/src/app/prisma:ro
     networks:
       - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   prisma-studio-analytics:
     image: node:20-alpine
@@ -222,9 +320,15 @@ services:
       - ./cloud-analytics-service/prisma:/usr/src/app/prisma:ro
     networks:
       - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   prisma-studio-billing:
-    image: cloud-layer-cloud-billing-service
+    build:
+      context: ./cloud-billing-service
+      dockerfile: Dockerfile
+      target: production
     working_dir: /usr/src/app
     ports:
       - "5565:5555"
@@ -238,9 +342,15 @@ services:
       - ./cloud-billing-service/prisma:/usr/src/app/prisma:ro
     networks:
       - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   prisma-studio-fleet-management:
-    image: node:20-alpine
+    build:
+      context: ./cloud-fleet-management
+      dockerfile: Dockerfile
+      target: production
     working_dir: /usr/src/app
     ports:
       - "5566:5555"
@@ -254,9 +364,15 @@ services:
       - ./cloud-fleet-management/prisma:/usr/src/app/prisma:ro
     networks:
       - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 networks:
   farmiq-net:
     name: farmiq-net
-    external: true
+    driver: bridge
+
+volumes:
+  postgres_data:
 

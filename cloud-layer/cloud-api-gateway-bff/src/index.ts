@@ -12,10 +12,24 @@ import { logger } from './utils/logger'
 const app = express()
 const port = process.env.APP_PORT || 3000
 
+// 🔍 DIAGNOSTIC LOG: Log BFF configuration
+console.log('🔍 [DEBUG] BFF Configuration:', {
+    port,
+    APP_PORT: process.env.APP_PORT,
+    NODE_ENV: process.env.NODE_ENV,
+    allowedOrigins: ['http://localhost:3000', 'http://localhost:5130', 'http://localhost:5135', 'http://localhost:5143', 'http://localhost:5173']
+});
+
 // API responses should not be cached by browsers during dev; 304s break clients expecting JSON.
 app.set('etag', false)
 
-const allowedOrigins = new Set<string>(['http://localhost:3000', 'http://localhost:5143', 'http://localhost:5135'])
+const allowedOrigins = new Set<string>([
+    'http://localhost:3000',
+    'http://localhost:5130',  // Dashboard Web
+    'http://localhost:5135',  // Admin Web (alternate)
+    'http://localhost:5143',  // Admin Web
+    'http://localhost:5173'   // Vite default
+])
 
 // In dev, allow any localhost/127.0.0.1 origin to avoid confusing "Network Error" in browser.
 // In production, keep CORS strict (only allow known origins).

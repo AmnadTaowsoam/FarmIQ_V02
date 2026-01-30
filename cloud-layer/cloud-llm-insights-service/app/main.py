@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import os
 import time
 from contextlib import asynccontextmanager
 from typing import Any
@@ -11,6 +12,8 @@ from fastapi import HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 
 from app.config import Settings
 from app.db import InMemoryLlmInsightsDb, LlmInsightsDb
@@ -18,6 +21,22 @@ from app.logging_ import configure_logging, request_id_ctx, tenant_id_ctx, trace
 from app.routes import router as llm_router
 from app.llm.health_monitor import get_health_monitor
 from app.governance import get_audit_trail
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Security headers middleware for FastAPI."""
+
+    async def dispatch(self, request: Request, call_next):
+        response: Response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
+
+# CORS Configuration
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5135,http://localhost:5143").split(",")
 
 # Rate limiting
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -53,28 +72,64 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # Initialize health monitor
         health_monitor = get_health_monitor()
         # Register providers for health monitoring
+        # Check if API key is available before initializing real providers
         if settings.llm_provider == "openai":
-            from app.llm.provider import OpenAIProvider
-            provider = OpenAIProvider(
-                model_name=settings.llm_model,
-                prompt_version=settings.prompt_version
-            )
-            health_monitor.register_provider(
-                provider_name="openai",
-                model_name=settings.llm_model,
-                health_checker=provider._health_check,
-            )
+            openai_api_key = os.getenv("OPENAI_API_KEY")
+            if openai_api_key:
+                from app.llm.provider import OpenAIProvider
+                provider = OpenAIProvider(
+                    model_name=settings.llm_model,
+                    prompt_version=settings.prompt_version,
+                    api_key=openai_api_key
+                )
+                health_monitor.register_provider(
+                    provider_name="openai",
+                    model_name=settings.llm_model,
+                    health_checker=provider._health_check,
+                )
+                logger.info("Initialized OpenAI provider")
+            else:
+                # Fallback to MockProvider when no API key is available
+                from app.llm.provider import MockProvider
+                provider = MockProvider(
+                    provider_name="openai-mock",
+                    model_name=settings.llm_model,
+                    prompt_version=settings.prompt_version
+                )
+                logger.warning("OPENAI_API_KEY not found, using MockProvider for development")
         elif settings.llm_provider == "anthropic":
-            from app.llm.provider import AnthropicProvider
-            provider = AnthropicProvider(
+            anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
+            if anthropic_api_key:
+                from app.llm.provider import AnthropicProvider
+                provider = AnthropicProvider(
+                    model_name=settings.llm_model,
+                    prompt_version=settings.prompt_version,
+                    api_key=anthropic_api_key
+                )
+                health_monitor.register_provider(
+                    provider_name="anthropic",
+                    model_name=settings.llm_model,
+                    health_checker=provider._health_check,
+                )
+                logger.info("Initialized Anthropic provider")
+            else:
+                # Fallback to MockProvider when no API key is available
+                from app.llm.provider import MockProvider
+                provider = MockProvider(
+                    provider_name="anthropic-mock",
+                    model_name=settings.llm_model,
+                    prompt_version=settings.prompt_version
+                )
+                logger.warning("ANTHROPIC_API_KEY not found, using MockProvider for development")
+        else:
+            # Default to MockProvider for unknown providers
+            from app.llm.provider import MockProvider
+            provider = MockProvider(
+                provider_name="mock",
                 model_name=settings.llm_model,
                 prompt_version=settings.prompt_version
             )
-            health_monitor.register_provider(
-                provider_name="anthropic",
-                model_name=settings.llm_model,
-                health_checker=provider._health_check,
-            )
+            logger.info(f"Using MockProvider for provider: {settings.llm_provider}")
 
         # Start health monitoring
         await health_monitor.start()
@@ -99,11 +154,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Add rate limiter state to app
     app.state.limiter = limiter
 
+    app.add_middleware(SecurityHeadersMiddleware)
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=ALLOWED_ORIGINS,  # Explicit whitelist from environment
         allow_credentials=True,
-        allow_methods=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["*"],
     )
 
