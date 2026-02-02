@@ -704,7 +704,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          cpus: '0.20'   # For Dev environment
           memory: 384M
 
   cloud-advanced-analytics:
@@ -736,7 +736,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          cpus: '0.20'   # For Dev environment
           memory: 384M
 
   cloud-data-pipeline:

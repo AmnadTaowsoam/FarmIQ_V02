@@ -358,3 +358,8 @@ networks:
   
 volumes:
   mqtt_data:
+  mqtt_log:
+  edge_postgres_data:
+  edge_mqtt_data:
+  edge_mqtt_log:
+  edge_minio_data:
