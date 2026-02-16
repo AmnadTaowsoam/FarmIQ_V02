@@ -1,0 +1,6 @@
+opencv-contrib-python
+numpy
+pyyaml
+fastapi==0.115.5
+uvicorn[standard]==0.30.6
+opencv-contrib-python==4.12.0.88

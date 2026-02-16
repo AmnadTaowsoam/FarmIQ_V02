@@ -1,0 +1,7 @@
+%YAML:1.0
+---
+z_floor_mm: 1366.6748674127427
+board_reference_z_mm: 1350.
+board_reference_path: "/workspace/iot-layer/camera-config/Geometry-based/board_reference.yml"
+maps_path: "/workspace/iot-layer/camera-config/calibration-camera/stereo_rectify_maps.yml"
+created_at: "2026-02-13 08:33:30"

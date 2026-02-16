@@ -1,0 +1,46 @@
+# Reference board configuration for metric measurement
+
+board:
+  name: blue_reference_board
+  color: blue
+
+  size_mm:
+    width: 510      # mm
+    height: 540     # mm
+
+roi:
+  # Offset of ROI center on the image plane (board plane) in millimeters.
+  # +x moves ROI to the right, +y moves ROI downward.
+  offset_mm:
+    x: 130
+    y: -10
+  # Scale ROI size relative to board size.
+  size_scale:
+    x: 1.25
+    y: 1
+  # Extra padding around ROI in millimeters (applied after scaling).
+  padding_mm:
+    x: 0
+    y: 0
+
+camera:
+  distance_to_board_mm: 1350  # Distance from camera optical center to board plane
+
+reference_plane:
+  axis: Z
+  z_mm: 1350                 # Board lies on Z = 1350 mm plane
+  normal: [0, 0, 1]          # Facing camera
+
+measurement:
+  unit:
+    length: mm
+  usage:
+    - pixel_to_mm_scale
+    - object_width_height_estimation
+    - object_height_from_depth
+
+metadata:
+  created_by: weight-vision-calibrator
+  description: >
+    Blue reference board with known dimensions used as a metric reference
+    for stereo vision measurement (W, L, H).
