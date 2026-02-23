@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model CaptureSession {
+  id              Int      @id @default(autoincrement())
+  sessionId       String   @unique
+  capturedAt      DateTime?
+  weightKg        Float?
+  detectionsCount Int
+  imageCount      Int
+  status          String
+  sourcePath      String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model CalibrationRun {
+  id        Int      @id @default(autoincrement())
+  runId     String   @unique
+  createdAt DateTime?
+  rmsStereo Float?
+  notes     String?
+  createdOn DateTime @default(now())
+  updatedOn DateTime @updatedAt
+}
+
+model ServiceSnapshot {
+  id            Int      @id @default(autoincrement())
+  capturedAt    DateTime @default(now())
+  mqttConnected Boolean  @default(false)
+  bufferedCount Int
+  lastCaptureAt DateTime?
+  stateDbExists Boolean
+}
+
+model CameraConfigSnapshot {
+  id         Int      @id @default(autoincrement())
+  profile    String
+  updatedAt  DateTime?
+  payload    String
+  createdAt  DateTime @default(now())
+}
+
+model Setting {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}

@@ -1,0 +1,123 @@
+services:
+  ui-app:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: ui-application/Dockerfile
+    working_dir: /workspace/iot-layer
+    environment:
+      IOT_LAYER_ROOT: /workspace/iot-layer
+      HOST: 0.0.0.0
+      PORT: 5174
+      CORS_ORIGINS: "*"
+      VITE_DEV_HOST: 0.0.0.0
+      VITE_DEV_PORT: 5173
+      CALIBRATOR_API_URL: http://weight-vision-calibrator:5180
+      VITE_API_BASE: /api
+      DOCKER_CONTAINER_UI_APP: iot-layer-ui-app-1
+      DOCKER_CONTAINER_CAPTURE: iot-layer-weight-vision-capture-1
+      DOCKER_CONTAINER_SERVICE: iot-layer-weight-vision-service-1
+      DOCKER_CONTAINER_CALIBRATOR: iot-layer-weight-vision-calibrator-1
+    volumes:
+      - ./:/workspace/iot-layer
+      - ui-web-node_modules:/workspace/iot-layer/ui-application/node_modules
+      - ui-api-node_modules:/workspace/iot-layer/ui-application/server/node_modules
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "5173:5173"
+      - "5174:5174"
+    depends_on:
+      - weight-vision-calibrator
+
+  weight-vision-service:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: weight-vision-service/Dockerfile
+    working_dir: /workspace/iot-layer/weight-vision-service
+    env_file:
+      - ./weight-vision-service/.env
+    volumes:
+      - ./:/workspace/iot-layer
+    networks:
+      - edge-net
+    depends_on:
+      - ui-app
+
+  weight-vision-capture:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: weight-vision-capture/Dockerfile
+    network_mode: "host"
+    devices:
+      - "${SCALE_PORT:-/dev/ttyUSB0}:${SCALE_PORT:-/dev/ttyUSB0}"
+    group_add:
+      - dialout
+    working_dir: /workspace/iot-layer/weight-vision-capture
+    env_file:
+      - ./.env
+    volumes:
+      - ./:/workspace/iot-layer
+    environment:
+      RTSP_IP_LEFT: ${RTSP_IP_LEFT:-192.168.1.199}
+      RTSP_IP_RIGHT: ${RTSP_IP_RIGHT:-192.168.1.200}
+      RTSP_USER: ${RTSP_USER:-admin}
+      RTSP_PASS: ${RTSP_PASS:-P@ssw0rd}
+      RTSP_STREAM_PATH: ${RTSP_STREAM_PATH:-/Streaming/Channels/101}
+      RTSP_PORT: ${RTSP_PORT:-554}
+      RTSP_READ_RETRIES: ${RTSP_READ_RETRIES:-8}
+      RTSP_RECONNECT_AFTER: ${RTSP_RECONNECT_AFTER:-10}
+      MAPS_PATH: ${MAPS_PATH:-/workspace/iot-layer/camera-config/calibration-camera/stereo_rectify_maps.yml}
+      SCALE_PORT: ${SCALE_PORT:-COM6}
+      SCALE_BAUD: ${SCALE_BAUD:-9600}
+      SCALE_DELTA_KG: ${SCALE_DELTA_KG:-0.15}
+      SCALE_STABLE_SECONDS: ${SCALE_STABLE_SECONDS:-2.5}
+      SCALE_EPS_KG: ${SCALE_EPS_KG:-0.02}
+      SCALE_DETECT_DELAY_SECONDS: ${SCALE_DETECT_DELAY_SECONDS:-1.5}
+      SCALE_POST_CAPTURE_WINDOW_SECONDS: ${SCALE_POST_CAPTURE_WINDOW_SECONDS:-3.0}
+      TRACK_NEW_DELAY_SECONDS: ${TRACK_NEW_DELAY_SECONDS:-1.5}
+      TRACK_EXIT_DELAY_SECONDS: ${TRACK_EXIT_DELAY_SECONDS:-1.5}
+      TRACK_COUNT_DELAY_SECONDS: ${TRACK_COUNT_DELAY_SECONDS:-1.5}
+      FOCUS_MIN_LAPLACIAN: ${FOCUS_MIN_LAPLACIAN:-70.0}
+      CAPTURE_COOLDOWN_SECONDS: ${CAPTURE_COOLDOWN_SECONDS:-2}
+      DETECT_EVERY: ${DETECT_EVERY:-1}
+      IMGSZ: ${IMGSZ:-640}
+      CONF: ${CONF:-0.2}
+      IOU: ${IOU:-0.5}
+    command:
+      [
+        "sh",
+        "-c",
+        "python run_service.py --maps \"${MAPS_PATH:-/workspace/iot-layer/camera-config/calibration-camera/stereo_rectify_maps.yml}\" --scale-enable --scale-port ${SCALE_PORT:-COM6} --scale-baud ${SCALE_BAUD:-9600} --scale-delta-kg ${SCALE_DELTA_KG:-0.15} --scale-stable-seconds ${SCALE_STABLE_SECONDS:-2.5} --scale-eps-kg ${SCALE_EPS_KG:-0.02} --scale-detect-delay-seconds ${SCALE_DETECT_DELAY_SECONDS:-1.5} --track-enable --track-new-delay-seconds ${TRACK_NEW_DELAY_SECONDS:-1.5} --track-exit-enable --track-exit-delay-seconds ${TRACK_EXIT_DELAY_SECONDS:-1.5} --track-count-change-enable --track-count-delay-seconds ${TRACK_COUNT_DELAY_SECONDS:-1.5} --focus-min-laplacian ${FOCUS_MIN_LAPLACIAN:-70.0} --focus-roi-only --capture-cooldown-seconds ${CAPTURE_COOLDOWN_SECONDS:-2} --rtsp-tcp --read-retries ${RTSP_READ_RETRIES:-8} --reconnect-after ${RTSP_RECONNECT_AFTER:-10} --detect-every ${DETECT_EVERY:-1} --imgsz ${IMGSZ:-640} --conf ${CONF:-0.2} --iou ${IOU:-0.5} --left-ip ${RTSP_IP_LEFT:-192.168.1.199} --right-ip ${RTSP_IP_RIGHT:-192.168.1.200} --username ${RTSP_USER:-admin} --password ${RTSP_PASS:-P@ssw0rd} --stream-path ${RTSP_STREAM_PATH:-/Streaming/Channels/101} --port ${RTSP_PORT:-554} --no-display"
+      ]
+    profiles:
+      - capture
+
+  weight-vision-calibrator:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: weight-vision-calibrator/Dockerfile.service
+    working_dir: /workspace/iot-layer/weight-vision-calibrator
+    env_file:
+      - ./.env
+    environment:
+      RTSP_IP_LEFT: ${RTSP_IP_LEFT:-192.168.1.199}
+      RTSP_IP_RIGHT: ${RTSP_IP_RIGHT:-192.168.1.200}
+      RTSP_USER: ${RTSP_USER:-admin}
+      RTSP_PASS: ${RTSP_PASS:-P@ssw0rd}
+      RTSP_STREAM_PATH: ${RTSP_STREAM_PATH:-/Streaming/Channels/101}
+      MAPS_PATH: ${MAPS_PATH:-/workspace/iot-layer/camera-config/calibration-camera/stereo_rectify_maps.yml}
+    volumes:
+      - ./:/workspace/iot-layer
+    ports:
+      - "5180:5180"
+
+volumes:
+  ui-api-node_modules:
+  ui-web-node_modules:
+
+networks:
+  edge-net:
+    driver: bridge

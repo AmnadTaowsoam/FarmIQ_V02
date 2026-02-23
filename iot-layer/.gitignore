@@ -1,0 +1,71 @@
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Secrets / local env
+.env
+.env.*
+!.env.example
+!rtsp.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.venv/
+venv/
+ENV/
+env/
+
+# Node / frontend
+node_modules/
+dist/
+build/
+.next/
+.nuxt/
+.parcel-cache/
+coverage/
+*.tsbuildinfo
+
+# Logs / runtime
+*.log
+logs/
+tmp/
+*.pid
+
+# Project generated data/artifacts
+weight-vision-capture/data/images/
+weight-vision-capture/data/masks/
+weight-vision-capture/data/metadata/
+weight-vision-calibrator/capture_metadata/
+weight-vision-calibrator/calib/samples/
+weight-vision-calibrator/calib/outputs/
+weight-vision-train-model/runs/
+weight-vision-train-model/data/images/
+weight-vision-train-model/data/labels/
+
+# Model / large binary artifacts
+*.pt
+*.onnx
+*.engine
+*.tflite
+*.ckpt
+*.pth
+*.weights
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3

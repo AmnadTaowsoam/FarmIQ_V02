@@ -1,0 +1,7 @@
+opencv-python-headless==4.13.0.92
+numpy==2.4.2
+ultralytics==8.4.14
+pyserial==3.5
+lap==0.5.12
+torch==2.10.0
+torchvision==0.25.0
