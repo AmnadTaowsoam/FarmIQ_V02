@@ -1,4 +1,4 @@
-# Development overrides for cloud services
+﻿# Development overrides for cloud services
 # Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 # Or: docker compose -f docker-compose.yml -f docker-compose.dev.yml build
 # Or standalone: docker compose -f docker-compose.dev.yml up
@@ -141,7 +141,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          cpus: '0.20'   # à¸ªà¸³à¸«à¸£à¸±à¸š Dev à¹à¸„à¹ˆà¸™à¸µà¹‰à¸žà¸­à¸•à¹ˆà¸­à¸à¸²à¸£à¸—à¸³à¸‡à¸²à¸™à¸—à¸±à¹ˆà¸§à¹„à¸›
           memory: 384M
 
   cloud-tenant-registry:
@@ -175,7 +175,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          cpus: '0.20'   # à¸ªà¸³à¸«à¸£à¸±à¸š Dev à¹à¸„à¹ˆà¸™à¸µà¹‰à¸žà¸­à¸•à¹ˆà¸­à¸à¸²à¸£à¸—à¸³à¸‡à¸²à¸™à¸—à¸±à¹ˆà¸§à¹„à¸›
           memory: 384M
 
   cloud-standards-service:
@@ -210,7 +210,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          cpus: '0.20'   # à¸ªà¸³à¸«à¸£à¸±à¸š Dev à¹à¸„à¹ˆà¸™à¸µà¹‰à¸žà¸­à¸•à¹ˆà¸­à¸à¸²à¸£à¸—à¸³à¸‡à¸²à¸™à¸—à¸±à¹ˆà¸§à¹„à¸›
           memory: 384M
 
   cloud-ingestion:
@@ -248,7 +248,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          cpus: '0.20'   # à¸ªà¸³à¸«à¸£à¸±à¸š Dev à¹à¸„à¹ˆà¸™à¸µà¹‰à¸žà¸­à¸•à¹ˆà¸­à¸à¸²à¸£à¸—à¸³à¸‡à¸²à¸™à¸—à¸±à¹ˆà¸§à¹„à¸›
           memory: 384M
 
   cloud-telemetry-service:
@@ -283,7 +283,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          cpus: '0.20'   # à¸ªà¸³à¸«à¸£à¸±à¸š Dev à¹à¸„à¹ˆà¸™à¸µà¹‰à¸žà¸­à¸•à¹ˆà¸­à¸à¸²à¸£à¸—à¸³à¸‡à¸²à¸™à¸—à¸±à¹ˆà¸§à¹„à¸›
           memory: 384M
 
   cloud-analytics-service:
@@ -331,7 +331,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          cpus: '0.20'   # à¸ªà¸³à¸«à¸£à¸±à¸š Dev à¹à¸„à¹ˆà¸™à¸µà¹‰à¸žà¸­à¸•à¹ˆà¸­à¸à¸²à¸£à¸—à¸³à¸‡à¸²à¸™à¸—à¸±à¹ˆà¸§à¹„à¸›
           memory: 384M
 
   cloud-llm-insights-service:
@@ -366,7 +366,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          cpus: '0.20'   # à¸ªà¸³à¸«à¸£à¸±à¸š Dev à¹à¸„à¹ˆà¸™à¸µà¹‰à¸žà¸­à¸•à¹ˆà¸­à¸à¸²à¸£à¸—à¸³à¸‡à¸²à¸™à¸—à¸±à¹ˆà¸§à¹„à¸›
           memory: 384M
 
   cloud-api-gateway-bff:
@@ -422,7 +422,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          cpus: '0.20'   # à¸ªà¸³à¸«à¸£à¸±à¸š Dev à¹à¸„à¹ˆà¸™à¸µà¹‰à¸žà¸­à¸•à¹ˆà¸­à¸à¸²à¸£à¸—à¸³à¸‡à¸²à¸™à¸—à¸±à¹ˆà¸§à¹„à¸›
           memory: 384M
 
   cloud-config-rules-service:
@@ -454,7 +454,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          cpus: '0.20'   # à¸ªà¸³à¸«à¸£à¸±à¸š Dev à¹à¸„à¹ˆà¸™à¸µà¹‰à¸žà¸­à¸•à¹ˆà¸­à¸à¸²à¸£à¸—à¸³à¸‡à¸²à¸™à¸—à¸±à¹ˆà¸§à¹„à¸›
           memory: 384M
 
   cloud-audit-log-service:
@@ -486,7 +486,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          cpus: '0.20'   # à¸ªà¸³à¸«à¸£à¸±à¸š Dev à¹à¸„à¹ˆà¸™à¸µà¹‰à¸žà¸­à¸•à¹ˆà¸­à¸à¸²à¸£à¸—à¸³à¸‡à¸²à¸™à¸—à¸±à¹ˆà¸§à¹„à¸›
           memory: 384M
 
   cloud-notification-service:
@@ -522,7 +522,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          cpus: '0.20'   # à¸ªà¸³à¸«à¸£à¸±à¸š Dev à¹à¸„à¹ˆà¸™à¸µà¹‰à¸žà¸­à¸•à¹ˆà¸­à¸à¸²à¸£à¸—à¸³à¸‡à¸²à¸™à¸—à¸±à¹ˆà¸§à¹„à¸›
           memory: 384M
 
   cloud-reporting-export-service:
@@ -562,7 +562,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          cpus: '0.20'   # à¸ªà¸³à¸«à¸£à¸±à¸š Dev à¹à¸„à¹ˆà¸™à¸µà¹‰à¸žà¸­à¸•à¹ˆà¸­à¸à¸²à¸£à¸—à¸³à¸‡à¸²à¸™à¸—à¸±à¹ˆà¸§à¹„à¸›
           memory: 384M
 
   cloud-feed-service:
@@ -598,7 +598,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          cpus: '0.20'   # à¸ªà¸³à¸«à¸£à¸±à¸š Dev à¹à¸„à¹ˆà¸™à¸µà¹‰à¸žà¸­à¸•à¹ˆà¸­à¸à¸²à¸£à¸—à¸³à¸‡à¸²à¸™à¸—à¸±à¹ˆà¸§à¹„à¸›
           memory: 384M
 
   cloud-barn-records-service:
@@ -634,7 +634,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          cpus: '0.20'   # à¸ªà¸³à¸«à¸£à¸±à¸š Dev à¹à¸„à¹ˆà¸™à¸µà¹‰à¸žà¸­à¸•à¹ˆà¸­à¸à¸²à¸£à¸—à¸³à¸‡à¸²à¸™à¸—à¸±à¹ˆà¸§à¹„à¸›
           memory: 384M
 
   cloud-weighvision-readmodel:
@@ -670,7 +670,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.20'   # สำหรับ Dev แค่นี้พอต่อการทำงานทั่วไป
+          cpus: '0.20'   # à¸ªà¸³à¸«à¸£à¸±à¸š Dev à¹à¸„à¹ˆà¸™à¸µà¹‰à¸žà¸­à¸•à¹ˆà¸­à¸à¸²à¸£à¸—à¸³à¸‡à¸²à¸™à¸—à¸±à¹ˆà¸§à¹„à¸›
           memory: 384M
 
   cloud-billing-service:
@@ -793,8 +793,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1.0'    # ให้เยอะหน่อยเพราะตอน Start-up หนักมาก
-          memory: 1024M  # Metabase มักไม่รันถ้า RAM ต่ำกว่า 1GB
+          cpus: '1.0'    # à¹ƒà¸«à¹‰à¹€à¸¢à¸­à¸°à¸«à¸™à¹ˆà¸­à¸¢à¹€à¸žà¸£à¸²à¸°à¸•à¸­à¸™ Start-up à¸«à¸™à¸±à¸à¸¡à¸²à¸
+          memory: 1024M  # Metabase à¸¡à¸±à¸à¹„à¸¡à¹ˆà¸£à¸±à¸™à¸–à¹‰à¸² RAM à¸•à¹ˆà¸³à¸à¸§à¹ˆà¸² 1GB
 
 networks:
   farmiq-net:
@@ -806,3 +806,4 @@ volumes:
   vault_data:
   report_exports_data:
   metabase_data:
+

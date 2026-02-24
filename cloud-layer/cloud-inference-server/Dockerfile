@@ -13,7 +13,9 @@ RUN apt-get update && apt-get install -y \
 
 # Install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+ENV PIP_DEFAULT_TIMEOUT=600 \
+    PIP_RETRIES=20
+RUN pip install --no-cache-dir --default-timeout=600 --retries=20 -r requirements.txt
 
 # Copy application code
 COPY app/ ./app/

@@ -64,7 +64,6 @@ RUN npx prisma generate
 # Copy source code (will be overridden by volume in docker-compose.dev.yml)
 COPY --from=build /usr/src/app/src ./src
 COPY --from=build /usr/src/app/tsconfig.json ./tsconfig.json
-COPY --from=build /usr/src/app/openapi.yaml ./openapi.yaml
 
 # Install nodemon globally for hot-reload
 RUN npm install -g nodemon ts-node
@@ -110,8 +109,6 @@ COPY --from=build /usr/src/app/dist ./dist
 COPY --from=build /usr/src/app/prisma ./prisma
 COPY --from=build /usr/src/app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=build /usr/src/app/node_modules/@prisma ./node_modules/@prisma
-# Copy the openapi.yaml file
-COPY --from=build /usr/src/app/openapi.yaml ./openapi.yaml
 
 # Install curl for healthcheck
 RUN apk add --no-cache curl

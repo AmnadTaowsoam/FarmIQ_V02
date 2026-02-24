@@ -1,14 +1,14 @@
 # Triton Inference Server
-tritonclient[all]==2.46.1
+tritonclient[all]==2.46.0
 numpy==1.26.3
-pandas==2.2.0
 
-# Model formats
-onnx==1.16.0
-onnxruntime==1.17.1
-torch==2.1.2
-torchvision==0.18.1
-tensorflow==2.15.0
+# Optional model-framework dependencies (commented out for faster/dev build)
+# pandas==2.2.0
+# onnx==1.16.0
+# onnxruntime==1.17.1
+# torch==2.1.2+cpu
+# torchvision==0.16.2+cpu
+# tensorflow==2.15.0
 
 # Web framework
 fastapi==0.109.0
@@ -26,9 +26,8 @@ ddtrace==2.12.3
 prometheus-client==0.19.0
 
 # Testing
-pytest==8.0.0
+pytest==7.4.4
 pytest-asyncio==0.23.4
-httpx==0.26.0
 
 # Utilities
 python-dotenv==1.0.0

@@ -89,7 +89,7 @@ COPY --from=build /usr/lib/libcrypto.so.3 /usr/lib/
 
 # Reuse deps from build stage and prune dev deps (no network)
 COPY --from=build /usr/src/app/node_modules ./node_modules
-RUN npm prune --omit=dev --ignore-scripts
+RUN npm prune --omit=dev --ignore-scripts --legacy-peer-deps
 
 # Copy the built application and Prisma client from the build stage
 COPY --from=build /usr/src/app/dist ./dist

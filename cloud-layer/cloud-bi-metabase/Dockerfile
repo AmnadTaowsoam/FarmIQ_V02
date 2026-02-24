@@ -8,8 +8,8 @@ ENV MB_JETTY_PORT=3000
 # Create data directory
 RUN mkdir -p /metabase-data
 
-# Install curl for healthcheck (base image may not have wget)
-RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+# Install curl for healthcheck
+RUN apk add --no-cache curl
 
 # Override entrypoint to avoid BusyBox su command issues
 # The base image entrypoint may use 'su -j' which BusyBox doesn't support

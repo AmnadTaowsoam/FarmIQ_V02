@@ -63,10 +63,11 @@ services:
     networks:
       - farmiq-net
     healthcheck:
-      test: [ "CMD", "rabbitmqctl", "status" ]
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 12
+      start_period: 90s
 
   datadog:
     image: gcr.io/datadoghq/agent:7
@@ -815,8 +816,8 @@ services:
   # ============================================
   dashboard-web:
     build:
-      context: ../apps/dashboard-web
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: apps/dashboard-web/Dockerfile
     container_name: farmiq-dashboard-web
     ports:
       - "5142:80"
@@ -832,8 +833,8 @@ services:
 
   admin-web:
     build:
-      context: ../apps/admin-web
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: apps/admin-web/Dockerfile
     container_name: farmiq-admin-web
     ports:
       - "5143:80"
