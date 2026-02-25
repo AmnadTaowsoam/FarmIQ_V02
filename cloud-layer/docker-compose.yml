@@ -77,7 +77,7 @@ services:
       - "8126:8126" # APM intake
       - "8125:8125/udp" # dogstatsd
     environment:
-      - DD_API_KEY=${DD_API_KEY}
+      - DD_API_KEY=${DD_API_KEY:-local-dev-dd-api-key}
       - DD_SITE=${DD_SITE:-datadoghq.com}
       - DD_ENV=${DD_ENV:-prod}
       - DD_TAGS=project:farmiq layer:cloud stack:prod

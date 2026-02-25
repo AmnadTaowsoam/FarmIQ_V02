@@ -8,6 +8,9 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 COPY prisma ./prisma/
 
+# Install OpenSSL 3 for Prisma engines
+RUN apk add --no-cache openssl libssl3
+
 # Configure npm for better network reliability
 RUN npm config set fetch-retries 5 && \
     npm config set fetch-retry-mintimeout 20000 && \
@@ -54,6 +57,7 @@ RUN npm install --legacy-peer-deps --ignore-scripts
 COPY --from=build /usr/src/app/prisma ./prisma
 COPY --from=build /usr/src/app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=build /usr/src/app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=build /usr/src/app/node_modules/prisma ./node_modules/prisma
 
 # Copy source code (will be overridden by volume in docker-compose.dev.yml)
 COPY --from=build /usr/src/app/src ./src
@@ -78,6 +82,9 @@ CMD ["npm", "run", "dev"]
 # Stage 3: Production image
 FROM node:20-alpine AS production
 
+# Install OpenSSL 3 for Prisma engines
+RUN apk add --no-cache openssl libssl3
+
 # Set the working directory
 WORKDIR /usr/src/app
 
@@ -96,11 +103,16 @@ RUN npm config set fetch-retries 5 && \
 # Install only production dependencies
 RUN npm install --legacy-peer-deps --only=production
 
+# Ensure Prisma CLI version is pinned in production image.
+# Without this, `npx prisma` may fetch Prisma v7 at runtime and break schema compatibility.
+RUN npm install --no-save prisma@5.22.0 --legacy-peer-deps
+
 # Copy the built application and Prisma client from the build stage
 COPY --from=build /usr/src/app/dist ./dist
 COPY --from=build /usr/src/app/prisma ./prisma
 COPY --from=build /usr/src/app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=build /usr/src/app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=build /usr/src/app/node_modules/prisma ./node_modules/prisma
 # Copy the openapi.yaml file
 COPY --from=build /usr/src/app/openapi.yaml ./openapi.yaml
 
@@ -120,6 +132,6 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
 CMD curl --fail http://localhost:3000/api/health || exit 1
 
-# Run database migrations before starting the application
-# Note: DATABASE_URL must be provided as environment variable
-CMD sh -c "npx prisma migrate deploy && node dist/src/index.js"
+# Run database migrations before starting the application.
+# Fallback to db push when schema already exists (e.g. Prisma P3005 on pre-seeded databases).
+CMD sh -c "(node node_modules/prisma/build/index.js migrate deploy || (echo 'prisma migrate deploy failed; fallback to prisma db push' && node node_modules/prisma/build/index.js db push)) && node dist/src/index.js"

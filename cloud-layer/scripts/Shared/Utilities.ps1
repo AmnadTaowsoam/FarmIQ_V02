@@ -67,6 +67,16 @@ function Test-Docker {
         # Use a simple command that doesn't require full daemon access
         $output = & $dockerPath ps --format "{{.ID}}" 2>&1
         $exitCode = $LASTEXITCODE
+
+        # Final fallback: try docker.exe from default install location directly
+        if ($exitCode -ne 0) {
+            $dockerExe = "C:\Program Files\Docker\Docker\resources\bin\docker.exe"
+            if (Test-Path $dockerExe) {
+                $dockerPath = $dockerExe
+                $output = & $dockerPath ps --format "{{.ID}}" 2>&1
+                $exitCode = $LASTEXITCODE
+            }
+        }
         
         # If we get permission denied, docker exists but daemon isn't accessible
         if ($output -match "permission denied|Cannot connect to the Docker daemon|dockerDesktopLinuxEngine") {
@@ -358,6 +368,8 @@ function Test-PostgresDatabase {
         $resultText = $checkResult.ToString()
     } elseif ($checkResult -is [array]) {
         $resultText = ($checkResult | ForEach-Object { $_.ToString() }) -join "`n"
+    } elseif ($null -eq $checkResult) {
+        $resultText = ""
     } else {
         $resultText = $checkResult.ToString()
     }
