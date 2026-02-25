@@ -36,16 +36,42 @@ export async function getSessions(params: {
     SELECT 
       s.*,
       (
-        SELECT COUNT(*)::int
-        FROM weighvision_media med_count
-        WHERE med_count."sessionDbId" = s.id
+        SELECT COALESCE(
+          (
+            SELECT (m_final_meta."metaJson"::jsonb ->> 'image_count')::int
+            FROM weighvision_measurement m_final_meta
+            WHERE m_final_meta."sessionDbId" = s.id
+              AND m_final_meta.source = 'finalized'
+              AND m_final_meta."metaJson" IS NOT NULL
+            ORDER BY m_final_meta.ts DESC
+            LIMIT 1
+          ),
+          (
+            SELECT COUNT(*)::int
+            FROM weighvision_media med_count
+            WHERE med_count."sessionDbId" = s.id
+          ),
+          0
+        )
       ) as image_count,
       (
-        SELECT m_last."weightKg"
-        FROM weighvision_measurement m_last
-        WHERE m_last."sessionDbId" = s.id
-        ORDER BY m_last.ts DESC
-        LIMIT 1
+        SELECT COALESCE(
+          (
+            SELECT m_final."weightKg"
+            FROM weighvision_measurement m_final
+            WHERE m_final."sessionDbId" = s.id
+              AND m_final.source = 'finalized'
+            ORDER BY m_final.ts DESC
+            LIMIT 1
+          ),
+          (
+            SELECT m_last."weightKg"
+            FROM weighvision_measurement m_last
+            WHERE m_last."sessionDbId" = s.id
+            ORDER BY m_last.ts DESC
+            LIMIT 1
+          )
+        )
       ) as final_weight_kg,
       COALESCE(
         (SELECT json_agg(m ORDER BY m.ts DESC) 
@@ -359,11 +385,18 @@ export async function handleSessionFinalized(event: WeighVisionEvent) {
     }
 
     const finalWeightRaw = (event.payload.final_weight_kg ?? event.payload.finalWeightKg) as unknown
+    const imageCountRaw = (event.payload.image_count ?? event.payload.imageCount) as unknown
     const finalWeightKg =
       typeof finalWeightRaw === 'number'
         ? finalWeightRaw
         : typeof finalWeightRaw === 'string'
           ? Number(finalWeightRaw)
+          : NaN
+    const imageCount =
+      typeof imageCountRaw === 'number'
+        ? imageCountRaw
+        : typeof imageCountRaw === 'string'
+          ? Number(imageCountRaw)
           : NaN
 
     // Update session
@@ -382,6 +415,11 @@ export async function handleSessionFinalized(event: WeighVisionEvent) {
     })
 
     if (Number.isFinite(finalWeightKg)) {
+      const finalizedMeta: Record<string, unknown> = { source_event: 'weighvision.session.finalized' }
+      if (Number.isFinite(imageCount) && imageCount >= 0) {
+        finalizedMeta.image_count = Math.trunc(imageCount)
+      }
+
       await prisma.weighVisionMeasurement.create({
         data: {
           id: `${event.event_id}:finalized`,
@@ -391,7 +429,7 @@ export async function handleSessionFinalized(event: WeighVisionEvent) {
           ts: new Date(event.occurred_at),
           weightKg: finalWeightKg,
           source: 'finalized',
-          metaJson: null,
+          metaJson: JSON.stringify(finalizedMeta),
         },
       })
     }

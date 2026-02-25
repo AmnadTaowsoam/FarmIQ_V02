@@ -24,6 +24,22 @@ services:
       timeout: 5s
       retries: 5
 
+  pgadmin:
+    image: dpage/pgadmin4:8
+    ports:
+      - "5438:80"
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL:-admin@farmiq.com}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD:-admin123}
+      - PGADMIN_CONFIG_SERVER_MODE=False
+    volumes:
+      - edge_pgadmin_data:/var/lib/pgadmin
+    networks:
+      - farmiq-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   minio:
     image: minio/minio:latest
     #container_name: farmiq-edge-minio
@@ -347,3 +363,4 @@ volumes:
   edge_mqtt_data:
   edge_mqtt_log:
   edge_minio_data:
+  edge_pgadmin_data:
