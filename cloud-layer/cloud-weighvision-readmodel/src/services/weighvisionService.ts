@@ -35,6 +35,18 @@ export async function getSessions(params: {
   let query = `
     SELECT 
       s.*,
+      (
+        SELECT COUNT(*)::int
+        FROM weighvision_media med_count
+        WHERE med_count."sessionDbId" = s.id
+      ) as image_count,
+      (
+        SELECT m_last."weightKg"
+        FROM weighvision_measurement m_last
+        WHERE m_last."sessionDbId" = s.id
+        ORDER BY m_last.ts DESC
+        LIMIT 1
+      ) as final_weight_kg,
       COALESCE(
         (SELECT json_agg(m ORDER BY m.ts DESC) 
          FROM (SELECT * FROM weighvision_measurement WHERE "sessionDbId" = s.id ORDER BY ts DESC LIMIT 10) m),
@@ -116,6 +128,8 @@ export async function getSessions(params: {
     startedAt: row.startedAt,
     endedAt: row.endedAt,
     status: row.status,
+    image_count: row.image_count ?? 0,
+    final_weight_kg: row.final_weight_kg != null ? Number(row.final_weight_kg) : null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     measurements: row.measurements || [],
@@ -344,8 +358,16 @@ export async function handleSessionFinalized(event: WeighVisionEvent) {
       return false
     }
 
+    const finalWeightRaw = (event.payload.final_weight_kg ?? event.payload.finalWeightKg) as unknown
+    const finalWeightKg =
+      typeof finalWeightRaw === 'number'
+        ? finalWeightRaw
+        : typeof finalWeightRaw === 'string'
+          ? Number(finalWeightRaw)
+          : NaN
+
     // Update session
-    await prisma.weighVisionSession.update({
+    const session = await prisma.weighVisionSession.update({
       where: {
         tenantId_sessionId: {
           tenantId: event.tenant_id,
@@ -358,6 +380,21 @@ export async function handleSessionFinalized(event: WeighVisionEvent) {
         updatedAt: new Date(),
       },
     })
+
+    if (Number.isFinite(finalWeightKg)) {
+      await prisma.weighVisionMeasurement.create({
+        data: {
+          id: `${event.event_id}:finalized`,
+          tenantId: event.tenant_id,
+          sessionId,
+          sessionDbId: session.id,
+          ts: new Date(event.occurred_at),
+          weightKg: finalWeightKg,
+          source: 'finalized',
+          metaJson: null,
+        },
+      })
+    }
 
     logger.info('WeighVision session finalized', {
       eventId: event.event_id,
@@ -557,8 +594,16 @@ export async function handleMediaStored(event: WeighVisionEvent) {
       return false
     }
 
-    const objectId = event.payload.object_id as string || event.payload.objectId as string
-    const path = event.payload.path as string || event.payload.url as string
+    const objectId =
+      event.payload.object_id as string ||
+      event.payload.objectId as string ||
+      event.payload.media_id as string ||
+      event.payload.mediaId as string
+    const path =
+      event.payload.path as string ||
+      event.payload.url as string ||
+      event.payload.object_key as string ||
+      event.payload.objectKey as string
     if (!objectId || !path) {
       logger.warn('Missing object_id or path in media.stored event', {
         eventId: event.event_id,

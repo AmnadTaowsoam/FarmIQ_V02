@@ -24,7 +24,20 @@ function normalizeSession(item: any): Session {
         item?.image_count ??
         item?.imageCount ??
         (Array.isArray(item?.media) ? item.media.length : undefined);
-    const finalWeightKg = item?.final_weight_kg ?? item?.finalWeightKg ?? item?.weightKg;
+    const latestMeasurementWeight = Array.isArray(item?.measurements) && item.measurements.length > 0
+        ? (item.measurements[0]?.weightKg ?? item.measurements[0]?.weight_kg)
+        : undefined;
+    const finalWeightRaw =
+        item?.final_weight_kg ??
+        item?.finalWeightKg ??
+        item?.weightKg ??
+        latestMeasurementWeight;
+    const finalWeightKg =
+        typeof finalWeightRaw === 'number'
+            ? finalWeightRaw
+            : typeof finalWeightRaw === 'string'
+                ? Number(finalWeightRaw)
+                : null;
 
     return {
         ...(item as Session),
@@ -32,7 +45,7 @@ function normalizeSession(item: any): Session {
         barn_id: barnId as any,
         start_at: startAt as any,
         image_count: (typeof imageCount === 'number' ? imageCount : 0) as any,
-        final_weight_kg: (typeof finalWeightKg === 'number' ? finalWeightKg : null) as any,
+        final_weight_kg: (typeof finalWeightKg === 'number' && Number.isFinite(finalWeightKg) ? finalWeightKg : null) as any,
     };
 }
 
