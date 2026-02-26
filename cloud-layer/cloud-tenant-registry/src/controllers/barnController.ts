@@ -82,21 +82,43 @@ export async function getBarn(req: Request, res: Response) {
  */
 export async function createBarnHandler(req: Request, res: Response) {
   try {
-    const tenantId = res.locals.tenantId || req.body.tenantId
-    const { farmId } = req.body
-    if (!tenantId || !farmId) {
+    const tenantId =
+      res.locals.tenantId ||
+      req.body.tenantId ||
+      req.body.tenant_id ||
+      (req.query.tenantId as string | undefined) ||
+      (req.query.tenant_id as string | undefined)
+
+    const farmId = req.body.farmId || req.body.farm_id
+    const animalType = req.body.animalType || req.body.animal_type
+
+    if (!farmId) {
       return res.status(400).json({
         error: {
           code: 'VALIDATION_ERROR',
-          message: 'tenantId and farmId are required',
+          message: 'farmId is required',
           traceId: res.locals.traceId || 'unknown',
         },
       })
     }
-    const barn = await createBarn(tenantId, farmId, req.body)
+
+    const barn = await createBarn(tenantId, farmId, {
+      ...req.body,
+      farmId,
+      animalType,
+    })
     res.status(201).json(barn)
   } catch (error: any) {
     logger.error('Error in createBarnHandler:', error)
+    if (error?.message === 'farmId not found' || error?.message === 'farmId does not belong to tenantId') {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: error.message,
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+    }
     if (error.code === 'P2002') {
       return res.status(409).json({
         error: {

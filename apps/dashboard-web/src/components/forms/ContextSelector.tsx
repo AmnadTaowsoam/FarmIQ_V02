@@ -95,8 +95,10 @@ export const ContextSelector: React.FC = () => {
         const normalized = barnsResponse.map((barn) => ({
           ...barn,
           barn_id: barn.barn_id || (barn as any).id,
+          farm_id: barn.farm_id || barn.farmId,
         }));
-        setBarns(normalized);
+        const filtered = normalized.filter((barn) => (barn.farm_id || barn.farmId) === farmId);
+        setBarns(filtered);
       } catch (e) {
         console.error(e);
       } finally {

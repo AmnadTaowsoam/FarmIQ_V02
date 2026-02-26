@@ -31,8 +31,12 @@ export const useBarns = () => {
             const normalized = barns.map((barn) => ({
                 ...barn,
                 barn_id: barn.barn_id || (barn as any).id,
+                farm_id: barn.farm_id || barn.farmId,
             }));
-            setData(normalized);
+            const filtered = farmId
+                ? normalized.filter((barn) => (barn.farm_id || barn.farmId) === farmId)
+                : normalized;
+            setData(filtered);
             setError(null);
         } catch (err) {
             console.error('Failed to fetch barns', err);

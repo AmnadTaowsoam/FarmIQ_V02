@@ -651,12 +651,17 @@ export async function createFarmHandler(req: Request, res: Response): Promise<vo
 export async function createBarnHandler(req: Request, res: Response): Promise<void> {
   const startTime = Date.now()
   const tenantId = getTenantIdFromRequest(res, resolveRequestTenantId(req))
+  const farmId = req.body?.farmId || req.body?.farm_id
+  const animalType = req.body?.animalType || req.body?.animal_type
 
-  if (!tenantId) {
+  // Backward compatibility:
+  // older dashboard bundles send farm_id/animal_type and may omit tenantId entirely.
+  // If farmId is present, allow downstream tenant-registry to resolve tenant by farm.
+  if (!tenantId && !farmId) {
     res.status(400).json({
       error: {
         code: 'VALIDATION_ERROR',
-        message: 'tenantId is required',
+        message: 'tenantId or farmId is required',
         traceId: res.locals.traceId || 'unknown',
       },
     })
@@ -664,7 +669,13 @@ export async function createBarnHandler(req: Request, res: Response): Promise<vo
   }
 
   try {
-    const body = { ...req.body, tenantId }
+    const body = {
+      ...req.body,
+      ...(tenantId ? { tenantId } : {}),
+      ...(farmId ? { farmId } : {}),
+      ...(animalType ? { animalType } : {}),
+    }
+
     const result = await tenantRegistryServiceClient.createBarn({
       body,
       headers: buildDownstreamHeaders(req, res),

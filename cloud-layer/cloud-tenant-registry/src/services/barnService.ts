@@ -61,7 +61,7 @@ export async function getBarnById(
  * Create a new barn
  */
 export async function createBarn(
-  tenantId: string,
+  tenantId: string | undefined,
   farmId: string,
   data: {
     name: string
@@ -70,11 +70,30 @@ export async function createBarn(
   }
 ) {
   try {
-    logger.info(`Creating barn for tenant ${tenantId}, farm ${farmId}:`, data)
+    const farm = await prisma.farm.findUnique({
+      where: { id: farmId },
+      select: { tenantId: true },
+    })
+
+    if (!farm) {
+      throw new Error('farmId not found')
+    }
+
+    if (tenantId && farm.tenantId !== tenantId) {
+      throw new Error('farmId does not belong to tenantId')
+    }
+
+    const resolvedTenantId = tenantId || farm.tenantId
+
+    if (!resolvedTenantId) {
+      throw new Error('Unable to resolve tenantId for farm')
+    }
+
+    logger.info(`Creating barn for tenant ${resolvedTenantId}, farm ${farmId}:`, data)
     return await prisma.barn.create({
       data: {
         id: newUuidV7(),
-        tenantId,
+        tenantId: resolvedTenantId,
         farmId,
         name: data.name,
         animalType: data.animalType,
@@ -82,7 +101,7 @@ export async function createBarn(
       },
     })
   } catch (error) {
-    logger.error(`Error creating barn for tenant ${tenantId}:`, error)
+    logger.error(`Error creating barn for tenant ${tenantId || 'unknown'}:`, error)
     throw error
   }
 }

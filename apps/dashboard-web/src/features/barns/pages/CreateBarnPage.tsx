@@ -54,10 +54,11 @@ export const CreateBarnPage: React.FC = () => {
     setErrors({});
     try {
       await api.barns.create({
+        tenantId,
         name: result.data.name,
-        animal_type: result.data.animalType,
+        animalType: result.data.animalType,
         status: result.data.status,
-        farm_id: farmId,
+        farmId,
       });
       enqueueSnackbar('Barn created successfully', { variant: 'success' });
       navigate('/barns');
