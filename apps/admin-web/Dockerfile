@@ -1,13 +1,5 @@
 ## Stage 0: Build Stage ##
-FROM node:24-slim AS builder
-
-# Install essential build tools
-RUN apt-get update && apt-get install -y \
-    git \
-    python3 \
-    make \
-    g++ \
-    && rm -rf /var/lib/apt/lists/*
+FROM node:20-alpine AS builder
 
 # Accept build argument for app name
 ARG APP_NAME=admin-web
@@ -22,17 +14,31 @@ COPY packages/ /usr/src/packages/
 
 # Build the packages first
 WORKDIR /usr/src/packages/farmiq-api-client
-RUN npm install && npm run build
+RUN for i in 1 2 3 4 5; do \
+      npm ci --include=dev && break; \
+      if [ "$i" -eq 5 ]; then exit 1; fi; \
+      sleep $((i * 5)); \
+    done && (test -x ./node_modules/.bin/tsc || npm install --include=dev typescript@^5) && npm run build
 
 WORKDIR /usr/src/packages/contracts
-RUN npm install && npm run build
+RUN for i in 1 2 3 4 5; do \
+      npm install && break; \
+      if [ "$i" -eq 5 ]; then exit 1; fi; \
+      sleep $((i * 5)); \
+    done && npm run build
 
 # Go back to app directory
 WORKDIR /app
 
 # Copy app package.json and install dependencies
 COPY apps/${APP_NAME}/package.json ./
-RUN npm cache clean --force && npm install
+COPY apps/${APP_NAME}/package-lock.json ./
+RUN npm cache clean --force && \
+    for i in 1 2 3 4 5; do \
+      npm ci --include=dev && break; \
+      if [ "$i" -eq 5 ]; then exit 1; fi; \
+      sleep $((i * 5)); \
+    done
 
 # Copy app source code (excluding node_modules)
 COPY apps/${APP_NAME}/src ./src
@@ -50,7 +56,7 @@ ENV NODE_OPTIONS="--max-old-space-size=4096"
 RUN npx vite build
 
 ## Stage 1: Development Stage ##
-FROM node:24-slim AS development
+FROM node:20-alpine AS development
 
 # Accept build argument for app name
 ARG APP_NAME=admin-web
@@ -65,17 +71,31 @@ COPY packages/ /usr/src/packages/
 
 # Build the packages first
 WORKDIR /usr/src/packages/farmiq-api-client
-RUN npm install && npm run build
+RUN for i in 1 2 3 4 5; do \
+      npm ci --include=dev && break; \
+      if [ "$i" -eq 5 ]; then exit 1; fi; \
+      sleep $((i * 5)); \
+    done && (test -x ./node_modules/.bin/tsc || npm install --include=dev typescript@^5) && npm run build
 
 WORKDIR /usr/src/packages/contracts
-RUN npm install && npm run build
+RUN for i in 1 2 3 4 5; do \
+      npm install && break; \
+      if [ "$i" -eq 5 ]; then exit 1; fi; \
+      sleep $((i * 5)); \
+    done && npm run build
 
 # Go back to app directory
 WORKDIR /app
 
 # Copy app package.json and install dependencies
 COPY apps/${APP_NAME}/package.json ./
-RUN npm cache clean --force && npm install
+COPY apps/${APP_NAME}/package-lock.json ./
+RUN npm cache clean --force && \
+    for i in 1 2 3 4 5; do \
+      npm ci --include=dev && break; \
+      if [ "$i" -eq 5 ]; then exit 1; fi; \
+      sleep $((i * 5)); \
+    done
 
 # Copy app source code (excluding node_modules)
 COPY apps/${APP_NAME}/src ./src
@@ -119,45 +139,122 @@ ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["npm", "run", "dev"]
 
 ## Stage 2: Production Stage ##
-FROM nginx:1.27.4-alpine
+FROM node:20-alpine
 
 # Accept build argument for app name
 ARG APP_NAME=admin-web
 
-# Install curl for health check
-RUN apk add --no-cache curl
+WORKDIR /app
 
 # Create non-root user if not exists
-RUN adduser -D -H -u 101 -s /sbin/nologin nginx || true
+RUN adduser -D -H -u 101 -s /sbin/nologin app || true
 
-# Copy build files and set ownership (Vite builds to 'dist' by default)
-COPY --from=builder --chown=nginx:nginx /app/build /usr/share/nginx/html
-
-# Copy source maps to separate location for debugging (optional)
-RUN mkdir -p /source-map/assets
-COPY --from=builder --chown=nginx:nginx /app/build/*.map /source-map/assets/
-
-# Copy and set ownership of nginx configuration
-COPY --chown=nginx:nginx apps/${APP_NAME}/nginx.conf /etc/nginx/nginx.conf
+# Copy static build artifacts
+COPY --from=builder --chown=app:app /app/build /app/build
 
 # Remove source maps for security
-RUN find /usr/share/nginx/html -type f -name "*.map" -exec rm -f {} \;
+RUN find /app/build -type f -name "*.map" -exec rm -f {} \;
 
-# Set up permissions
-RUN chmod 1777 /tmp && \
-    chown -R nginx:nginx /var/cache/nginx /var/run /var/log/nginx && \
-    touch /var/run/nginx.pid && \
-    chown nginx:nginx /var/run/nginx.pid
+# Runtime server: serve SPA and proxy /api/* to BFF on host
+RUN cat > /app/server.js <<'EOF'
+const http = require('http');
+const https = require('https');
+const fs = require('fs');
+const path = require('path');
 
-# Switch to non-root user
-USER nginx
+const root = '/app/build';
+const upstreamHost = process.env.BFF_HOST || 'host.docker.internal';
+const upstreamPort = Number(process.env.BFF_PORT || '5125');
+
+const mime = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.ico': 'image/x-icon',
+  '.map': 'application/json; charset=utf-8',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2'
+};
+
+function proxyApi(req, res) {
+  const useHttps = req.headers['x-forwarded-proto'] === 'https';
+  const transport = useHttps ? https : http;
+  const options = {
+    hostname: upstreamHost,
+    port: upstreamPort,
+    path: req.url,
+    method: req.method,
+    headers: {
+      ...req.headers,
+      host: `${upstreamHost}:${upstreamPort}`,
+      connection: 'close'
+    }
+  };
+
+  const upstream = transport.request(options, (upRes) => {
+    res.writeHead(upRes.statusCode || 502, upRes.headers);
+    upRes.pipe(res);
+  });
+
+  upstream.on('error', () => {
+    res.statusCode = 502;
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.end(JSON.stringify({ error: { code: 'BFF_UNREACHABLE', message: 'Cannot reach API gateway' } }));
+  });
+
+  req.pipe(upstream);
+}
+
+function serveStatic(req, res) {
+  let u = (req.url || '/').split('?')[0];
+  if (u === '/' || u === '') u = '/index.html';
+  const fp = path.join(root, path.normalize(u));
+  if (!fp.startsWith(root)) {
+    res.statusCode = 400;
+    res.end('Bad Request');
+    return;
+  }
+
+  const send = (p) => {
+    fs.readFile(p, (e, d) => {
+      if (e) {
+        res.statusCode = 404;
+        res.end('Not Found');
+        return;
+      }
+      res.setHeader('Content-Type', mime[path.extname(p)] || 'application/octet-stream');
+      res.end(d);
+    });
+  };
+
+  fs.stat(fp, (e, s) => {
+    if (!e && s.isFile()) return send(fp);
+    return send(path.join(root, 'index.html'));
+  });
+}
+
+const server = http.createServer((req, res) => {
+  if ((req.url || '').startsWith('/api/')) return proxyApi(req, res);
+  return serveStatic(req, res);
+});
+
+server.listen(80, '0.0.0.0');
+EOF
+RUN chown app:app /app/server.js
 
 # Expose port
 EXPOSE 80
 
+# Switch to non-root user
+USER app
+
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost/ || exit 1
+    CMD wget -q -O /dev/null http://localhost:80/ || exit 1
 
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["node", "/app/server.js"]

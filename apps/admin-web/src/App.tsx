@@ -67,6 +67,22 @@ const AdminTenantsPage = React.lazy(async () => {
 
 });
 
+const CreateTenantPage = React.lazy(async () => {
+
+  try {
+
+    const module = await import('./features/admin/pages/CreateTenantPage');
+
+    return { default: module.CreateTenantPage };
+
+  } catch (e: any) {
+
+    return { default: () => <div>Create Tenant (Error: {String(e)})</div> };
+
+  }
+
+});
+
 
 
 const AdminUsersPage = React.lazy(async () => {
@@ -612,6 +628,26 @@ function App() {
                       <Suspense fallback={<div>Loading...</div>}>
 
                         <AdminTenantsPage />
+
+                      </Suspense>
+
+                    </RoleGuard>
+
+                  }
+
+                />
+
+                <Route
+
+                  path="/tenants/new"
+
+                  element={
+
+                    <RoleGuard allowedRoles={['platform_admin']}>
+
+                      <Suspense fallback={<div>Loading...</div>}>
+
+                        <CreateTenantPage />
 
                       </Suspense>
 

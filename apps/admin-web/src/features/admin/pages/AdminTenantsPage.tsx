@@ -7,7 +7,6 @@ import { AdminPageHeader } from '../../../components/admin/AdminPageHeader';
 import { AdminDataTable, FilterOption } from '../../../components/admin/AdminDataTable';
 import { StatusPill } from '../../../components/admin/StatusPill';
 import { useTenantsQuery } from '../../../api/admin/adminQueries';
-import { Permission } from '../../../lib/permissions';
 import { formatDistanceToNow } from 'date-fns';
 
 export const AdminTenantsPage: React.FC = () => {
@@ -16,7 +15,6 @@ export const AdminTenantsPage: React.FC = () => {
   const [pageSize, setPageSize] = useState(25);
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState<FilterOption[]>([]);
-
   // Extract filter values
   const filterParams = filters.reduce((acc, filter) => {
     acc[filter.key] = filter.value;
@@ -141,9 +139,10 @@ export const AdminTenantsPage: React.FC = () => {
       sortable: false,
       renderCell: (params) => (
         <Button
+          type="button"
           size="small"
           startIcon={<Eye size={16} />}
-          onClick={() => navigate(`/admin/tenants/${params.row.id}`)}
+          onClick={() => navigate(`/tenants/${params.row.id}`)}
         >
           View
         </Button>
@@ -158,9 +157,10 @@ export const AdminTenantsPage: React.FC = () => {
         subtitle="Manage tenants and their configurations"
         actions={
           <Button
+            type="button"
             variant="contained"
             startIcon={<Plus size={18} />}
-            onClick={() => navigate('/admin/tenants/new')}
+            onClick={() => navigate('/tenants/new')}
           >
             Create Tenant
           </Button>

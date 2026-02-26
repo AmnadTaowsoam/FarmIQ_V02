@@ -85,15 +85,16 @@ export interface PaginatedResponse<T> {
 
 export interface CreateTenantInput {
   name: string;
-  slug: string;
-  plan: string;
-  status?: 'active' | 'suspended' | 'trial';
+  type?: 'standard' | 'enterprise' | 'trial';
+  status?: 'active' | 'inactive' | 'suspended';
+  region?: string;
 }
 
 export interface UpdateTenantInput {
   name?: string;
-  plan?: string;
-  status?: 'active' | 'suspended' | 'trial';
+  type?: 'standard' | 'enterprise' | 'trial';
+  status?: 'active' | 'inactive' | 'suspended';
+  region?: string;
 }
 
 export interface CreateUserInput {

@@ -61,7 +61,7 @@ export const AdminPageHeader: React.FC<AdminPageHeaderProps> = ({
           {showHomeBreadcrumb && (
             <Link
               component="button"
-              onClick={() => navigate('/admin/overview')}
+              onClick={() => navigate('/overview')}
               sx={{
                 display: 'flex',
                 alignItems: 'center',
@@ -178,7 +178,7 @@ function generateBreadcrumbsFromPath(pathname: string): BreadcrumbItem[] {
   }
   
   const breadcrumbs: BreadcrumbItem[] = [];
-  let currentPath = '/admin';
+  let currentPath = '';
   
   segments.forEach((segment, index) => {
     currentPath += `/${segment}`;

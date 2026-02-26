@@ -146,6 +146,108 @@ export async function getAdminTenantsHandler(req: Request, res: Response): Promi
 }
 
 /**
+ * Resolve tenantId candidate from request payload/query/header.
+ * This keeps POST endpoints compatible with older dashboard bundles
+ * that may not send tenantId in request body.
+ */
+function resolveRequestTenantId(req: Request): string | undefined {
+  const body = (req.body || {}) as Record<string, unknown>
+  const query = (req.query || {}) as Record<string, unknown>
+  const headerTenantId = req.headers['x-tenant-id']
+  const referer = req.headers.referer as string | undefined
+
+  const fromBody = (body.tenantId || body.tenant_id) as string | undefined
+  const fromQuery = (query.tenantId || query.tenant_id) as string | undefined
+  const fromHeader = Array.isArray(headerTenantId)
+    ? headerTenantId[0]
+    : (headerTenantId as string | undefined)
+  let fromReferer: string | undefined
+
+  if (referer) {
+    try {
+      const refererUrl = new URL(referer)
+      fromReferer =
+        refererUrl.searchParams.get('tenantId') ||
+        refererUrl.searchParams.get('tenant_id') ||
+        undefined
+    } catch {
+      fromReferer = undefined
+    }
+  }
+
+  return fromBody || fromQuery || fromHeader || fromReferer
+}
+
+/**
+ * GET /api/v1/admin/tenants/:id
+ */
+export async function getAdminTenantByIdHandler(req: Request, res: Response): Promise<void> {
+  const startTime = Date.now()
+  const { id } = req.params
+
+  try {
+    const result = await tenantRegistryServiceClient.getAdminTenantById({
+      id,
+      headers: buildDownstreamHeaders(req, res),
+    })
+
+    const duration = Date.now() - startTime
+    logger.info('Get admin tenant by id request completed', {
+      route: '/api/v1/admin/tenants/:id',
+      downstreamService: 'tenant-registry',
+      duration_ms: duration,
+      status_code: result.status,
+      requestId: res.locals.requestId,
+    })
+
+    handleDownstreamResponse(result, res)
+  } catch (error) {
+    logger.error('Error in getAdminTenantByIdHandler', error)
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to fetch admin tenant',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+  }
+}
+
+/**
+ * POST /api/v1/admin/tenants
+ */
+export async function createTenantHandler(req: Request, res: Response): Promise<void> {
+  const startTime = Date.now()
+
+  try {
+    const result = await tenantRegistryServiceClient.createTenant({
+      body: req.body,
+      headers: buildDownstreamHeaders(req, res),
+    })
+
+    const duration = Date.now() - startTime
+    logger.info('Create tenant request completed', {
+      route: '/api/v1/admin/tenants',
+      downstreamService: 'tenant-registry',
+      duration_ms: duration,
+      status_code: result.status,
+      requestId: res.locals.requestId,
+    })
+
+    handleDownstreamResponse(result, res)
+  } catch (error) {
+    logger.error('Error in createTenantHandler', error)
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to create tenant',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+  }
+}
+
+/**
  * GET /api/v1/admin/devices
  */
 export async function getAdminDevicesHandler(req: Request, res: Response): Promise<void> {
@@ -497,11 +599,105 @@ export async function getStationsHandler(req: Request, res: Response): Promise<v
 }
 
 /**
+ * POST /api/v1/farms
+ */
+export async function createFarmHandler(req: Request, res: Response): Promise<void> {
+  const startTime = Date.now()
+  const tenantId = getTenantIdFromRequest(res, resolveRequestTenantId(req))
+
+  if (!tenantId) {
+    res.status(400).json({
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'tenantId is required',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+    return
+  }
+
+  try {
+    const body = { ...req.body, tenantId }
+    const result = await tenantRegistryServiceClient.createFarm({
+      body,
+      headers: buildDownstreamHeaders(req, res),
+    })
+
+    const duration = Date.now() - startTime
+    logger.info('Create farm request completed', {
+      route: '/api/v1/farms',
+      downstreamService: 'tenant-registry',
+      duration_ms: duration,
+      status_code: result.status,
+      requestId: res.locals.requestId,
+    })
+
+    handleDownstreamResponse(result, res)
+  } catch (error) {
+    logger.error('Error in createFarmHandler', error)
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to create farm',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+  }
+}
+
+/**
+ * POST /api/v1/barns
+ */
+export async function createBarnHandler(req: Request, res: Response): Promise<void> {
+  const startTime = Date.now()
+  const tenantId = getTenantIdFromRequest(res, resolveRequestTenantId(req))
+
+  if (!tenantId) {
+    res.status(400).json({
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'tenantId is required',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+    return
+  }
+
+  try {
+    const body = { ...req.body, tenantId }
+    const result = await tenantRegistryServiceClient.createBarn({
+      body,
+      headers: buildDownstreamHeaders(req, res),
+    })
+
+    const duration = Date.now() - startTime
+    logger.info('Create barn request completed', {
+      route: '/api/v1/barns',
+      downstreamService: 'tenant-registry',
+      duration_ms: duration,
+      status_code: result.status,
+      requestId: res.locals.requestId,
+    })
+
+    handleDownstreamResponse(result, res)
+  } catch (error) {
+    logger.error('Error in createBarnHandler', error)
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to create barn',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+  }
+}
+
+/**
  * POST /api/v1/devices
  */
 export async function createDeviceHandler(req: Request, res: Response): Promise<void> {
   const startTime = Date.now()
-  const tenantId = getTenantIdFromRequest(res, req.body.tenantId as string)
+  const tenantId = getTenantIdFromRequest(res, resolveRequestTenantId(req))
 
   if (!tenantId) {
     res.status(400).json({

@@ -9,11 +9,20 @@ export const getBFFBaseURL = () => API_BASE_URL;
 export const isMockMode = () => import.meta.env.VITE_MOCK_MODE === 'true';
 export const apiClient = httpClient;
 
-export const unwrapApiResponse = <T>(response: AxiosResponse<ApiResponse<T> | T>): T => {
-    const payload = response.data as any;
-    if (payload && typeof payload === 'object' && 'data' in payload) {
-        return payload.data as T;
+export const unwrapApiResponse = <T>(response: AxiosResponse<ApiResponse<T> | T> | ApiResponse<T> | T): T => {
+    const hasTopLevelData =
+        response !== null &&
+        typeof response === 'object' &&
+        'data' in (response as Record<string, unknown>);
+
+    const payload = hasTopLevelData
+        ? (response as AxiosResponse<ApiResponse<T> | T>).data
+        : (response as T | ApiResponse<T>);
+
+    if (payload && typeof payload === 'object' && 'data' in (payload as Record<string, unknown>)) {
+        return (payload as ApiResponse<T>).data as T;
     }
+
     return payload as T;
 };
 

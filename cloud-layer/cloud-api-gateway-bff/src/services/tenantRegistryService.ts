@@ -10,6 +10,14 @@ export interface TenantRegistryServiceClient {
     query: Record<string, string>
     headers: Record<string, string>
   }): Promise<{ ok: boolean; status: number; data?: unknown }>
+  getAdminTenantById(params: {
+    id: string
+    headers: Record<string, string>
+  }): Promise<{ ok: boolean; status: number; data?: unknown }>
+  createTenant(params: {
+    body: unknown
+    headers: Record<string, string>
+  }): Promise<{ ok: boolean; status: number; data?: unknown }>
   getAdminDevices(params: {
     query: Record<string, string>
     headers: Record<string, string>
@@ -124,6 +132,27 @@ export const tenantRegistryServiceClient: TenantRegistryServiceClient = {
     return callDownstreamJson(url, {
       method: 'GET',
       headers: params.headers,
+    })
+  },
+
+  async getAdminTenantById(params) {
+    const { registryBaseUrl } = getServiceBaseUrls()
+    const url = `${registryBaseUrl}/api/v1/tenants/${params.id}`
+    logger.info('Calling tenant-registry: GET /api/v1/tenants/:id', { id: params.id })
+    return callDownstreamJson(url, {
+      method: 'GET',
+      headers: params.headers,
+    })
+  },
+
+  async createTenant(params) {
+    const { registryBaseUrl } = getServiceBaseUrls()
+    const url = `${registryBaseUrl}/api/v1/tenants`
+    logger.info('Calling tenant-registry: POST /api/v1/tenants')
+    return callDownstreamJson(url, {
+      method: 'POST',
+      headers: params.headers,
+      body: params.body,
     })
   },
 

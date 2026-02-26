@@ -5,15 +5,19 @@ services:
     build:
       context: ..
       dockerfile: apps/admin-web/Dockerfile
+      extra_hosts:
+        - "registry.npmjs.org:104.16.7.34"
       args:
         - APP_NAME=admin-web
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     container_name: farmiq-admin-web
     ports:
       - "5143:80"
     networks:
       - farmiq-net
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost/" ]
+      test: [ "CMD-SHELL", "wget -q -O /dev/null http://localhost/ || exit 1" ]
       interval: 30s
       timeout: 3s
       start_period: 5s

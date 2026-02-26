@@ -49,6 +49,7 @@ export const CreateFarmPage: React.FC = () => {
     setErrors({});
     try {
       await api.farms.create({
+        tenantId,
         name: result.data.name,
         location: result.data.location,
         status: result.data.status,

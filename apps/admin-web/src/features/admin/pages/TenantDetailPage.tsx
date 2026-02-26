@@ -61,7 +61,7 @@ export const TenantDetailPage: React.FC = () => {
         title={tenant.name}
         subtitle={`Tenant ID: ${tenant.id}`}
         breadcrumbs={[
-          { label: 'Tenants', path: '/admin/tenants' },
+          { label: 'Tenants', path: '/tenants' },
           { label: tenant.name },
         ]}
       />

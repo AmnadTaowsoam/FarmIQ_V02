@@ -254,7 +254,7 @@ export const finalizeSession = async (
     if (!session) throw new Error('Session not found')
     if (session.status === 'finalized') return session
 
-    const finalWeight = session.weights[0]?.weightKg || session.initialWeightKg
+    const finalWeight = session.weights[0]?.weightKg ?? session.initialWeightKg ?? 0
     const endTime = new Date()
 
     const updatedSession = await tx.weightSession.update({
@@ -274,18 +274,20 @@ export const finalizeSession = async (
     await prisma.$executeRawUnsafe(
       `
       INSERT INTO sync_outbox (
-        id, tenant_id, device_id, session_id,
+        id, tenant_id, farm_id, barn_id, device_id, session_id,
         event_type, occurred_at, trace_id, payload_json,
         status, next_attempt_at, priority, attempt_count, created_at, updated_at
       ) VALUES (
-        $1::uuid, $2::text, $3::text, $4::text,
-        'weighvision.session.finalized', $5::timestamptz, $6::text, $7::jsonb,
+        $1::uuid, $2::text, $3::text, $4::text, $5::text, $6::text,
+        'weighvision.session.finalized', $7::timestamptz, $8::text, $9::jsonb,
         'pending', NOW(), 0, 0, NOW(), NOW()
       )
       ON CONFLICT (id) DO NOTHING
       `,
       data.eventId,
       data.tenantId,
+      updatedSession.farmId,
+      updatedSession.barnId,
       updatedSession.deviceId,
       sessionId,
       new Date(data.occurredAt),
@@ -293,6 +295,8 @@ export const finalizeSession = async (
       JSON.stringify({
         session_id: sessionId,
         tenant_id: data.tenantId,
+        farm_id: updatedSession.farmId,
+        barn_id: updatedSession.barnId,
         device_id: updatedSession.deviceId,
         final_weight_kg: updatedSession.finalWeightKg,
         image_count: updatedSession.imageCount,
