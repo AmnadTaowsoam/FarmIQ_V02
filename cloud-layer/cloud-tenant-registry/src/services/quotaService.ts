@@ -3,11 +3,38 @@ import { logger } from '../utils/logger';
 
 const prisma = new PrismaClient();
 
+const DEFAULT_TENANT_QUOTA = {
+  maxDevices: 100,
+  maxFarms: 10,
+  maxBarns: 50,
+  maxUsers: 20,
+  maxStorageGb: 100,
+  maxApiCallsPerDay: 10000,
+} as const;
+
+function tenantNotFoundError(tenantId: string) {
+  const err = new Error(`Tenant with id ${tenantId} not found`) as Error & { code?: string };
+  err.code = 'TENANT_NOT_FOUND';
+  return err;
+}
+
+async function assertTenantExists(tenantId: string) {
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { id: true },
+  });
+  if (!tenant) {
+    throw tenantNotFoundError(tenantId);
+  }
+}
+
 /**
  * Get tenant quota
  */
 export async function getTenantQuota(tenantId: string) {
   try {
+    await assertTenantExists(tenantId);
+
     let quota = await prisma.tenantQuota.findUnique({
       where: { tenantId },
     });
@@ -17,12 +44,7 @@ export async function getTenantQuota(tenantId: string) {
       quota = await prisma.tenantQuota.create({
         data: {
           tenantId,
-          maxDevices: 100,
-          maxFarms: 10,
-          maxBarns: 50,
-          maxUsers: 20,
-          maxStorageGb: 100,
-          maxApiCallsPerDay: 10000,
+          ...DEFAULT_TENANT_QUOTA,
         },
       });
     }
@@ -49,6 +71,8 @@ export async function updateTenantQuota(
   }
 ) {
   try {
+    await assertTenantExists(tenantId);
+
     return await prisma.tenantQuota.upsert({
       where: { tenantId },
       create: {
@@ -124,6 +148,9 @@ export async function checkTenantQuota(
       current,
     };
   } catch (error) {
+    if ((error as any)?.code === 'TENANT_NOT_FOUND') {
+      throw error;
+    }
     logger.error('Error checking tenant quota', error);
     // On error, allow the operation (fail open)
     return { allowed: true };

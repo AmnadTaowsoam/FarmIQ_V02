@@ -108,10 +108,15 @@ apiClient.interceptors.response.use(
         }
 
         // 2. Standardize Error Shape
-        const errorResponse = {
+        const errorResponse: any = {
             message: 'An unexpected error occurred',
             code: 'UNKNOWN_ERROR',
             traceId: error.response?.headers['x-trace-id'] || uuidv4(),
+            status: error.response?.status,
+            url: error.config?.url,
+            method: error.config?.method,
+            networkCode: (error as any)?.code,
+            networkMessage: error.message,
             originalError: error
         };
 
@@ -121,7 +126,14 @@ apiClient.interceptors.response.use(
                 errorResponse.message = data.error.message || errorResponse.message;
                 errorResponse.code = data.error.code || errorResponse.code;
                 errorResponse.traceId = data.error.traceId || errorResponse.traceId;
+            } else if (typeof data.message === 'string') {
+                errorResponse.message = data.message;
+                errorResponse.code = data.code || errorResponse.code;
             }
+            errorResponse.responseData = data;
+        } else if (typeof error.response?.data === 'string' && error.response.data.trim()) {
+            errorResponse.message = error.response.data.slice(0, 300);
+            errorResponse.responseData = error.response.data;
         }
 
         return Promise.reject(errorResponse);

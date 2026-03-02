@@ -12,19 +12,19 @@ router.use(jwtAuthMiddleware)
 
 router.get(
   '/inbox',
-  requireRole('tenant_admin', 'farm_manager', 'house_operator', 'viewer'),
+  requireRole('platform_admin', 'tenant_admin', 'farm_manager', 'house_operator', 'viewer'),
   getDashboardNotificationsInboxHandler
 )
 
 router.get(
   '/history',
-  requireRole('tenant_admin', 'farm_manager', 'house_operator', 'viewer'),
+  requireRole('platform_admin', 'tenant_admin', 'farm_manager', 'house_operator', 'viewer'),
   getDashboardNotificationsHistoryHandler
 )
 
 router.post(
   '/send',
-  requireRole('tenant_admin', 'farm_manager'),
+  requireRole('platform_admin', 'tenant_admin', 'farm_manager'),
   postDashboardNotificationsSendHandler
 )
 

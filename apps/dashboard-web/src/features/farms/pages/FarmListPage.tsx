@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Box, Grid, Typography, Stack, alpha, useTheme, Button, Chip } from '@mui/material';
+import { Box, Grid, Typography, Stack, alpha, useTheme, Button } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { Warehouse, MapPin, Activity } from 'lucide-react';
 import { PageHeader } from '../../../components/PageHeader';
@@ -100,55 +100,6 @@ export const FarmListPage: React.FC = () => {
 
     const displayFarms = farms && farms.length > 0 ? farms : fallbackFarms;
 
-    const renderPreview = (previewFarms: Farm[]) => (
-        <PremiumCard sx={{ mb: 3 }}>
-            <Typography variant="h6" fontWeight={700} gutterBottom>
-                Farms Preview
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Quick preview of farms in current tenant.
-            </Typography>
-            {!previewFarms.length ? (
-                <Typography variant="body2" color="text.secondary">
-                    No farm records in this tenant yet.
-                </Typography>
-            ) : (
-                <Stack spacing={1.25}>
-                    {previewFarms.slice(0, 8).map((farm) => (
-                        <Box
-                            key={farm.farm_id || farm.id}
-                            sx={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                border: '1px solid',
-                                borderColor: 'divider',
-                                borderRadius: 2,
-                                p: 1.5,
-                            }}
-                        >
-                            <Box sx={{ minWidth: 0 }}>
-                                <Typography variant="body2" fontWeight={700} noWrap>
-                                    {farm.name || farm.farm_id || farm.id}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary" noWrap>
-                                    {farm.farm_id || farm.id}
-                                </Typography>
-                            </Box>
-                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                                {farm.location ? <Chip size="small" label={farm.location} variant="outlined" /> : null}
-                                <StatusChip
-                                    status={farm.status === 'active' ? 'success' : 'info'}
-                                    label={(farm.status || 'active').toUpperCase()}
-                                />
-                            </Box>
-                        </Box>
-                    ))}
-                </Stack>
-            )}
-        </PremiumCard>
-    );
-
     if (loading) {
         return (
             <Box>
@@ -182,7 +133,6 @@ export const FarmListPage: React.FC = () => {
                         { label: 'Create Farm', variant: 'contained', startIcon: <Warehouse size={18} />, onClick: () => navigate('/farms/new') }
                     ]}
                 />
-                {renderPreview(displayFarms)}
                 <EmptyState
                     title="No farms found"
                     description="No farms are available for this tenant context."
@@ -202,8 +152,6 @@ export const FarmListPage: React.FC = () => {
                     { label: 'Create Farm', variant: 'contained', startIcon: <Warehouse size={18} />, onClick: () => navigate('/farms/new') }
                 ]}
             />
-            {renderPreview(displayFarms)}
-            
             <Grid container spacing={3}>
                 {displayFarms.map((farm, index) => (
                     <Grid item xs={12} sm={6} md={4} key={farm.farm_id} sx={{ animation: `fadeIn 0.4s ease-out ${index * 0.1}s both` }}>

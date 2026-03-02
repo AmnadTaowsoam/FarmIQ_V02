@@ -111,6 +111,28 @@ export interface UpdateUserInput {
   status?: 'active' | 'inactive' | 'locked';
 }
 
+export interface CreateDeviceInput {
+  tenantId: string;
+  deviceType: string;
+  serialNo?: string;
+  farmId?: string;
+  barnId?: string;
+  batchId?: string;
+  status?: 'active' | 'inactive' | 'maintenance';
+  metadata?: Record<string, unknown>;
+}
+
+export interface UpdateDeviceInput {
+  tenantId: string;
+  deviceType?: string;
+  serialNo?: string;
+  farmId?: string | null;
+  barnId?: string | null;
+  batchId?: string | null;
+  status?: 'active' | 'inactive' | 'maintenance';
+  metadata?: Record<string, unknown>;
+}
+
 export interface AuditEvent {
   id: string;
   timestamp: string;

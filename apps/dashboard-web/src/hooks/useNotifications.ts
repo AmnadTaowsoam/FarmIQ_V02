@@ -8,6 +8,13 @@ import {
     NotificationFilters,
 } from '../api/notifications';
 import { useAuth } from '../contexts/AuthContext';
+import { getTenantId } from '../api/auth';
+
+const isContextSelectionPage = (): boolean => {
+    if (typeof window === 'undefined') return false;
+    const path = window.location.pathname;
+    return path === '/select-context' || path === '/select-tenant' || path === '/select-farm';
+};
 
 // Query keys
 export const notificationKeys = {
@@ -23,11 +30,13 @@ export const notificationKeys = {
  */
 export const useNotificationsInbox = (): UseQueryResult<NotificationInboxResponse, Error> => {
     const { isAuthenticated } = useAuth();
+    const hasTenantContext = Boolean(getTenantId());
+    const shouldSkipOnThisPage = isContextSelectionPage();
 
     return useQuery({
         queryKey: notificationKeys.inbox(),
         queryFn: () => fetchNotificationsInbox(),
-        enabled: isAuthenticated,
+        enabled: isAuthenticated && hasTenantContext && !shouldSkipOnThisPage,
         staleTime: 30000, // 30 seconds
         refetchInterval: 60000, // Refetch every 60 seconds
         refetchOnWindowFocus: true,
@@ -41,11 +50,13 @@ export const useNotificationsHistory = (
     filters?: NotificationFilters
 ): UseQueryResult<NotificationHistoryResponse, Error> => {
     const { isAuthenticated } = useAuth();
+    const hasTenantContext = Boolean(getTenantId());
+    const shouldSkipOnThisPage = isContextSelectionPage();
 
     return useQuery({
         queryKey: notificationKeys.history(filters),
         queryFn: () => fetchNotificationsHistory(filters),
-        enabled: isAuthenticated,
+        enabled: isAuthenticated && hasTenantContext && !shouldSkipOnThisPage,
         staleTime: 60000, // 1 minute
     });
 };
@@ -56,11 +67,13 @@ export const useNotificationsHistory = (
  */
 export const useUnreadCount = (): UseQueryResult<number, Error> => {
     const { isAuthenticated } = useAuth();
+    const hasTenantContext = Boolean(getTenantId());
+    const shouldSkipOnThisPage = isContextSelectionPage();
 
     return useQuery({
         queryKey: notificationKeys.unreadCount(),
         queryFn: () => fetchUnreadCount(),
-        enabled: isAuthenticated,
+        enabled: isAuthenticated && hasTenantContext && !shouldSkipOnThisPage,
         staleTime: 30000, // 30 seconds
         refetchInterval: 45000, // Refetch every 45 seconds
         refetchOnWindowFocus: true,

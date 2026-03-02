@@ -6,7 +6,7 @@ import {
   updateDeviceHandler,
   deleteDeviceHandler,
 } from '../controllers/deviceController'
-import { validateDevice } from '../middlewares/validationMiddleware'
+import { validateDevice, validateDeviceUpdate } from '../middlewares/validationMiddleware'
 import { jwtAuthMiddleware } from '../middlewares/authMiddleware'
 
 const router = express.Router()
@@ -152,7 +152,7 @@ router.post('/', validateDevice, createDeviceHandler)
  *       200:
  *         description: Device updated
  */
-router.patch('/:id', validateDevice, updateDeviceHandler)
+router.patch('/:id', validateDeviceUpdate, updateDeviceHandler)
 
 /**
  * @swagger

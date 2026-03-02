@@ -749,3 +749,52 @@ export async function createDeviceHandler(req: Request, res: Response): Promise<
     })
   }
 }
+
+/**
+ * PATCH /api/v1/devices/:id
+ */
+export async function updateDeviceHandler(req: Request, res: Response): Promise<void> {
+  const startTime = Date.now()
+  const tenantId = getTenantIdFromRequest(res, resolveRequestTenantId(req))
+  const id = req.params.id
+
+  if (!tenantId) {
+    res.status(400).json({
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'tenantId is required',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+    return
+  }
+
+  try {
+    const body = { ...req.body, tenantId }
+    const result = await tenantRegistryServiceClient.updateDevice({
+      id,
+      body,
+      headers: buildDownstreamHeaders(req, res),
+    })
+
+    const duration = Date.now() - startTime
+    logger.info('Update device request completed', {
+      route: '/api/v1/devices/:id',
+      downstreamService: 'tenant-registry',
+      duration_ms: duration,
+      status_code: result.status,
+      requestId: res.locals.requestId,
+    })
+
+    handleDownstreamResponse(result, res)
+  } catch (error) {
+    logger.error('Error in updateDeviceHandler', error)
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to update device',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+  }
+}

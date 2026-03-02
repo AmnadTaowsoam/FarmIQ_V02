@@ -39,6 +39,14 @@ export const login = async (req: Request, res: Response) => {
             });
         }
 
+        // Track successful login timestamp using existing updated_at column.
+        // This is used by admin user listing as "last login" without requiring a schema migration.
+        try {
+            await prisma.$executeRaw`UPDATE users SET updated_at = NOW() WHERE id = ${user.id}`;
+        } catch {
+            // Non-blocking: authentication should still succeed even if tracking fails.
+        }
+
         const payload = {
             sub: user.id,
             roles: user.roles.map((r) => r.name),

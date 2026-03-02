@@ -128,8 +128,8 @@ services:
       - NODE_ENV=production
       - APP_PORT=3000
       - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_identity_access
-      - JWT_SECRET=super-secret-jwt-key-change-in-production
-      - REFRESH_TOKEN_SECRET=super-secret-refresh-key-change-in-production
+      - JWT_SECRET=${JWT_SECRET:-super-secret-jwt-key-change-in-production}
+      - REFRESH_TOKEN_SECRET=${REFRESH_TOKEN_SECRET:-super-secret-refresh-key-change-in-production}
       - DD_ENV=${DD_ENV:-prod}
       - DD_SERVICE=cloud-identity-access
       - DD_VERSION=${DD_VERSION:-local}
@@ -783,7 +783,7 @@ services:
       - NODE_ENV=production
       - APP_PORT=3000
       - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/cloud_api_gateway_bff
-      - JWT_SECRET=${JWT_SECRET}
+      - JWT_SECRET=${JWT_SECRET:-super-secret-jwt-key-change-in-production}
       - IDENTITY_BASE_URL=http://cloud-identity-access:3000
       - REGISTRY_BASE_URL=http://cloud-tenant-registry:3000
       - TELEMETRY_BASE_URL=http://cloud-telemetry-service:3000

@@ -14,6 +14,11 @@ const formatDisplayName = (email: string): string => {
     .join(' ')
 }
 
+const deriveLastLogin = (createdAt: Date, updatedAt: Date): Date | null => {
+  // Freshly created users have createdAt ~= updatedAt and should still display "Never".
+  return updatedAt.getTime() - createdAt.getTime() > 1000 ? updatedAt : null
+}
+
 /**
  * Generate a secure random password for new users
  * Password will be 16 characters, base64url encoded
@@ -91,7 +96,7 @@ export async function getAdminUsers(req: Request, res: Response) {
       status: 'active',
       tenantId: user.tenantId,
       tenantName: user.tenantId || '—',
-      lastLogin: null,
+      lastLogin: deriveLastLogin(user.createdAt, user.updatedAt),
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     }))
@@ -142,7 +147,7 @@ export async function getAdminUserById(req: Request, res: Response) {
       status: 'active',
       tenantId: user.tenantId,
       tenantName: user.tenantId || '—',
-      lastLogin: null,
+      lastLogin: deriveLastLogin(user.createdAt, user.updatedAt),
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     })

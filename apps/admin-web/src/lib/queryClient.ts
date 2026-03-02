@@ -40,7 +40,16 @@ export const queryClient = new QueryClient({
   mutationCache: new MutationCache({
     onError: (error: any, variables, context) => {
       // Global error handler for mutations
-      console.error('Mutation error:', error, variables);
+      const details = {
+        code: error?.code,
+        message: error?.message,
+        traceId: error?.traceId,
+        status: error?.status,
+        url: error?.url,
+        method: error?.method,
+        responseData: error?.responseData,
+      };
+      console.error('Mutation error:', details, variables);
     },
   }),
 });

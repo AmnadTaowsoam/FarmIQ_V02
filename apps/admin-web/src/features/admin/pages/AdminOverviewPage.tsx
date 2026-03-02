@@ -10,6 +10,7 @@ import { FadeIn } from '../../../components/motion/FadeIn';
 import { Stagger } from '../../../components/motion/Stagger';
 import { LoadingScreen } from '../../../components/feedback/LoadingScreen';
 import { formatDistanceToNow } from 'date-fns';
+import { useAuth } from '../../../contexts/AuthContext';
 
 // Admin Metric Card
 const AdminMetricCard: React.FC<{
@@ -69,7 +70,23 @@ const AdminMetricCard: React.FC<{
 
 export const AdminOverviewPage: React.FC = () => {
   const theme = useTheme();
-  const { data: stats, isLoading, error } = useOverviewStats();
+  const { user } = useAuth();
+  const isPlatformAdmin = user?.roles?.includes('platform_admin') ?? false;
+  const { data: stats, isLoading, error } = useOverviewStats({ enabled: isPlatformAdmin });
+
+  if (!isPlatformAdmin) {
+    return (
+      <Box p={4}>
+        <AdminPageHeader title="Admin Overview" subtitle="System-wide metrics and health monitoring" />
+        <PremiumCard variant="outlined" sx={{ borderColor: 'warning.main', bgcolor: alpha(theme.palette.warning.main, 0.08) }}>
+          <Box p={3} display="flex" alignItems="center" gap={2}>
+            <AlertTriangle color={theme.palette.warning.main} />
+            <Typography color="warning.dark" fontWeight={600}>Overview statistics require platform_admin role.</Typography>
+          </Box>
+        </PremiumCard>
+      </Box>
+    );
+  }
 
   if (isLoading) {
     return <LoadingScreen message="Loading system metrics..." />;

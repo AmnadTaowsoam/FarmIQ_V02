@@ -37,8 +37,14 @@ export default defineConfig({
     port: 5143,
     host: true,
     proxy: {
+      '/api/v1/identity/rbac': {
+        target: 'http://127.0.0.1:5120',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/api\/v1\/identity/, '/api/v1'),
+      },
       '/api': {
-        target: 'http://localhost:5125',
+        target: 'http://127.0.0.1:5125',
         changeOrigin: true,
         secure: false,
       },

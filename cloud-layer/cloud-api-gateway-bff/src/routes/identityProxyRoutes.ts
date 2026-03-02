@@ -8,9 +8,9 @@ const IDENTITY_SERVICE_URL = process.env.IDENTITY_SERVICE_URL || 'http://cloud-i
 const identityProxy = createProxyMiddleware({
     target: IDENTITY_SERVICE_URL,
     changeOrigin: true,
-    pathRewrite: {
-        '^/api/v1/identity': '/api/v1', // Maps /api/v1/identity/rbac -> /api/v1/rbac
-    },
+    // This router is mounted at /api/v1/identity, so proxied paths arrive as "/<rest>".
+    // Prefix with /api/v1 to match identity-service route mounts.
+    pathRewrite: (path) => `/api/v1${path}`,
 });
 
 router.use(jwtAuthMiddleware);

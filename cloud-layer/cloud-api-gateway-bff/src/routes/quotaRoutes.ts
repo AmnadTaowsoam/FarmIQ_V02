@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createProxyMiddleware } from 'http-proxy-middleware';
+import { createProxyMiddleware, fixRequestBody } from 'http-proxy-middleware';
 import { jwtAuthMiddleware } from '../middlewares/authMiddleware';
 
 const router = Router();
@@ -8,8 +8,35 @@ const TENANT_REGISTRY_URL = process.env.REGISTRY_BASE_URL || 'http://cloud-tenan
 const quotaProxy = createProxyMiddleware({
     target: TENANT_REGISTRY_URL,
     changeOrigin: true,
-    // pathRewrite: not needed if we want to forward /api/v1/tenants/:id/quota as is to backend /api/v1/tenants/:id/quota
-    // assuming we mount this at /api/v1
+    on: {
+        proxyReq: fixRequestBody,
+    },
+    pathRewrite: (path, req) => {
+        const tenantId = (req as any).params?.tenantId as string | undefined;
+        if (!tenantId) {
+            return `/api/v1${path}`;
+        }
+        // `path` can be "/" (base quota) or "/check".
+        const suffix = path === '/' ? '' : path;
+        return `/api/v1/tenants/${tenantId}/quota${suffix}`;
+    },
+});
+
+const rateLimitsProxy = createProxyMiddleware({
+    target: TENANT_REGISTRY_URL,
+    changeOrigin: true,
+    on: {
+        proxyReq: fixRequestBody,
+    },
+    pathRewrite: (path, req) => {
+        const tenantId = (req as any).params?.tenantId as string | undefined;
+        if (!tenantId) {
+            return `/api/v1${path}`;
+        }
+        // `path` is "/" for get/post/delete rate-limits endpoints.
+        const suffix = path === '/' ? '' : path;
+        return `/api/v1/tenants/${tenantId}/rate-limits${suffix}`;
+    },
 });
 
 router.use(jwtAuthMiddleware);
@@ -17,6 +44,6 @@ router.use(jwtAuthMiddleware);
 // Proxy specific quota paths
 // We match /tenants/:id/quota and /tenants/:id/rate-limits
 router.use('/tenants/:tenantId/quota', quotaProxy);
-router.use('/tenants/:tenantId/rate-limits', quotaProxy);
+router.use('/tenants/:tenantId/rate-limits', rateLimitsProxy);
 
 export default router;

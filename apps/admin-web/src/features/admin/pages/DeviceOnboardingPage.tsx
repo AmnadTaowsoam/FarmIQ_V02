@@ -1,25 +1,107 @@
 import React from 'react';
-import { Box, Card, CardContent, Typography, Grid, Stack, Button, TextField } from '@mui/material';
-import { AdminPageHeader } from '../../../components/admin/AdminPageHeader';
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Grid,
+  MenuItem,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
 import { QrCode, Hash, Smartphone } from 'lucide-react';
+import { AdminPageHeader } from '../../../components/admin/AdminPageHeader';
+import { apiClient } from '../../../api/client';
 
 export const DeviceOnboardingPage: React.FC = () => {
+  const [tenantId, setTenantId] = React.useState('');
+  const [deviceType, setDeviceType] = React.useState('weighvision');
   const [claimCode, setClaimCode] = React.useState('');
+  const [submitting, setSubmitting] = React.useState(false);
+  const [submitError, setSubmitError] = React.useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = React.useState<string | null>(null);
 
-  const handleClaimDevice = () => {
-    console.log('Claiming device with code:', claimCode);
-    // TODO: Implement device claiming logic
+  const handleClaimDevice = async () => {
+    const normalizedTenantId = tenantId.trim();
+    const normalizedClaimCode = claimCode.trim();
+
+    if (!normalizedTenantId) {
+      setSubmitError('Tenant ID is required.');
+      return;
+    }
+
+    if (normalizedClaimCode.length < 4) {
+      setSubmitError('Claim code must be at least 4 characters.');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setSubmitError(null);
+      setSubmitSuccess(null);
+
+      const response = await apiClient.post('/api/v1/devices', {
+        tenantId: normalizedTenantId,
+        deviceType,
+        serialNo: normalizedClaimCode,
+        status: 'active',
+        metadata: {
+          onboardingMethod: 'claim-code',
+          claimCode: normalizedClaimCode,
+        },
+      });
+
+      setSubmitSuccess(`Device claimed successfully (ID: ${response.data?.id || 'created'}).`);
+      setClaimCode('');
+    } catch (error: any) {
+      setSubmitError(error?.message || 'Failed to claim device');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <Box>
-      <AdminPageHeader
-        title="Device Onboarding"
-        subtitle="Enroll new devices into the FarmIQ platform"
-      />
+      <AdminPageHeader title="Device Onboarding" subtitle="Enroll new devices into the FarmIQ platform" />
 
       <Grid container spacing={3}>
-        {/* QR Code Method */}
+        <Grid item xs={12}>
+          <Card variant="outlined">
+            <CardContent>
+              <Stack spacing={2}>
+                {submitError && <Alert severity="error">{submitError}</Alert>}
+                {submitSuccess && <Alert severity="success">{submitSuccess}</Alert>}
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      required
+                      label="Tenant ID"
+                      placeholder="t-001"
+                      value={tenantId}
+                      onChange={(e) => setTenantId(e.target.value)}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      select
+                      label="Device Type"
+                      value={deviceType}
+                      onChange={(e) => setDeviceType(e.target.value)}
+                    >
+                      <MenuItem value="weighvision">weighvision</MenuItem>
+                      <MenuItem value="sensor-gateway">sensor-gateway</MenuItem>
+                    </TextField>
+                  </Grid>
+                </Grid>
+              </Stack>
+            </CardContent>
+          </Card>
+        </Grid>
+
         <Grid item xs={12} md={6}>
           <Card>
             <CardContent>
@@ -77,7 +159,6 @@ export const DeviceOnboardingPage: React.FC = () => {
           </Card>
         </Grid>
 
-        {/* Claim Code Method */}
         <Grid item xs={12} md={6}>
           <Card>
             <CardContent>
@@ -109,26 +190,25 @@ export const DeviceOnboardingPage: React.FC = () => {
 
                 <TextField
                   fullWidth
-                  label="Claim Code"
-                  placeholder="Enter 12-digit claim code"
+                  label="Claim Code / Serial No"
+                  placeholder="Enter claim code"
                   value={claimCode}
                   onChange={(e) => setClaimCode(e.target.value)}
-                  helperText="Format: XXXX-XXXX-XXXX"
+                  helperText="This value will be saved as serialNo"
                 />
 
                 <Stack spacing={2}>
                   <Typography variant="body2" color="text.secondary">
-                    Device claim codes are provided with each device shipment. Enter the code to
-                    register the device to your tenant.
+                    Enter tenant ID and claim code, then press Claim Device to register a new device.
                   </Typography>
 
                   <Button
                     variant="contained"
                     fullWidth
                     onClick={handleClaimDevice}
-                    disabled={claimCode.length < 12}
+                    disabled={submitting || !tenantId.trim() || claimCode.trim().length < 4}
                   >
-                    Claim Device
+                    {submitting ? 'Claiming...' : 'Claim Device'}
                   </Button>
                 </Stack>
               </Stack>
@@ -136,7 +216,6 @@ export const DeviceOnboardingPage: React.FC = () => {
           </Card>
         </Grid>
 
-        {/* Instructions */}
         <Grid item xs={12}>
           <Card variant="outlined">
             <CardContent>
@@ -148,13 +227,13 @@ export const DeviceOnboardingPage: React.FC = () => {
                   Ensure the device is powered on and connected to the network
                 </Typography>
                 <Typography component="li" variant="body2">
-                  Use either QR code scanning or claim code entry method
+                  Fill in Tenant ID and device type
                 </Typography>
                 <Typography component="li" variant="body2">
-                  Assign the device to a farm and barn after enrollment
+                  Enter claim code and click Claim Device
                 </Typography>
                 <Typography component="li" variant="body2">
-                  Configure device settings and verify connectivity
+                  Verify device appears on the Devices page
                 </Typography>
               </Stack>
             </CardContent>

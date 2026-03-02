@@ -15,6 +15,8 @@ import type {
   UpdateTenantInput,
   CreateUserInput,
   UpdateUserInput,
+  CreateDeviceInput,
+  UpdateDeviceInput,
   AuditEvent,
   BillingSummary,
 } from './types';
@@ -32,13 +34,14 @@ export interface Role {
 /**
  * Hook to fetch overview statistics for the admin dashboard
  */
-export const useOverviewStats = () => {
+export const useOverviewStats = (options?: { enabled?: boolean }) => {
   return useQuery({
     queryKey: ['admin', 'overview'],
     queryFn: async () => {
       const response = await apiClient.get('/api/v1/admin/overview');
       return response.data as OverviewStats;
     },
+    enabled: options?.enabled ?? true,
     staleTime: 30000, // 30 seconds
     refetchInterval: 60000, // Refresh every minute
   });
@@ -135,13 +138,17 @@ export const useDeleteTenant = () => {
 /**
  * Hook to fetch paginated list of users
  */
-export const useUsersQuery = (params?: { tenantId?: string; page?: number; pageSize?: number; search?: string }) => {
+export const useUsersQuery = (
+  params?: { tenantId?: string; page?: number; pageSize?: number; search?: string },
+  options?: { enabled?: boolean }
+) => {
   return useQuery({
     queryKey: ['admin', 'users', params],
     queryFn: async () => {
       const response = await apiClient.get('/api/v1/admin/users', { params });
       return response.data as PaginatedResponse<User>;
     },
+    enabled: options?.enabled ?? true,
     staleTime: 60000, // 1 minute
   });
 };
@@ -218,11 +225,22 @@ export const useDeleteUser = () => {
 /**
  * Hook to fetch paginated list of devices
  */
-export const useDevicesQuery = (params?: { tenantId?: string; status?: string; page?: number; pageSize?: number }) => {
+export const useDevicesQuery = (
+  params?: {
+    tenantId?: string;
+    farmId?: string;
+    barnId?: string;
+    status?: string;
+    type?: string;
+    search?: string;
+    page?: number;
+    pageSize?: number;
+  }
+) => {
   return useQuery({
     queryKey: ['admin', 'devices', params],
     queryFn: async () => {
-      const response = await apiClient.get('/api/v1/devices', { params });
+      const response = await apiClient.get('/api/v1/admin/devices', { params });
       return response.data as PaginatedResponse<Device>;
     },
     staleTime: 60000, // 1 minute
@@ -236,7 +254,7 @@ export const useDeviceById = (deviceId: string) => {
   return useQuery({
     queryKey: ['admin', 'devices', deviceId],
     queryFn: async () => {
-      const response = await apiClient.get(`/api/v1/devices/${deviceId}`);
+      const response = await apiClient.get(`/api/v1/admin/devices/${deviceId}`);
       return response.data as Device;
     },
     enabled: !!deviceId,
@@ -246,6 +264,39 @@ export const useDeviceById = (deviceId: string) => {
 
 // Alias for backward compatibility
 export const useDevice = useDeviceById;
+
+/**
+ * Hook to create a new device
+ */
+export const useCreateDevice = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: CreateDeviceInput) => {
+      const response = await apiClient.post('/api/v1/devices', data);
+      return response.data as Device;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'devices'] });
+    },
+  });
+};
+
+/**
+ * Hook to update an existing device
+ */
+export const useUpdateDevice = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ deviceId, data }: { deviceId: string; data: UpdateDeviceInput }) => {
+      const response = await apiClient.patch(`/api/v1/devices/${deviceId}`, data);
+      return response.data as Device;
+    },
+    onSuccess: (_, { deviceId }) => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'devices'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'devices', deviceId] });
+    },
+  });
+};
 
 // ========== System Health ==========
 
@@ -320,13 +371,14 @@ export const useBillingSummary = () => {
 /**
  * Hook to fetch admin roles
  */
-export const useAdminRoles = () => {
+export const useAdminRoles = (options?: { enabled?: boolean }) => {
   return useQuery({
     queryKey: ['admin', 'roles'],
     queryFn: async () => {
       const response = await apiClient.get('/api/v1/admin/roles');
       return response.data as PaginatedResponse<Role>;
     },
+    enabled: options?.enabled ?? true,
     staleTime: 300000, // 5 minutes - roles don't change often
   });
 };

@@ -19,8 +19,17 @@ export async function getTenantQuotaRoute(req: Request, res: Response) {
     const quota = await getTenantQuota(tenantId);
 
     return res.status(200).json(quota);
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error getting tenant quota', error);
+    if (error?.code === 'TENANT_NOT_FOUND') {
+      return res.status(404).json({
+        error: {
+          code: 'NOT_FOUND',
+          message: error.message,
+          traceId: req.headers['x-trace-id'] || 'trace-id',
+        },
+      });
+    }
     return res.status(500).json({
       error: {
         code: 'INTERNAL_ERROR',
@@ -49,8 +58,17 @@ export async function updateTenantQuotaRoute(req: Request, res: Response) {
     });
 
     return res.status(200).json(quota);
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error updating tenant quota', error);
+    if (error?.code === 'TENANT_NOT_FOUND') {
+      return res.status(404).json({
+        error: {
+          code: 'NOT_FOUND',
+          message: error.message,
+          traceId: req.headers['x-trace-id'] || 'trace-id',
+        },
+      });
+    }
     return res.status(500).json({
       error: {
         code: 'INTERNAL_ERROR',
@@ -86,8 +104,17 @@ export async function checkTenantQuotaRoute(req: Request, res: Response) {
     );
 
     return res.status(200).json(result);
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error checking tenant quota', error);
+    if (error?.code === 'TENANT_NOT_FOUND') {
+      return res.status(404).json({
+        error: {
+          code: 'NOT_FOUND',
+          message: error.message,
+          traceId: req.headers['x-trace-id'] || 'trace-id',
+        },
+      });
+    }
     return res.status(500).json({
       error: {
         code: 'INTERNAL_ERROR',

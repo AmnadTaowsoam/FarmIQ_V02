@@ -14,6 +14,7 @@ import {
   getBatchesHandler,
   getDevicesHandler,
   createDeviceHandler,
+  updateDeviceHandler,
   getStationsHandler,
 } from '../controllers/tenantRegistryController'
 
@@ -46,6 +47,7 @@ router.get('/batches', getBatchesHandler)
 // Devices
 router.get('/devices', getDevicesHandler)
 router.post('/devices', createDeviceHandler)
+router.patch('/devices/:id', updateDeviceHandler)
 
 // Stations
 router.get('/stations', getStationsHandler)

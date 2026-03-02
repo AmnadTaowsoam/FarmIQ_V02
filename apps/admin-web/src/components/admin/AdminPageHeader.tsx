@@ -12,6 +12,7 @@ interface AdminPageHeaderProps {
   title: string;
   subtitle?: string;
   breadcrumbs?: BreadcrumbItem[];
+  action?: React.ReactNode;
   actions?: React.ReactNode;
   showHomeBreadcrumb?: boolean;
 }
@@ -40,6 +41,7 @@ export const AdminPageHeader: React.FC<AdminPageHeaderProps> = ({
   title,
   subtitle,
   breadcrumbs,
+  action,
   actions,
   showHomeBreadcrumb = true,
 }) => {
@@ -147,9 +149,9 @@ export const AdminPageHeader: React.FC<AdminPageHeaderProps> = ({
           </Typography>
         </Box>
         
-        {actions && (
+        {(actions || action) && (
           <Box sx={{ flexShrink: 0 }}>
-            {actions}
+            {actions || action}
           </Box>
         )}
       </Stack>

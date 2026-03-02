@@ -32,12 +32,26 @@ export const batchSchema = z.object({
 export const deviceSchema = z.object({
   deviceType: z.string().min(1),
   serialNo: z.string().optional(),
-  farmId: z.string().uuid().optional(),
-  barnId: z.string().uuid().optional(),
-  batchId: z.string().uuid().optional(),
+  farmId: z.string().min(1).optional(),
+  barnId: z.string().min(1).optional(),
+  batchId: z.string().min(1).optional(),
   status: z.enum(['active', 'inactive', 'maintenance']).optional(),
   metadata: z.record(z.unknown()).optional(),
 })
+
+export const deviceUpdateSchema = z
+  .object({
+    deviceType: z.string().min(1).optional(),
+    serialNo: z.string().optional(),
+    farmId: z.string().min(1).nullable().optional(),
+    barnId: z.string().min(1).nullable().optional(),
+    batchId: z.string().min(1).nullable().optional(),
+    status: z.enum(['active', 'inactive', 'maintenance']).optional(),
+    metadata: z.record(z.unknown()).optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, {
+    message: 'At least one field is required for device update',
+  })
 
 export const stationSchema = z.object({
   name: z.string().min(1),
@@ -122,6 +136,7 @@ export const validateFarm = validateBody(farmSchema)
 export const validateBarn = validateBody(barnSchema)
 export const validateBatch = validateBody(batchSchema)
 export const validateDevice = validateBody(deviceSchema)
+export const validateDeviceUpdate = validateBody(deviceUpdateSchema)
 export const validateStation = validateBody(stationSchema)
 export const validateSensor = validateBody(sensorSchema)
 export const validateSensorUpdate = validateBody(sensorUpdateSchema)

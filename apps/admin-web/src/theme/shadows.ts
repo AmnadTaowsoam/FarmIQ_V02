@@ -8,7 +8,7 @@ export const customShadows = [
     '0px 16px 48px rgba(0, 0, 0, 0.15)', // 3: Elevated Card
     '0px 4px 16px rgba(76, 175, 80, 0.4)', // 4: Primary Button Hover
     '0px 8px 24px rgba(33, 150, 243, 0.3)', // 5: Secondary Button Hover
-    ...Array(18).fill('none') // Placeholder for now
+    ...Array(19).fill('none') // Fill indexes 6..24 to satisfy MUI shadow scale
 ] as Shadows;
 
 export const shape = {

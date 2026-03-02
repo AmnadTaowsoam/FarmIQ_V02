@@ -1,11 +1,11 @@
 import React from 'react';
 import { Box, Typography, Button, useTheme } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
 import { ShieldX } from 'lucide-react';
+import { useAuth } from '../../../contexts/AuthContext';
 
 export const ForbiddenPage: React.FC = () => {
   const theme = useTheme();
-  const navigate = useNavigate();
+  const { logout } = useAuth();
 
   return (
     <Box
@@ -27,8 +27,8 @@ export const ForbiddenPage: React.FC = () => {
       <Typography variant="body1" color="text.secondary" textAlign="center" maxWidth={360}>
         You do not have permission to access this resource.
       </Typography>
-      <Button variant="contained" onClick={() => navigate('/overview')}>
-        Back to Overview
+      <Button variant="contained" color="primary" onClick={() => void logout()}>
+        Sign Out & Login
       </Button>
     </Box>
   );

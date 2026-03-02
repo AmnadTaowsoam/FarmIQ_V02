@@ -4,6 +4,7 @@ import { getAllTenants, createTenant } from '../../services/tenantService'
 // Mock Prisma
 jest.mock('@prisma/client', () => {
   const mockPrismaClient = {
+    $transaction: jest.fn(),
     tenant: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
@@ -11,11 +12,18 @@ jest.mock('@prisma/client', () => {
       update: jest.fn(),
       delete: jest.fn(),
     },
+    tenantQuota: {
+      create: jest.fn(),
+    },
   }
   return {
     PrismaClient: jest.fn(() => mockPrismaClient),
   }
 })
+
+jest.mock('../../utils/uuid', () => ({
+  newUuidV7: jest.fn(() => 't-new-001'),
+}))
 
 describe('TenantService', () => {
   let prisma: PrismaClient
@@ -44,17 +52,38 @@ describe('TenantService', () => {
 
   describe('createTenant', () => {
     it('should create a tenant', async () => {
-      const mockTenant = { id: '1', name: 'New Tenant', status: 'active' }
+      const mockTenant = { id: 't-new-001', name: 'New Tenant', status: 'active' }
       const input = { name: 'New Tenant' }
       ;(prisma.tenant.create as jest.Mock).mockResolvedValue(mockTenant)
+      ;(prisma.tenantQuota.create as jest.Mock).mockResolvedValue({
+        tenantId: 't-new-001',
+      })
+      ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback: any) =>
+        callback(prisma)
+      )
 
       const result = await createTenant(input)
 
       expect(result).toEqual(mockTenant)
+      expect(prisma.$transaction).toHaveBeenCalled()
       expect(prisma.tenant.create).toHaveBeenCalledWith({
         data: {
+          id: 't-new-001',
           name: 'New Tenant',
           status: 'active',
+          type: 'standard',
+          region: 'TH',
+        },
+      })
+      expect(prisma.tenantQuota.create).toHaveBeenCalledWith({
+        data: {
+          tenantId: 't-new-001',
+          maxDevices: 100,
+          maxFarms: 10,
+          maxBarns: 50,
+          maxUsers: 20,
+          maxStorageGb: 100,
+          maxApiCallsPerDay: 10000,
         },
       })
     })

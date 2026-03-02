@@ -31,6 +31,7 @@ interface TenantQuota {
 }
 
 export const TenantQuotasPage: React.FC = () => {
+  const [tenantInput, setTenantInput] = useState('');
   const [selectedTenantId, setSelectedTenantId] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formValues, setFormValues] = useState({
@@ -63,6 +64,11 @@ export const TenantQuotasPage: React.FC = () => {
       setDialogOpen(false);
     },
   });
+
+  const handleCheckTenant = () => {
+    const tenantId = tenantInput.trim();
+    setSelectedTenantId(tenantId);
+  };
 
   const openEditDialog = () => {
     if (quota) {
@@ -108,13 +114,28 @@ export const TenantQuotasPage: React.FC = () => {
       />
 
       <Stack spacing={3} sx={{ mt: 3 }}>
-        <TextField
-          label="Select Tenant"
-          value={selectedTenantId}
-          onChange={(e) => setSelectedTenantId(e.target.value)}
-          fullWidth
-          required
-        />
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+          <TextField
+            label="Select Tenant"
+            value={tenantInput}
+            onChange={(e) => setTenantInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleCheckTenant();
+              }
+            }}
+            fullWidth
+            required
+          />
+          <Button
+            variant="contained"
+            onClick={handleCheckTenant}
+            disabled={!tenantInput.trim()}
+            sx={{ minWidth: 110 }}
+          >
+            Check
+          </Button>
+        </Stack>
 
         {quota && (
           <Card>

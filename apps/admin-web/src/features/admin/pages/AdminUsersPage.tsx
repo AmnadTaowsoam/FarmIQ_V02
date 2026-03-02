@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, MenuItem, Stack, IconButton, Tooltip } from '@mui/material';
+import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, MenuItem, Stack, IconButton, Tooltip } from '@mui/material';
 import { GridColDef } from '@mui/x-data-grid';
 import { Eye, Plus, Pencil, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -8,9 +8,12 @@ import { AdminDataTable, FilterOption } from '../../../components/admin/AdminDat
 import { StatusPill } from '../../../components/admin/StatusPill';
 import { useAdminRoles, useCreateUser, useDeleteUser, useUpdateUser, useUsersQuery } from '../../../api/admin/adminQueries';
 import { formatDistanceToNow } from 'date-fns';
+import { useAuth } from '../../../contexts/AuthContext';
 
 export const AdminUsersPage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isPlatformAdmin = user?.roles?.includes('platform_admin') ?? false;
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [search, setSearch] = useState('');
@@ -29,13 +32,16 @@ export const AdminUsersPage: React.FC = () => {
     return acc;
   }, {} as Record<string, string>);
 
-  const { data, isLoading, refetch } = useUsersQuery({
-    page,
-    pageSize,
-    search,
-    ...filterParams,
-  });
-  const rolesQuery = useAdminRoles();
+  const { data, isLoading, refetch } = useUsersQuery(
+    {
+      page,
+      pageSize,
+      search,
+      ...filterParams,
+    },
+    { enabled: isPlatformAdmin }
+  );
+  const rolesQuery = useAdminRoles({ enabled: isPlatformAdmin });
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
   const deleteUser = useDeleteUser();
@@ -147,17 +153,28 @@ export const AdminUsersPage: React.FC = () => {
         title="User Management"
         subtitle="Manage users, roles, and permissions"
         actions={
-          <Button variant="contained" startIcon={<Plus size={18} />} onClick={openCreateDialog}>
+          <Button
+            variant="contained"
+            startIcon={<Plus size={18} />}
+            onClick={openCreateDialog}
+            disabled={!isPlatformAdmin}
+          >
             Create User
           </Button>
         }
       />
 
+      {!isPlatformAdmin && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          User management actions require `platform_admin` role.
+        </Alert>
+      )}
+
       <AdminDataTable
         columns={columns}
-        rows={data?.data || []}
+        rows={isPlatformAdmin ? data?.data || [] : []}
         loading={isLoading}
-        totalRows={data?.total}
+        totalRows={isPlatformAdmin ? data?.total : 0}
         pageSize={pageSize}
         searchPlaceholder="Search users..."
         filters={filters}

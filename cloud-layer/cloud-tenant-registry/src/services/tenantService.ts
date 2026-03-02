@@ -139,14 +139,31 @@ export async function createTenant(data: {
 }) {
   try {
     logger.info('Creating tenant:', data)
-    return await prisma.tenant.create({
-      data: {
-        id: newUuidV7(),
-        name: data.name,
-        status: data.status || 'active',
-        type: data.type || 'standard',
-        region: data.region || 'TH',
-      },
+    const tenantId = newUuidV7()
+    return await prisma.$transaction(async (tx) => {
+      const tenant = await tx.tenant.create({
+        data: {
+          id: tenantId,
+          name: data.name,
+          status: data.status || 'active',
+          type: data.type || 'standard',
+          region: data.region || 'TH',
+        },
+      })
+
+      await tx.tenantQuota.create({
+        data: {
+          tenantId,
+          maxDevices: 100,
+          maxFarms: 10,
+          maxBarns: 50,
+          maxUsers: 20,
+          maxStorageGb: 100,
+          maxApiCallsPerDay: 10000,
+        },
+      })
+
+      return tenant
     })
   } catch (error) {
     logger.error('Error creating tenant:', error)

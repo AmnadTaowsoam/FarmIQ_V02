@@ -9,6 +9,7 @@ import {
   DialogContent,
   DialogTitle,
   TextField,
+  MenuItem,
   Stack,
   Typography,
   Chip,
@@ -20,6 +21,7 @@ import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { AdminPageHeader } from '../../../components/admin/AdminPageHeader';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../api/client';
+import { useAuth } from '../../../contexts/AuthContext';
 
 interface CustomRole {
   id: string;
@@ -27,10 +29,17 @@ interface CustomRole {
   description?: string;
   tenantId: string;
   baseRoleId?: string;
-  permissions: Array<{ permission: { name: string; category: string } }>;
+  permissions: Array<{ permission: { id: string; name: string; category: string } }>;
+}
+
+interface AdminRole {
+  id: string;
+  name: string;
 }
 
 export const CustomRolesPage: React.FC = () => {
+  const { user } = useAuth();
+  const isPlatformAdmin = user?.roles?.includes('platform_admin') ?? false;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedTenantId, setSelectedTenantId] = useState('');
   const [editingRole, setEditingRole] = useState<CustomRole | null>(null);
@@ -47,16 +56,25 @@ export const CustomRolesPage: React.FC = () => {
   const { data: permissions } = useQuery({
     queryKey: ['rbac', 'permissions'],
     queryFn: async () => {
-      const response = await apiClient.get('/api/v1/rbac/permissions');
+      const response = await apiClient.get('/api/v1/identity/rbac/permissions');
       return response.data;
     },
+  });
+
+  const { data: adminRoles } = useQuery({
+    queryKey: ['admin', 'roles'],
+    queryFn: async () => {
+      const response = await apiClient.get('/api/v1/admin/roles');
+      return response.data;
+    },
+    enabled: isPlatformAdmin,
   });
 
   const { data: customRoles, isLoading } = useQuery({
     queryKey: ['rbac', 'custom-roles', selectedTenantId],
     queryFn: async () => {
       if (!selectedTenantId) return { data: [] };
-      const response = await apiClient.get(`/api/v1/rbac/tenants/${selectedTenantId}/custom-roles`);
+      const response = await apiClient.get(`/api/v1/identity/rbac/tenants/${selectedTenantId}/custom-roles`);
       return response.data;
     },
     enabled: !!selectedTenantId,
@@ -64,7 +82,7 @@ export const CustomRolesPage: React.FC = () => {
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await apiClient.post('/api/v1/rbac/custom-roles', data);
+      const response = await apiClient.post('/api/v1/identity/rbac/custom-roles', data);
       return response.data;
     },
     onSuccess: () => {
@@ -75,7 +93,7 @@ export const CustomRolesPage: React.FC = () => {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      await apiClient.delete(`/api/v1/rbac/custom-roles/${id}`);
+      await apiClient.delete(`/api/v1/identity/rbac/custom-roles/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rbac', 'custom-roles'] });
@@ -95,7 +113,14 @@ export const CustomRolesPage: React.FC = () => {
   };
 
   const handleSubmit = () => {
-    createMutation.mutate(formValues);
+    createMutation.mutate({
+      ...formValues,
+      name: formValues.name.trim(),
+      description: formValues.description.trim(),
+      tenantId: formValues.tenantId.trim(),
+      baseRoleId: formValues.baseRoleId?.trim() ? formValues.baseRoleId.trim() : null,
+      permissionIds: Array.isArray(formValues.permissionIds) ? formValues.permissionIds : [],
+    });
   };
 
   const togglePermission = (permissionId: string) => {
@@ -107,9 +132,12 @@ export const CustomRolesPage: React.FC = () => {
     });
   };
 
-  const roles = customRoles?.data || [];
-  const permissionList = permissions?.data || [];
-  const groupedPermissions = permissions?.data || {};
+  const roles: CustomRole[] = Array.isArray(customRoles?.data) ? customRoles.data : [];
+  const groupedPermissions: Record<string, any[]> =
+    permissions?.grouped && typeof permissions.grouped === 'object'
+      ? permissions.grouped
+      : {};
+  const baseRoles: AdminRole[] = Array.isArray(adminRoles?.data) ? adminRoles.data : [];
 
   return (
     <Box>
@@ -150,10 +178,10 @@ export const CustomRolesPage: React.FC = () => {
                     </Typography>
                   )}
                   <Stack direction="row" spacing={1} sx={{ mt: 2 }} flexWrap="wrap">
-                    {role.permissions.map((rp) => (
+                    {(Array.isArray(role.permissions) ? role.permissions : []).map((rp, idx) => (
                       <Chip
-                        key={rp.permission.id}
-                        label={rp.permission.name}
+                        key={rp?.permission?.id || `${role.id}-perm-${idx}`}
+                        label={rp?.permission?.name || 'Unknown permission'}
                         size="small"
                         color="primary"
                         variant="outlined"
@@ -205,6 +233,26 @@ export const CustomRolesPage: React.FC = () => {
               fullWidth
               required
             />
+            <TextField
+              select
+              label="Base Role (Optional)"
+              value={formValues.baseRoleId}
+              onChange={(e) => setFormValues({ ...formValues, baseRoleId: e.target.value })}
+              fullWidth
+              disabled={!isPlatformAdmin}
+              helperText={
+                isPlatformAdmin
+                  ? 'Choose a system role as the base template for this custom role'
+                  : 'Base role selection requires platform_admin role'
+              }
+            >
+              <MenuItem value="">None</MenuItem>
+              {baseRoles.map((role) => (
+                <MenuItem key={role.id} value={role.id}>
+                  {role.name}
+                </MenuItem>
+              ))}
+            </TextField>
             <Typography variant="subtitle2" sx={{ mt: 2 }}>
               Permissions
             </Typography>
@@ -214,9 +262,9 @@ export const CustomRolesPage: React.FC = () => {
                   {category.toUpperCase()}
                 </Typography>
                 <FormGroup>
-                  {perms.map((perm: any) => (
+                  {(Array.isArray(perms) ? perms : []).map((perm: any) => (
                     <FormControlLabel
-                      key={perm.name}
+                      key={perm.id || perm.name}
                       control={
                         <Checkbox
                           checked={formValues.permissionIds.includes(perm.id)}
