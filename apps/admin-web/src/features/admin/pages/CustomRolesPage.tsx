@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Alert,
   Box,
   Button,
   Card,
@@ -42,6 +43,7 @@ export const CustomRolesPage: React.FC = () => {
   const isPlatformAdmin = user?.roles?.includes('platform_admin') ?? false;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedTenantId, setSelectedTenantId] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
   const [editingRole, setEditingRole] = useState<CustomRole | null>(null);
   const [formValues, setFormValues] = useState({
     name: '',
@@ -87,7 +89,11 @@ export const CustomRolesPage: React.FC = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rbac', 'custom-roles'] });
+      setFormError(null);
       setDialogOpen(false);
+    },
+    onError: (error: any) => {
+      setFormError(error?.message || 'Failed to create custom role');
     },
   });
 
@@ -102,6 +108,7 @@ export const CustomRolesPage: React.FC = () => {
 
   const openCreateDialog = () => {
     setEditingRole(null);
+    setFormError(null);
     setFormValues({
       name: '',
       description: '',
@@ -113,12 +120,30 @@ export const CustomRolesPage: React.FC = () => {
   };
 
   const handleSubmit = () => {
+    setFormError(null);
+    const trimmedName = formValues.name.trim();
+    const trimmedTenantId = formValues.tenantId.trim();
+    const trimmedBaseRole = formValues.baseRoleId?.trim() || '';
+    const hasBaseRole = trimmedBaseRole.length > 0;
+    const matchedBaseRole = hasBaseRole
+      ? baseRoles.find((role) => role.id === trimmedBaseRole || role.name === trimmedBaseRole)
+      : undefined;
+
+    if (!trimmedName || !trimmedTenantId) {
+      setFormError('Name and Tenant ID are required');
+      return;
+    }
+    if (hasBaseRole && !matchedBaseRole) {
+      setFormError('Invalid Base Role. Please select from dropdown again.');
+      return;
+    }
+
     createMutation.mutate({
       ...formValues,
-      name: formValues.name.trim(),
+      name: trimmedName,
       description: formValues.description.trim(),
-      tenantId: formValues.tenantId.trim(),
-      baseRoleId: formValues.baseRoleId?.trim() ? formValues.baseRoleId.trim() : null,
+      tenantId: trimmedTenantId,
+      baseRoleId: matchedBaseRole?.id || null,
       permissionIds: Array.isArray(formValues.permissionIds) ? formValues.permissionIds : [],
     });
   };
@@ -211,6 +236,7 @@ export const CustomRolesPage: React.FC = () => {
         <DialogTitle>Create Custom Role</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
+            {formError && <Alert severity="error">{formError}</Alert>}
             <TextField
               label="Name"
               value={formValues.name}

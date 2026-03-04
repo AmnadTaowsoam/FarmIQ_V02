@@ -19,6 +19,16 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+def _env_optional_int(name: str) -> Optional[int]:
+    value = os.getenv(name)
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
+
 def _env_float(name: str, default: float) -> float:
     value = os.getenv(name)
     if value is None or value == "":
@@ -106,9 +116,22 @@ class BufferConfig:
 
 
 @dataclass
+class HealthConfig:
+    enabled: bool
+    interval_seconds: int
+    firmware_version: str
+    ip: str
+    signal_strength: Optional[int]
+    camera_ok: bool
+    scale_ok: bool
+    disk_ok: bool
+
+
+@dataclass
 class ServiceConfig:
     device: DeviceConfig
     mqtt: MqttConfig
+    health: HealthConfig
     media_store: MediaStoreConfig
     session_base_url: str
     capture: CaptureConfig
@@ -169,6 +192,17 @@ def get_config() -> ServiceConfig:
         client_key=_env("MQTT_CLIENT_KEY", ""),
     )
 
+    health = HealthConfig(
+        enabled=_env_bool("HEALTH_STATUS_ENABLED", True),
+        interval_seconds=max(1, _env_int("HEALTH_STATUS_INTERVAL_SECONDS", 30)),
+        firmware_version=_env("DEVICE_FIRMWARE_VERSION", "unknown"),
+        ip=_env("DEVICE_IP", ""),
+        signal_strength=_env_optional_int("DEVICE_SIGNAL_STRENGTH"),
+        camera_ok=_env_bool("DEVICE_HEALTH_CAMERA_OK", True),
+        scale_ok=_env_bool("DEVICE_HEALTH_SCALE_OK", True),
+        disk_ok=_env_bool("DEVICE_HEALTH_DISK_OK", True),
+    )
+
     media_store = MediaStoreConfig(
         base_url=_env("EDGE_MEDIA_STORE_BASE_URL", "http://localhost:5106"),
         presign_endpoint=_env("PRESIGN_ENDPOINT", "/api/v1/media/images/presign"),
@@ -194,6 +228,7 @@ def get_config() -> ServiceConfig:
     return ServiceConfig(
         device=device,
         mqtt=mqtt,
+        health=health,
         media_store=media_store,
         session_base_url=_env("EDGE_SESSION_BASE_URL", "http://localhost:5105"),
         capture=capture,

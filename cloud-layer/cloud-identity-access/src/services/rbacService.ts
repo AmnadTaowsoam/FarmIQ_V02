@@ -94,6 +94,15 @@ export async function createCustomRole(
       throw new Error('Custom role with this name already exists for tenant');
     }
 
+    if (baseRoleId) {
+      const baseRole = await prisma.role.findUnique({
+        where: { id: baseRoleId },
+      });
+      if (!baseRole) {
+        throw new Error('Base role not found');
+      }
+    }
+
     const customRole = await prisma.customRole.create({
       data: {
         tenantId,

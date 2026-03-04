@@ -20,15 +20,17 @@ type AdminDevice = {
   ipAddress: string
 }
 
-function mapStatusToAdmin(status: string): string {
-  switch (status) {
-    case 'active':
-      return 'online'
-    case 'inactive':
-      return 'offline'
-    default:
-      return 'error'
-  }
+const ONLINE_LAST_HELLO_THRESHOLD_MS = 30 * 60 * 1000
+
+function mapStatusToAdmin(status: string, lastHello: Date | null): string {
+  // Admin connectivity status is derived from heartbeat freshness.
+  if (status !== 'active') return 'offline'
+  if (!lastHello) return 'offline'
+
+  const lastHelloMs = lastHello.getTime()
+  if (Number.isNaN(lastHelloMs)) return 'offline'
+
+  return Date.now() - lastHelloMs <= ONLINE_LAST_HELLO_THRESHOLD_MS ? 'online' : 'offline'
 }
 
 function mapStatusToDb(status?: string): string | undefined {
@@ -54,6 +56,7 @@ function mapAdminDevice(device: {
   deviceType: string
   serialNo: string | null
   status: string
+  lastHello: Date | null
   metadata: Prisma.JsonValue | null
   updatedAt: Date
   tenant?: { name: string } | null
@@ -64,7 +67,10 @@ function mapAdminDevice(device: {
   const name = getMetadataValue(metadata, 'name')
     || device.serialNo
     || `${device.deviceType}-${device.id.slice(0, 8)}`
-  const lastSeen = getMetadataValue(metadata, 'lastSeen') || device.updatedAt.toISOString()
+  const lastSeen =
+    device.lastHello?.toISOString()
+    || getMetadataValue(metadata, 'lastSeen')
+    || device.updatedAt.toISOString()
   const firmwareVersion = getMetadataValue(metadata, 'firmwareVersion') || 'unknown'
   const ipAddress = getMetadataValue(metadata, 'ipAddress') || 'unknown'
 
@@ -72,7 +78,7 @@ function mapAdminDevice(device: {
     id: device.id,
     name,
     type: getMetadataValue(metadata, 'type') || device.deviceType,
-    status: mapStatusToAdmin(device.status),
+    status: mapStatusToAdmin(device.status, device.lastHello),
     tenantId: device.tenantId,
     tenantName: device.tenant?.name || null,
     farmId: device.farmId,

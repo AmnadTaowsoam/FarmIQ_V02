@@ -11,6 +11,22 @@ const identityProxy = createProxyMiddleware({
     // This router is mounted at /api/v1/identity, so proxied paths arrive as "/<rest>".
     // Prefix with /api/v1 to match identity-service route mounts.
     pathRewrite: (path) => `/api/v1${path}`,
+    on: {
+        proxyReq: (proxyReq, req) => {
+            // express.json() has already consumed the incoming stream.
+            // Re-write JSON body for proxied mutating requests.
+            const method = (req.method || 'GET').toUpperCase();
+            if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) return;
+
+            const body = (req as any).body;
+            if (!body || typeof body !== 'object' || Object.keys(body).length === 0) return;
+
+            const bodyData = JSON.stringify(body);
+            proxyReq.setHeader('Content-Type', 'application/json');
+            proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+            proxyReq.write(bodyData);
+        },
+    },
 });
 
 router.use(jwtAuthMiddleware);

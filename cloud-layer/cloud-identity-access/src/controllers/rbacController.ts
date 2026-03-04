@@ -145,6 +145,15 @@ export async function createCustomRoleRoute(req: Request, res: Response) {
         },
       });
     }
+    if (error.message?.includes('Base role not found')) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: error.message,
+          traceId: req.headers['x-trace-id'] || 'trace-id',
+        },
+      });
+    }
     return res.status(500).json({
       error: {
         code: 'INTERNAL_ERROR',
