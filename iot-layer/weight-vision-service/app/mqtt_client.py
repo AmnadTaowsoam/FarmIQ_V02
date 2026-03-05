@@ -106,6 +106,8 @@ class EventBuffer:
 
 
 class MQTTClient:
+    _CONNECT_RETRY_SECONDS = 5.0
+
     def __init__(
         self,
         mqtt_config: MqttConfig,
@@ -122,6 +124,9 @@ class MQTTClient:
         self.active_host: Optional[str] = None
         self.active_port: Optional[int] = None
         self._last_status_sent_at: float = 0.0
+        self._last_connect_attempt_at: float = 0.0
+        self._next_host_index: int = 0
+        self._loop_started: bool = False
         self._status_topic = (
             f"iot/status/{self.device.tenant_id}/"
             f"{self.device.farm_id}/"
@@ -160,20 +165,38 @@ class MQTTClient:
     def connect(self) -> None:
         if not self.client:
             return
+        self._attempt_reconnect_if_due(force=True)
+
+    def _attempt_reconnect_if_due(self, force: bool = False) -> bool:
+        if not self.client:
+            return False
+        now = time.time()
+        if not force and now - self._last_connect_attempt_at < self._CONNECT_RETRY_SECONDS:
+            return False
+
+        self._last_connect_attempt_at = now
         last_error: Optional[Exception] = None
-        for entry in self.config.hosts or [self.config.host]:
+        hosts = self.config.hosts or [self.config.host]
+        total_hosts = len(hosts)
+        for offset in range(total_hosts):
+            host_index = (self._next_host_index + offset) % total_hosts
+            entry = hosts[host_index]
             host, port = _parse_host_entry(entry, self.config.port)
             try:
                 self.client.connect(host, port, keepalive=60)
                 self.active_host = host
                 self.active_port = port
-                self.client.loop_start()
-                return
+                self._next_host_index = (host_index + 1) % total_hosts
+                if not self._loop_started:
+                    self.client.loop_start()
+                    self._loop_started = True
+                return True
             except Exception as exc:
                 last_error = exc
                 logger.warning("MQTT connect failed: %s:%s (%s)", host, port, exc)
         if last_error:
             logger.error("MQTT connect failed for all hosts: %s", last_error)
+        return False
 
     def _on_connect(self, client: mqtt.Client, userdata: object, flags: dict, reason_code: int, properties: object) -> None:
         self.connected = True
@@ -198,6 +221,8 @@ class MQTTClient:
 
     def publish_or_buffer(self, topic: str, event: EventEnvelope, qos: int = 1, retain: bool = False) -> None:
         payload = event.to_bytes()
+        if not self.connected:
+            self._attempt_reconnect_if_due()
         if self.connected:
             try:
                 self._publish_now(topic, payload, qos, retain)
@@ -253,6 +278,7 @@ class MQTTClient:
         if not self.status_config.enabled:
             return False
         if not self.connected:
+            self._attempt_reconnect_if_due()
             return False
         now = time.time()
         if not force and now - self._last_status_sent_at < max(self.status_config.interval_seconds, 1.0):
