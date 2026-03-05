@@ -1,8 +1,10 @@
 import hashlib
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
+
+APP_TIMEZONE = timezone(timedelta(hours=7))
 
 
 def ensure_dir(path: str) -> None:
@@ -11,11 +13,18 @@ def ensure_dir(path: str) -> None:
 
 def normalize_ts(ts: Optional[str]) -> str:
     if not ts:
-        return datetime.now(timezone.utc).isoformat()
-    ts = ts.strip()
-    if ts.endswith("Z") or "+" in ts or ts.endswith("z"):
-        return ts.replace("z", "Z")
-    return f"{ts}Z"
+        return datetime.now(APP_TIMEZONE).isoformat()
+    raw = ts.strip()
+    candidate = raw[:-1] + "+00:00" if raw.lower().endswith("z") else raw
+    try:
+        parsed = datetime.fromisoformat(candidate)
+    except ValueError:
+        if "+" in raw or raw.endswith("Z") or raw.endswith("z"):
+            return raw.replace("z", "Z")
+        return f"{raw}+07:00"
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=APP_TIMEZONE)
+    return parsed.astimezone(APP_TIMEZONE).isoformat()
 
 
 def sha256_file(path: str) -> str:
@@ -39,4 +48,4 @@ def guess_content_type(path: str) -> str:
 
 
 def now_utc_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(APP_TIMEZONE).isoformat()

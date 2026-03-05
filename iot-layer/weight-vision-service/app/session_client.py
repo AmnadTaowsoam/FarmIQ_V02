@@ -1,7 +1,7 @@
 import logging
 import time
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import requests
 
@@ -73,13 +73,17 @@ class FinalizeSessionRequest:
     tenant_id: str
     event_id: str
     occurred_at: str
+    payload: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> dict:
-        return {
+        data = {
             "tenantId": self.tenant_id,
             "eventId": self.event_id,
             "occurredAt": self.occurred_at,
         }
+        if self.payload is not None:
+            data["payload"] = self.payload
+        return data
 
 
 class SessionClient:

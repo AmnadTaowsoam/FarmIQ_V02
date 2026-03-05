@@ -1,16 +1,18 @@
 import json
 import logging
 import random
+import socket
 import time
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional
 
 import paho.mqtt.client as mqtt
 
-from .config import MqttConfig, BufferConfig
-from .events import EventEnvelope
-from .utils import ensure_dir
+from .config import MqttConfig, BufferConfig, DeviceConfig, StatusConfig
+from .events import EventEnvelope, new_event
+from .utils import ensure_dir, now_utc_iso
 
 logger = logging.getLogger(__name__)
 
@@ -104,13 +106,28 @@ class EventBuffer:
 
 
 class MQTTClient:
-    def __init__(self, mqtt_config: MqttConfig, buffer_config: BufferConfig):
+    def __init__(
+        self,
+        mqtt_config: MqttConfig,
+        buffer_config: BufferConfig,
+        device_config: DeviceConfig,
+        status_config: StatusConfig,
+    ):
         self.config = mqtt_config
         self.buffer = EventBuffer(buffer_config)
+        self.device = device_config
+        self.status_config = status_config
         self.client: Optional[mqtt.Client] = None
         self.connected = False
         self.active_host: Optional[str] = None
         self.active_port: Optional[int] = None
+        self._last_status_sent_at: float = 0.0
+        self._status_topic = (
+            f"iot/status/{self.device.tenant_id}/"
+            f"{self.device.farm_id}/"
+            f"{self.device.barn_id}/"
+            f"{self.device.device_id}"
+        )
         self._setup_client()
 
     def _setup_client(self) -> None:
@@ -132,6 +149,13 @@ class MQTTClient:
 
         self.client.on_connect = self._on_connect
         self.client.on_disconnect = self._on_disconnect
+        if self.status_config.enabled:
+            self.client.will_set(
+                self._status_topic,
+                payload=self._build_status_event(online=False).to_bytes(),
+                qos=self.config.qos,
+                retain=True,
+            )
 
     def connect(self) -> None:
         if not self.client:
@@ -156,11 +180,19 @@ class MQTTClient:
         host = self.active_host or self.config.host
         port = self.active_port or self.config.port
         logger.info("MQTT connected: %s:%s", host, port)
+        self.publish_status(force=True, online=True)
         replayed = self.buffer.replay(self._publish_now)
         if replayed:
             logger.info("Replayed %d buffered events", replayed)
 
-    def _on_disconnect(self, client: mqtt.Client, userdata: object, reason_code: int, properties: object) -> None:
+    def _on_disconnect(
+        self,
+        client: mqtt.Client,
+        userdata: object,
+        disconnect_flags: object,
+        reason_code: int,
+        properties: object,
+    ) -> None:
         self.connected = False
         logger.warning("MQTT disconnected: %s", reason_code)
 
@@ -180,6 +212,60 @@ class MQTTClient:
         info = self.client.publish(topic, payload=payload, qos=qos, retain=retain)
         if info.rc != mqtt.MQTT_ERR_SUCCESS:
             raise RuntimeError(f"MQTT publish error rc={info.rc}")
+
+    def _resolve_local_ip(self) -> str:
+        try:
+            hostname = socket.gethostname()
+            ip = socket.gethostbyname(hostname)
+            if ip and ip != "127.0.0.1":
+                return ip
+        except Exception:
+            pass
+        return ""
+
+    def _build_status_event(self, online: bool) -> EventEnvelope:
+        now_iso = now_utc_iso()
+        payload = {
+            "status": "online" if online else "offline",
+            "last_seen_at": now_iso,
+            "firmware_version": self.status_config.firmware_version,
+            "health": {
+                "camera_ok": self.status_config.camera_ok,
+                "scale_ok": self.status_config.scale_ok,
+                "disk_ok": self.status_config.disk_ok,
+            },
+        }
+        ip = self._resolve_local_ip()
+        if ip:
+            payload["ip"] = ip
+        if self.status_config.signal_strength is not None:
+            payload["signal_strength"] = self.status_config.signal_strength
+        return new_event(
+            tenant_id=self.device.tenant_id,
+            device_id=self.device.device_id,
+            event_type="device.status",
+            payload=payload,
+            trace_id=f"trace-health-{uuid.uuid4()}",
+            ts=now_iso,
+        )
+
+    def publish_status(self, force: bool = False, online: bool = True) -> bool:
+        if not self.status_config.enabled:
+            return False
+        if not self.connected:
+            return False
+        now = time.time()
+        if not force and now - self._last_status_sent_at < max(self.status_config.interval_seconds, 1.0):
+            return False
+        event = self._build_status_event(online=online)
+        self._publish_now(
+            self._status_topic,
+            event.to_bytes(),
+            qos=self.config.qos,
+            retain=True,
+        )
+        self._last_status_sent_at = now
+        return True
 
 
 def _parse_host_entry(entry: str, default_port: int) -> tuple[str, int]:

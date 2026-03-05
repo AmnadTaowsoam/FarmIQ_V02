@@ -19,7 +19,7 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
-def _env_optional_int(name: str) -> Optional[int]:
+def _env_opt_int(name: str) -> Optional[int]:
     value = os.getenv(name)
     if value is None or value == "":
         return None
@@ -116,11 +116,10 @@ class BufferConfig:
 
 
 @dataclass
-class HealthConfig:
+class StatusConfig:
     enabled: bool
-    interval_seconds: int
+    interval_seconds: float
     firmware_version: str
-    ip: str
     signal_strength: Optional[int]
     camera_ok: bool
     scale_ok: bool
@@ -131,13 +130,14 @@ class HealthConfig:
 class ServiceConfig:
     device: DeviceConfig
     mqtt: MqttConfig
-    health: HealthConfig
+    status: StatusConfig
     media_store: MediaStoreConfig
     session_base_url: str
     capture: CaptureConfig
     buffer: BufferConfig
     state_dir: str
     dry_run: bool
+    metadata_file_once: str
 
 
 def get_config() -> ServiceConfig:
@@ -192,17 +192,6 @@ def get_config() -> ServiceConfig:
         client_key=_env("MQTT_CLIENT_KEY", ""),
     )
 
-    health = HealthConfig(
-        enabled=_env_bool("HEALTH_STATUS_ENABLED", True),
-        interval_seconds=max(1, _env_int("HEALTH_STATUS_INTERVAL_SECONDS", 30)),
-        firmware_version=_env("DEVICE_FIRMWARE_VERSION", "unknown"),
-        ip=_env("DEVICE_IP", ""),
-        signal_strength=_env_optional_int("DEVICE_SIGNAL_STRENGTH"),
-        camera_ok=_env_bool("DEVICE_HEALTH_CAMERA_OK", True),
-        scale_ok=_env_bool("DEVICE_HEALTH_SCALE_OK", True),
-        disk_ok=_env_bool("DEVICE_HEALTH_DISK_OK", True),
-    )
-
     media_store = MediaStoreConfig(
         base_url=_env("EDGE_MEDIA_STORE_BASE_URL", "http://localhost:5106"),
         presign_endpoint=_env("PRESIGN_ENDPOINT", "/api/v1/media/images/presign"),
@@ -222,17 +211,27 @@ def get_config() -> ServiceConfig:
         replay_throttle=_env_float("REPLAY_THROTTLE", 20.0),
         replay_backoff_ms=_env_int("REPLAY_BACKOFF_MS", 200),
     )
+    status = StatusConfig(
+        enabled=_env_bool("STATUS_PUBLISH_ENABLED", True),
+        interval_seconds=_env_float("STATUS_PUBLISH_INTERVAL_SECONDS", 30.0),
+        firmware_version=_env("FIRMWARE_VERSION", "unknown"),
+        signal_strength=_env_opt_int("STATUS_SIGNAL_STRENGTH"),
+        camera_ok=_env_bool("STATUS_CAMERA_OK", True),
+        scale_ok=_env_bool("STATUS_SCALE_OK", True),
+        disk_ok=_env_bool("STATUS_DISK_OK", True),
+    )
 
     state_dir = _env("STATE_DIR", "./state")
 
     return ServiceConfig(
         device=device,
         mqtt=mqtt,
-        health=health,
+        status=status,
         media_store=media_store,
         session_base_url=_env("EDGE_SESSION_BASE_URL", "http://localhost:5105"),
         capture=capture,
         buffer=buffer,
         state_dir=state_dir,
         dry_run=_env_bool("DRY_RUN", False),
+        metadata_file_once=_env("METADATA_FILE_ONCE", "").strip(),
     )

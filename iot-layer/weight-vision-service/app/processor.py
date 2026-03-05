@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import uuid
+from copy import deepcopy
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -54,8 +55,21 @@ class CaptureProcessor:
         with open(path, "r", encoding="utf-8") as f:
             metadata = json.load(f)
 
-        image_id = metadata.get("image_id") or path.stem
-        session_id = metadata.get("session_id") or image_id
+        raw_image_id = str(metadata.get("image_id") or path.stem)
+        image_id = raw_image_id.strip() or path.stem
+        raw_session_id = str(metadata.get("session_id") or image_id)
+        session_id = raw_session_id.strip() or image_id
+        if raw_image_id != image_id or raw_session_id != session_id:
+            logger.warning(
+                "Normalized metadata id values for %s (image_id: %r -> %r, session_id: %r -> %r)",
+                path.name,
+                raw_image_id,
+                image_id,
+                raw_session_id,
+                session_id,
+            )
+            metadata["image_id"] = image_id
+            metadata["session_id"] = session_id
         trace_id = str(uuid.uuid4())
         captured_at = normalize_ts(metadata.get("timestamp"))
 
@@ -76,7 +90,9 @@ class CaptureProcessor:
         if not uploaded_media:
             raise RuntimeError("No media uploaded")
 
-        events = self._build_events(metadata, session_id, trace_id, captured_at, uploaded_media)
+        events = self._build_events(
+            metadata, image_id, session_id, trace_id, captured_at, uploaded_media
+        )
         for topic, event in events:
             if self.config.dry_run:
                 logger.info("DRY_RUN publish %s: %s", topic, event.event_type)
@@ -141,6 +157,7 @@ class CaptureProcessor:
     def _build_events(
         self,
         metadata: Dict,
+        image_id: str,
         session_id: str,
         trace_id: str,
         captured_at: str,
@@ -163,7 +180,7 @@ class CaptureProcessor:
         events = []
 
         created_payload = {
-            "capture_id": metadata.get("image_id"),
+            "capture_id": image_id,
             "batchId": metadata.get("batch_id"),
             "captured_at": captured_at,
         }
@@ -232,7 +249,7 @@ class CaptureProcessor:
                     logger.warning("Bind weight failed for %s", session_id)
 
         for image_path, media_id in uploaded_media:
-            role = image_path.stem.replace(f"{metadata.get('image_id', '')}_", "")
+            role = image_path.stem.replace(f"{image_id}_", "")
             payload = {
                 "mediaObjectId": media_id,
                 "image_role": role,
@@ -260,11 +277,33 @@ class CaptureProcessor:
                 if not ok:
                     logger.warning("Bind media failed for %s", session_id)
 
-        finalized_payload = {
-            "image_count": len(uploaded_media),
-            "capture_id": metadata.get("image_id"),
-            "finalized_at": now_utc_iso(),
+        inference_payload = {
+            "capture_id": image_id,
+            "session_id": session_id,
+            "media_ids": [media_id for _, media_id in uploaded_media],
+            # Send full capture metadata JSON to edge-layer.
+            "metadata": metadata,
         }
+        inference_event = new_event(
+            tenant_id=self.config.device.tenant_id,
+            device_id=self.config.device.device_id,
+            event_type="weighvision.inference.completed",
+            payload=inference_payload,
+            trace_id=trace_id,
+            ts=captured_at,
+        )
+        events.append((f"{topic_base}weighvision.inference.completed", inference_event))
+
+        # Include full metadata in finalized payload so edge outbox can persist
+        # the same measurement context from metadata JSON.
+        finalized_payload = deepcopy(metadata)
+        finalized_payload.update(
+            {
+                "image_count": len(uploaded_media),
+                "capture_id": image_id,
+                "finalized_at": now_utc_iso(),
+            }
+        )
         finalized_event = new_event(
             tenant_id=self.config.device.tenant_id,
             device_id=self.config.device.device_id,
@@ -290,6 +329,7 @@ class CaptureProcessor:
                 tenant_id=self.config.device.tenant_id,
                 event_id=finalized_event.event_id,
                 occurred_at=captured_at,
+                payload=finalized_payload,
             )
             ok = self.session_client.finalize_session(session_id, finalize_req, trace_id)
             if not ok:
