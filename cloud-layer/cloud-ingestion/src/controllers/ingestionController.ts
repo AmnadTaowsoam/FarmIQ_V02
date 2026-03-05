@@ -28,6 +28,12 @@ interface IngestionBatch {
     events: IngestionEvent[];
 }
 
+interface HeartbeatCandidate {
+    tenantId: string;
+    deviceId: string;
+    observedAt: string;
+}
+
 export const ingestBatch = async (req: Request, res: Response) => {
     const traceId = (req.headers['x-trace-id'] as string) || uuidv4();
     const requestId = (req as any).requestId || uuidv4();
@@ -59,6 +65,7 @@ export const ingestBatch = async (req: Request, res: Response) => {
     let duplicated = 0;
     let rejected = 0;
     const errors: any[] = [];
+    const heartbeatByDevice = new Map<string, HeartbeatCandidate>();
 
     for (const event of batch.events) {
         try {
@@ -88,11 +95,42 @@ export const ingestBatch = async (req: Request, res: Response) => {
             });
 
             accepted++;
+
+            if (event.device_id) {
+                const candidate = normalizeHeartbeatCandidate(event);
+                if (candidate) {
+                    const key = `${candidate.tenantId}:${candidate.deviceId}`;
+                    const existing = heartbeatByDevice.get(key);
+                    if (!existing || new Date(existing.observedAt).getTime() < new Date(candidate.observedAt).getTime()) {
+                        heartbeatByDevice.set(key, candidate);
+                    }
+                }
+            }
         } catch (error: any) {
             logger.error(`Error processing event ${event.event_id}`, error);
             rejected++;
             errors.push({ event_id: event.event_id, error: error.message });
         }
+    }
+
+    if (heartbeatByDevice.size > 0) {
+        const candidates = Array.from(heartbeatByDevice.values());
+        await Promise.all(
+            candidates.map(async (candidate) => {
+                try {
+                    await sendHeartbeatToTenantRegistry(candidate);
+                } catch (error: unknown) {
+                    logger.warn('Failed to update tenant-registry heartbeat', {
+                        tenantId: candidate.tenantId,
+                        deviceId: candidate.deviceId,
+                        observedAt: candidate.observedAt,
+                        error: error instanceof Error ? error.message : String(error),
+                        requestId,
+                        traceId,
+                    });
+                }
+            })
+        );
     }
 
     logger.info(`Batch processed: accepted=${accepted}, duplicated=${duplicated}, rejected=${rejected}`, {
@@ -188,5 +226,57 @@ async function checkAndMarkDedupe(tenantId: string, eventId: string): Promise<bo
             return true;
         }
         throw error;
+    }
+}
+
+function normalizeHeartbeatCandidate(event: IngestionEvent): HeartbeatCandidate | null {
+    if (!event.device_id) return null;
+
+    const observedAt = new Date(event.occurred_at);
+    if (Number.isNaN(observedAt.getTime())) return null;
+
+    return {
+        tenantId: event.tenant_id,
+        deviceId: event.device_id,
+        observedAt: observedAt.toISOString(),
+    };
+}
+
+async function sendHeartbeatToTenantRegistry(candidate: HeartbeatCandidate): Promise<void> {
+    const baseUrl = process.env.TENANT_REGISTRY_BASE_URL;
+    if (!baseUrl) {
+        return;
+    }
+
+    const timeoutMs = Number.parseInt(process.env.TENANT_REGISTRY_HEARTBEAT_TIMEOUT_MS || '3000', 10);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), Number.isNaN(timeoutMs) ? 3000 : timeoutMs);
+
+    try {
+        const response = await fetch(
+            `${baseUrl.replace(/\/+$/, '')}/api/internal/device-heartbeat`,
+            {
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json',
+                    ...(process.env.INTERNAL_SERVICE_TOKEN
+                        ? { 'x-internal-token': process.env.INTERNAL_SERVICE_TOKEN }
+                        : {}),
+                },
+                body: JSON.stringify({
+                    tenantId: candidate.tenantId,
+                    deviceId: candidate.deviceId,
+                    observedAt: candidate.observedAt,
+                }),
+                signal: controller.signal,
+            }
+        );
+
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`tenant-registry responded ${response.status}: ${text || response.statusText}`);
+        }
+    } finally {
+        clearTimeout(timer);
     }
 }

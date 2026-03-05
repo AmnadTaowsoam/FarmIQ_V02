@@ -164,6 +164,7 @@ describe('processIngressMessage', () => {
 
   it('updates last_seen on status topic', async () => {
     const upsertLastSeen = jest.fn().mockResolvedValue(undefined)
+    const writeStatusEvent = jest.fn().mockResolvedValue(undefined)
     const topic: ParsedTopic = {
       kind: 'status',
       tenantId: 't-1',
@@ -192,6 +193,7 @@ describe('processIngressMessage', () => {
         deviceAllowlist: allowlistedDevice,
         stationAllowlist: allowlistedStation,
         lastSeen: { upsertLastSeen },
+        statusOutbox: { writeStatusEvent },
         downstream: { telemetryBaseUrl: 'http://telemetry', weighvisionBaseUrl: 'http://w', timeoutMs: 50 },
         dedupeTtlMs: 60_000,
       },
@@ -199,6 +201,10 @@ describe('processIngressMessage', () => {
 
     expect(decision.action).toBe('processed')
     expect(upsertLastSeen).toHaveBeenCalled()
+    expect(writeStatusEvent).toHaveBeenCalled()
+    if (decision.action === 'processed') {
+      expect(decision.routedTo).toBe('device_last_seen+sync_outbox')
+    }
   })
 
   it('drops event topic when event_type mismatches topic', async () => {

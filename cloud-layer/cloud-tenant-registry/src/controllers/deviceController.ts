@@ -7,6 +7,7 @@ import {
   createDevice,
   updateDevice,
   deleteDevice,
+  updateDeviceHeartbeat,
 } from '../services/deviceService'
 import { logger } from '../utils/logger'
 
@@ -260,6 +261,64 @@ export async function deleteDeviceHandler(req: Request, res: Response) {
       error: {
         code: 'INTERNAL_ERROR',
         message: 'Failed to delete device',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+  }
+}
+
+/**
+ * Internal endpoint: update device heartbeat from ingestion pipeline.
+ */
+export async function updateDeviceHeartbeatHandler(req: Request, res: Response) {
+  try {
+    const tenantId = typeof req.body?.tenantId === 'string' ? req.body.tenantId : ''
+    const deviceId = typeof req.body?.deviceId === 'string' ? req.body.deviceId : ''
+    const observedAtRaw = typeof req.body?.observedAt === 'string' ? req.body.observedAt : undefined
+
+    if (!tenantId || !deviceId) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'tenantId and deviceId are required',
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+    }
+
+    const observedAt = observedAtRaw ? new Date(observedAtRaw) : new Date()
+    if (Number.isNaN(observedAt.getTime())) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'observedAt must be a valid ISO datetime',
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+    }
+
+    const updated = await updateDeviceHeartbeat({ tenantId, deviceId, observedAt })
+    if (!updated) {
+      return res.status(404).json({
+        error: {
+          code: 'NOT_FOUND',
+          message: `Device ${deviceId} not found for tenant ${tenantId}`,
+          traceId: res.locals.traceId || 'unknown',
+        },
+      })
+    }
+
+    return res.status(200).json({
+      ok: true,
+      deviceId: updated.id,
+      lastHello: updated.lastHello?.toISOString() || null,
+    })
+  } catch (error) {
+    logger.error('Error in updateDeviceHeartbeatHandler:', error)
+    return res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to update device heartbeat',
         traceId: res.locals.traceId || 'unknown',
       },
     })

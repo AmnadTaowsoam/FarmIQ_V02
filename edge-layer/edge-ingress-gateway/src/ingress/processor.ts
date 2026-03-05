@@ -4,6 +4,7 @@ import {
   StationAllowlistStore,
 } from '../db/allowlistStore'
 import { LastSeenStore } from '../db/lastSeenStore'
+import { StatusOutboxStore } from '../db/statusOutboxStore'
 import { postJson } from '../http/downstream'
 import { logger } from '../utils/logger'
 import { parseEnvelopeFromBuffer } from './envelope'
@@ -15,6 +16,7 @@ export type IngressProcessorDeps = {
   deviceAllowlist: DeviceAllowlistStore
   stationAllowlist: StationAllowlistStore
   lastSeen: LastSeenStore
+  statusOutbox?: StatusOutboxStore
   downstream: {
     telemetryBaseUrl: string
     weighvisionBaseUrl: string
@@ -285,6 +287,36 @@ export async function processIngressMessage(params: {
       topic: params.rawTopic,
       payloadHash,
     })
+
+    if (params.deps.statusOutbox) {
+      try {
+        await params.deps.statusOutbox.writeStatusEvent({
+          eventId: envelope.event_id,
+          tenantId: envelope.tenant_id,
+          farmId: params.topic.farmId,
+          barnId: params.topic.barnId,
+          deviceId: envelope.device_id,
+          occurredAtIso: envelope.ts,
+          traceId: envelope.trace_id,
+          topic: params.rawTopic,
+          payload: envelope.payload,
+          payloadHash,
+        })
+        return { action: 'processed', routedTo: 'device_last_seen+sync_outbox', ...ids }
+      } catch (error: unknown) {
+        logger.warn('status outbox write failed', {
+          ...ids,
+          topic: params.rawTopic,
+          error: error instanceof Error ? error.message : 'unknown error',
+        })
+        return {
+          action: 'processed',
+          routedTo: 'device_last_seen+sync_outbox (failed)',
+          ...ids,
+        }
+      }
+    }
+
     return { action: 'processed', routedTo: 'device_last_seen', ...ids }
   }
 

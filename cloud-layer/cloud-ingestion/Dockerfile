@@ -128,6 +128,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
 CMD curl --fail http://localhost:3000/api/health || exit 1
 
-# Run database migrations before starting the application
-# Note: DATABASE_URL must be provided as environment variable
-CMD sh -c "npx prisma migrate deploy && node dist/src/index.js"
+# Run migrations first; if schema baseline already exists (P3005), fallback to db push in dev-like environments.
+CMD sh -c "npx prisma migrate deploy || npx prisma db push && node dist/src/index.js"

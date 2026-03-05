@@ -12,6 +12,7 @@ import { ensureIngressSchema } from './db/ensureSchema'
 import { PrismaDedupeStore } from './db/dedupeStore'
 import { PrismaAllowlistStore } from './db/allowlistStore'
 import { PrismaLastSeenStore } from './db/lastSeenStore'
+import { PrismaStatusOutboxStore } from './db/statusOutboxStore'
 import { IngressStats } from './ingress/stats'
 import { buildDownstreamConfig } from './http/downstream'
 import { startMqttConsumer } from './ingress/mqttConsumer'
@@ -97,6 +98,7 @@ async function startServer() {
     const dedupe = new PrismaDedupeStore(prisma)
     const allowlists = new PrismaAllowlistStore(prisma)
     const lastSeen = new PrismaLastSeenStore(prisma)
+    const statusOutbox = new PrismaStatusOutboxStore(prisma)
 
     mqttState = startMqttConsumer({
       config: {
@@ -111,6 +113,7 @@ async function startServer() {
         deviceAllowlist: allowlists,
         stationAllowlist: allowlists,
         lastSeen,
+        statusOutbox,
         downstream,
         dedupeTtlMs: Number(process.env.DEDUPE_TTL_MS ?? 72 * 60 * 60 * 1000),
       },

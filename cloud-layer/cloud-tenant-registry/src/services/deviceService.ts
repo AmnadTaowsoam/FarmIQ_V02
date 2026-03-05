@@ -321,3 +321,57 @@ export async function deleteDevice(tenantId: string, deviceId: string) {
     throw error
   }
 }
+
+export async function updateDeviceHeartbeat(params: {
+  tenantId: string
+  deviceId: string
+  observedAt: Date
+}) {
+  const { tenantId, deviceId, observedAt } = params
+  try {
+    const matched = await prisma.device.findFirst({
+      where: {
+        tenantId,
+        OR: [{ id: deviceId }, { serialNo: deviceId }],
+      },
+      select: {
+        id: true,
+        status: true,
+        lastHello: true,
+      },
+    })
+
+    if (!matched) return null
+
+    const nextLastHello =
+      matched.lastHello && matched.lastHello.getTime() > observedAt.getTime()
+        ? matched.lastHello
+        : observedAt
+
+    const shouldUpdate =
+      matched.status !== 'active'
+      || !matched.lastHello
+      || nextLastHello.getTime() !== matched.lastHello.getTime()
+
+    if (!shouldUpdate) {
+      return { id: matched.id, lastHello: nextLastHello }
+    }
+
+    const updated = await prisma.device.update({
+      where: { id: matched.id },
+      data: {
+        status: 'active',
+        lastHello: nextLastHello,
+      },
+      select: {
+        id: true,
+        lastHello: true,
+      },
+    })
+
+    return updated
+  } catch (error) {
+    logger.error(`Error updating heartbeat for device ${deviceId}:`, error)
+    throw error
+  }
+}
