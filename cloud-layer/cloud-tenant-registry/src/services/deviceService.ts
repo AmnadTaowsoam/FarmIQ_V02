@@ -20,7 +20,7 @@ type AdminDevice = {
   ipAddress: string
 }
 
-const ONLINE_LAST_HELLO_THRESHOLD_MS = 30 * 60 * 1000
+const ONLINE_LAST_HELLO_THRESHOLD_MS = 5 * 60 * 1000
 
 function mapStatusToAdmin(status: string, lastHello: Date | null): string {
   // Admin connectivity status is derived from heartbeat freshness.

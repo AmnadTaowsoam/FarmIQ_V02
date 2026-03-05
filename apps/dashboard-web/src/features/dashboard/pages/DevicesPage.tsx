@@ -15,6 +15,7 @@ import { queryKeys, DEFAULT_STALE_TIME } from '../../../services/queryKeys';
 import type { components } from '@farmiq/api-client';
 import { useNavigate } from 'react-router-dom';
 import { ProvisionDeviceDialog } from '../components/ProvisionDeviceDialog';
+import { resolveDeviceHealthStatus, resolveDeviceLastSeen } from '../utils/deviceHealth';
 
 type Device = components['schemas']['Device'];
 
@@ -47,7 +48,8 @@ export const DevicesPage: React.FC = () => {
                 device_id: device.id,
                 name: device.serialNo || device.id,
                 type: device.deviceType,
-                last_seen: device.updatedAt,
+                status: resolveDeviceHealthStatus(device),
+                last_seen: resolveDeviceLastSeen(device),
             }));
             console.log('[DevicesPage] Mapped devices:', mappedDevices);
             return mappedDevices;
@@ -64,7 +66,7 @@ export const DevicesPage: React.FC = () => {
         { 
             id: 'status', 
             label: 'Status',
-            format: (val: string) => <StatusChip status={val === 'active' ? 'success' : val === 'warning' ? 'warning' : 'info'} label={val?.toUpperCase()} />
+            format: (val: string) => <StatusChip status={val === 'online' ? 'success' : 'error'} label={val?.toUpperCase()} />
         },
         {
             id: 'last_seen',

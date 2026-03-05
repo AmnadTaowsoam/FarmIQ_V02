@@ -12,6 +12,7 @@ import { EmptyState } from '../../../components/EmptyState';
 import { api, unwrapApiResponse } from '../../../api';
 import { useActiveContext } from '../../../contexts/ActiveContext';
 import type { components } from '@farmiq/api-client';
+import { resolveDeviceHealthStatus, resolveDeviceLastSeen } from '../utils/deviceHealth';
 
 type DeviceDetail = components['schemas']['DeviceDetailResponse']['data'];
 type TelemetryReading = components['schemas']['TelemetryReading'];
@@ -38,10 +39,12 @@ export const DeviceDetailPage: React.FC = () => {
         const response = await api.devices.get(deviceId as string, { tenantId });
         const deviceResponse = unwrapApiResponse<any>(response);
         if (deviceResponse) {
+          const healthStatus = resolveDeviceHealthStatus(deviceResponse);
           setDevice({
             ...deviceResponse,
             device_id: deviceResponse.device_id || (deviceResponse as any).id,
-            last_seen: deviceResponse.last_seen || (deviceResponse as any).lastSeen,
+            status: healthStatus,
+            last_seen: resolveDeviceLastSeen(deviceResponse) || undefined,
           } as DeviceDetail);
         } else {
           setDevice(null);
@@ -139,7 +142,7 @@ export const DeviceDetailPage: React.FC = () => {
       <Grid container spacing={3} mt={1}>
         {[
             { label: 'Device Type', value: device.type || 'Generic IoT', icon: <Cpu size={24} />, color: 'primary.main' },
-            { label: 'Current Status', value: device.status || 'Active', icon: <Wifi size={24} />, color: 'success.main', isStatus: true },
+            { label: 'Current Status', value: device.status || 'offline', icon: <Wifi size={24} />, color: 'success.main', isStatus: true },
             { label: 'Firmware', value: device.firmware_version || 'v1.0.4', icon: <Binary size={24} />, color: 'info.main' },
         ].map((stat, idx) => (
             <Grid item xs={12} md={4} key={idx} sx={{ animation: `fadeIn 0.4s ease-out ${idx * 0.1}s both` }}>
@@ -157,7 +160,7 @@ export const DeviceDetailPage: React.FC = () => {
                             <Typography variant="caption" color="text.secondary" fontWeight="600" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>{stat.label}</Typography>
                             {stat.isStatus ? (
                                 <Box sx={{ mt: 0.5 }}>
-                                    <StatusChip status={stat.value === 'active' || stat.value === 'Active' ? 'success' : 'info'} label={stat.value.toUpperCase()} />
+                                    <StatusChip status={String(stat.value).toLowerCase() === 'online' ? 'success' : 'error'} label={String(stat.value).toUpperCase()} />
                                 </Box>
                             ) : (
                                 <Typography variant="h5" fontWeight="800">{stat.value}</Typography>
