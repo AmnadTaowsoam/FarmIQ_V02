@@ -1,10 +1,8 @@
 import hashlib
 import json
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Optional
-
-APP_TIMEZONE = timezone(timedelta(hours=7))
 
 
 def ensure_dir(path: str) -> None:
@@ -13,18 +11,21 @@ def ensure_dir(path: str) -> None:
 
 def normalize_ts(ts: Optional[str]) -> str:
     if not ts:
-        return datetime.now(APP_TIMEZONE).isoformat()
+        return now_utc_iso()
     raw = ts.strip()
     candidate = raw[:-1] + "+00:00" if raw.lower().endswith("z") else raw
     try:
         parsed = datetime.fromisoformat(candidate)
     except ValueError:
-        if "+" in raw or raw.endswith("Z") or raw.endswith("z"):
-            return raw.replace("z", "Z")
-        return f"{raw}+07:00"
+        if raw.endswith("Z") or raw.endswith("z"):
+            return raw[:-1] + "Z"
+        if "+" in raw:
+            return raw
+        return f"{raw}Z"
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=APP_TIMEZONE)
-    return parsed.astimezone(APP_TIMEZONE).isoformat()
+        # Keep compatibility with existing metadata format: naive timestamp is treated as UTC.
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def sha256_file(path: str) -> str:
@@ -48,4 +49,4 @@ def guess_content_type(path: str) -> str:
 
 
 def now_utc_iso() -> str:
-    return datetime.now(APP_TIMEZONE).isoformat()
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
