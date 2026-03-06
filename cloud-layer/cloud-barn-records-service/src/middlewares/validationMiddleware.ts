@@ -4,10 +4,10 @@ import { logger } from '../utils/logger'
 
 // Morbidity event validation schema
 export const morbidityEventSchema = z.object({
-  tenantId: z.string().uuid().optional(),
+  tenantId: z.string().min(1).optional(),
   farmId: z.string().uuid(),
   barnId: z.string().uuid(),
-  batchId: z.string().uuid().optional().nullable(),
+  batchId: z.string().min(1).optional().nullable(),
   occurredAt: z.string().datetime(),
   diseaseCode: z.string().optional().nullable(),
   severity: z.enum(['low', 'medium', 'high']).optional().nullable(),
@@ -18,10 +18,10 @@ export const morbidityEventSchema = z.object({
 
 // Mortality event validation schema
 export const mortalityEventSchema = z.object({
-  tenantId: z.string().uuid().optional(),
+  tenantId: z.string().min(1).optional(),
   farmId: z.string().uuid(),
   barnId: z.string().uuid(),
-  batchId: z.string().uuid().optional().nullable(),
+  batchId: z.string().min(1).optional().nullable(),
   occurredAt: z.string().datetime(),
   causeCode: z.string().optional().nullable(),
   animalCount: z.number().int().min(0),
@@ -32,10 +32,10 @@ export const mortalityEventSchema = z.object({
 
 // Vaccine event validation schema
 export const vaccineEventSchema = z.object({
-  tenantId: z.string().uuid().optional(),
+  tenantId: z.string().min(1).optional(),
   farmId: z.string().uuid(),
   barnId: z.string().uuid(),
-  batchId: z.string().uuid().optional().nullable(),
+  batchId: z.string().min(1).optional().nullable(),
   occurredAt: z.string().datetime(),
   vaccineName: z.string().min(1),
   doseMl: z.number().min(0).optional().nullable(),
@@ -48,10 +48,10 @@ export const vaccineEventSchema = z.object({
 
 // Treatment event validation schema
 export const treatmentEventSchema = z.object({
-  tenantId: z.string().uuid().optional(),
+  tenantId: z.string().min(1).optional(),
   farmId: z.string().uuid(),
   barnId: z.string().uuid(),
-  batchId: z.string().uuid().optional().nullable(),
+  batchId: z.string().min(1).optional().nullable(),
   occurredAt: z.string().datetime(),
   treatmentName: z.string().min(1),
   doseMl: z.number().min(0).optional().nullable(),
@@ -65,10 +65,10 @@ export const treatmentEventSchema = z.object({
 
 // Daily count validation schema
 export const dailyCountSchema = z.object({
-  tenantId: z.string().uuid().optional(),
+  tenantId: z.string().min(1).optional(),
   farmId: z.string().uuid(),
   barnId: z.string().uuid(),
-  batchId: z.string().uuid().optional().nullable(),
+  batchId: z.string().min(1).optional().nullable(),
   recordDate: z.string().date(),
   animalCount: z.number().int().min(0),
   averageWeightKg: z.number().min(0).optional().nullable(),
@@ -79,10 +79,10 @@ export const dailyCountSchema = z.object({
 
 // Welfare check validation schema
 export const welfareCheckSchema = z.object({
-  tenantId: z.string().uuid().optional(),
+  tenantId: z.string().min(1).optional(),
   farmId: z.string().uuid(),
   barnId: z.string().uuid(),
-  batchId: z.string().uuid().optional().nullable(),
+  batchId: z.string().min(1).optional().nullable(),
   occurredAt: z.string().datetime(),
   gaitScore: z.number().int().min(0).max(5).optional().nullable(),
   lesionScore: z.number().int().min(0).max(5).optional().nullable(),
@@ -94,7 +94,7 @@ export const welfareCheckSchema = z.object({
 
 // Housing condition validation schema
 export const housingConditionSchema = z.object({
-  tenantId: z.string().uuid().optional(),
+  tenantId: z.string().min(1).optional(),
   farmId: z.string().uuid(),
   barnId: z.string().uuid(),
   occurredAt: z.string().datetime(),
@@ -110,8 +110,8 @@ export const housingConditionSchema = z.object({
 
 // Genetic profile validation schema
 export const geneticProfileSchema = z.object({
-  tenantId: z.string().uuid().optional(),
-  batchId: z.string().uuid(),
+  tenantId: z.string().min(1).optional(),
+  batchId: z.string().min(1),
   speciesCode: z.string().min(1),
   geneticLineCode: z.string().optional().nullable(),
   growthTargetSetId: z.string().uuid().optional().nullable(),

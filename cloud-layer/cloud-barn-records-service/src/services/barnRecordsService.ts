@@ -572,7 +572,32 @@ export async function createDailyCount(
       },
     })
     if (existingByDate) {
-      throw new Error('DUPLICATE_DATE_ENTRY')
+      const updated = await prisma.barnDailyCount.update({
+        where: { id: existingByDate.id },
+        data: {
+          farmId: input.farmId,
+          batchId: input.batchId,
+          animalCount: input.animalCount,
+          averageWeightKg: input.averageWeightKg ? new Decimal(input.averageWeightKg) : null,
+          mortalityCount: input.mortalityCount || 0,
+          cullCount: input.cullCount || 0,
+          externalRef: input.externalRef || existingByDate.externalRef,
+        },
+      })
+
+      await publishBarnDailyCountsUpsertedEvent({
+        tenantId,
+        farmId: input.farmId,
+        barnId: input.barnId,
+        batchId: input.batchId,
+        recordDate: input.recordDate,
+        animalCount: input.animalCount,
+        averageWeightKg: input.averageWeightKg ?? null,
+        mortalityCount: input.mortalityCount ?? 0,
+        cullCount: input.cullCount ?? 0,
+      })
+
+      return updated
     }
 
     const event = await prisma.barnDailyCount.create({

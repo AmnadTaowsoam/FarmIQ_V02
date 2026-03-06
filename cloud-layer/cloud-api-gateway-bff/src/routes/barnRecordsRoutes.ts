@@ -10,6 +10,13 @@ import {
   createGeneticProfileHandler,
   createDailyCountHandler,
   listDailyCountsHandler,
+  listMortalityHandler,
+  listMorbidityHandler,
+  listVaccinesHandler,
+  listTreatmentsHandler,
+  listWelfareChecksHandler,
+  listHousingConditionsHandler,
+  listGeneticsHandler,
 } from '../controllers/barnRecordsController'
 
 const router = express.Router()
@@ -30,36 +37,43 @@ router.use(jwtAuthMiddleware)
  * Mortality Events
  */
 router.post('/barn-records/mortality', createMortalityHandler)
+router.get('/barn-records/mortality', listMortalityHandler)
 
 /**
  * Morbidity Events
  */
 router.post('/barn-records/morbidity', createMorbidityHandler)
+router.get('/barn-records/morbidity', listMorbidityHandler)
 
 /**
  * Vaccine Events
  */
 router.post('/barn-records/vaccines', createVaccineHandler)
+router.get('/barn-records/vaccines', listVaccinesHandler)
 
 /**
  * Treatment Events
  */
 router.post('/barn-records/treatments', createTreatmentHandler)
+router.get('/barn-records/treatments', listTreatmentsHandler)
 
 /**
  * Welfare Checks
  */
 router.post('/barn-records/welfare-checks', createWelfareCheckHandler)
+router.get('/barn-records/welfare-checks', listWelfareChecksHandler)
 
 /**
  * Housing Conditions
  */
 router.post('/barn-records/housing-conditions', createHousingConditionHandler)
+router.get('/barn-records/housing-conditions', listHousingConditionsHandler)
 
 /**
  * Genetic Profiles
  */
 router.post('/barn-records/genetics', createGeneticProfileHandler)
+router.get('/barn-records/genetics', listGeneticsHandler)
 
 /**
  * Daily Counts

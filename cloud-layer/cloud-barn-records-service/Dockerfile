@@ -86,6 +86,7 @@ WORKDIR /usr/src/app
 
 # Set the environment to production
 ENV NODE_ENV=production
+ENV PRISMA_QUERY_ENGINE_LIBRARY=/usr/src/app/node_modules/.prisma/client/libquery_engine-linux-musl-openssl-3.0.x.so.node
 
 # Copy package.json and package-lock.json
 COPY package*.json ./
@@ -104,6 +105,7 @@ COPY --from=build /usr/src/app/dist ./dist
 COPY --from=build /usr/src/app/prisma ./prisma
 COPY --from=build /usr/src/app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=build /usr/src/app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=build /usr/src/app/node_modules/prisma ./node_modules/prisma
 # Copy the openapi.yaml file
 COPY --from=build /usr/src/app/openapi.yaml ./openapi.yaml
 
@@ -123,7 +125,6 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
 CMD curl --fail http://localhost:3000/api/health || exit 1
 
-# Run database migrations before starting the application
-# Note: DATABASE_URL must be provided as environment variable
-CMD sh -c "npx prisma migrate deploy && node dist/src/index.js"
+# Start the API directly; migrations are handled separately in local/dev workflows.
+CMD ["node", "dist/src/index.js"]
 

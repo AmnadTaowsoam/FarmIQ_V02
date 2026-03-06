@@ -46,6 +46,41 @@ export interface BarnRecordsServiceClient {
     query: Record<string, string>
     headers: Record<string, string>
   }): Promise<{ ok: boolean; status: number; data?: unknown }>
+
+  listMortality(params: {
+    query: Record<string, string>
+    headers: Record<string, string>
+  }): Promise<{ ok: boolean; status: number; data?: unknown }>
+
+  listMorbidity(params: {
+    query: Record<string, string>
+    headers: Record<string, string>
+  }): Promise<{ ok: boolean; status: number; data?: unknown }>
+
+  listVaccines(params: {
+    query: Record<string, string>
+    headers: Record<string, string>
+  }): Promise<{ ok: boolean; status: number; data?: unknown }>
+
+  listTreatments(params: {
+    query: Record<string, string>
+    headers: Record<string, string>
+  }): Promise<{ ok: boolean; status: number; data?: unknown }>
+
+  listWelfareChecks(params: {
+    query: Record<string, string>
+    headers: Record<string, string>
+  }): Promise<{ ok: boolean; status: number; data?: unknown }>
+
+  listHousingConditions(params: {
+    query: Record<string, string>
+    headers: Record<string, string>
+  }): Promise<{ ok: boolean; status: number; data?: unknown }>
+
+  listGenetics(params: {
+    query: Record<string, string>
+    headers: Record<string, string>
+  }): Promise<{ ok: boolean; status: number; data?: unknown }>
 }
 
 const BARN_RECORDS_SERVICE_URL =
@@ -149,6 +184,76 @@ export const barnRecordsServiceClient: BarnRecordsServiceClient = {
     const queryString = buildQueryString(params.query)
     const url = `${BARN_RECORDS_SERVICE_URL}/api/v1/barn-records/daily-counts${queryString}`
     logger.info('Calling barn-records-service: GET /api/v1/barn-records/daily-counts')
+    return callDownstreamJson(url, {
+      method: 'GET',
+      headers: params.headers,
+    })
+  },
+
+  async listMortality(params) {
+    const queryString = buildQueryString(params.query)
+    const url = `${BARN_RECORDS_SERVICE_URL}/api/v1/barn-records/mortality${queryString}`
+    logger.info('Calling barn-records-service: GET /api/v1/barn-records/mortality')
+    return callDownstreamJson(url, {
+      method: 'GET',
+      headers: params.headers,
+    })
+  },
+
+  async listMorbidity(params) {
+    const queryString = buildQueryString(params.query)
+    const url = `${BARN_RECORDS_SERVICE_URL}/api/v1/barn-records/morbidity${queryString}`
+    logger.info('Calling barn-records-service: GET /api/v1/barn-records/morbidity')
+    return callDownstreamJson(url, {
+      method: 'GET',
+      headers: params.headers,
+    })
+  },
+
+  async listVaccines(params) {
+    const queryString = buildQueryString(params.query)
+    const url = `${BARN_RECORDS_SERVICE_URL}/api/v1/barn-records/vaccines${queryString}`
+    logger.info('Calling barn-records-service: GET /api/v1/barn-records/vaccines')
+    return callDownstreamJson(url, {
+      method: 'GET',
+      headers: params.headers,
+    })
+  },
+
+  async listTreatments(params) {
+    const queryString = buildQueryString(params.query)
+    const url = `${BARN_RECORDS_SERVICE_URL}/api/v1/barn-records/treatments${queryString}`
+    logger.info('Calling barn-records-service: GET /api/v1/barn-records/treatments')
+    return callDownstreamJson(url, {
+      method: 'GET',
+      headers: params.headers,
+    })
+  },
+
+  async listWelfareChecks(params) {
+    const queryString = buildQueryString(params.query)
+    const url = `${BARN_RECORDS_SERVICE_URL}/api/v1/barn-records/welfare-checks${queryString}`
+    logger.info('Calling barn-records-service: GET /api/v1/barn-records/welfare-checks')
+    return callDownstreamJson(url, {
+      method: 'GET',
+      headers: params.headers,
+    })
+  },
+
+  async listHousingConditions(params) {
+    const queryString = buildQueryString(params.query)
+    const url = `${BARN_RECORDS_SERVICE_URL}/api/v1/barn-records/housing-conditions${queryString}`
+    logger.info('Calling barn-records-service: GET /api/v1/barn-records/housing-conditions')
+    return callDownstreamJson(url, {
+      method: 'GET',
+      headers: params.headers,
+    })
+  },
+
+  async listGenetics(params) {
+    const queryString = buildQueryString(params.query)
+    const url = `${BARN_RECORDS_SERVICE_URL}/api/v1/barn-records/genetics${queryString}`
+    logger.info('Calling barn-records-service: GET /api/v1/barn-records/genetics')
     return callDownstreamJson(url, {
       method: 'GET',
       headers: params.headers,

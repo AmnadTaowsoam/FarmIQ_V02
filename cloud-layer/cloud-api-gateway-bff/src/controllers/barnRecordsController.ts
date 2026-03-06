@@ -60,6 +60,69 @@ function normalizeDateRange(query: Record<string, unknown>): { start?: string; e
   return { start, end }
 }
 
+async function listBarnRecordsResource(
+  req: Request,
+  res: Response,
+  resource: string,
+  listFn: (params: { query: Record<string, string>; headers: Record<string, string> }) => Promise<{ ok: boolean; status: number; data?: unknown }>
+): Promise<void> {
+  const startTime = Date.now()
+  const tenantId = getTenantIdFromRequest(res, req.query.tenantId as string)
+
+  if (!tenantId) {
+    res.status(400).json({
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'tenantId is required',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+    return
+  }
+
+  const query: Record<string, string> = {}
+  Object.keys(req.query).forEach((key) => {
+    if (req.query[key]) {
+      query[key] = req.query[key] as string
+    }
+  })
+  query.tenantId = tenantId
+  const { start, end } = normalizeDateRange(req.query as Record<string, unknown>)
+  if (start) query.start = start
+  if (end) query.end = end
+
+  try {
+    const result = await listFn({
+      query,
+      headers: buildDownstreamHeaders(req, res),
+    })
+
+    const duration = Date.now() - startTime
+    logger.info(`List ${resource} request completed`, {
+      route: `/api/v1/barn-records/${resource}`,
+      downstreamService: 'barn-records-service',
+      duration_ms: duration,
+      status_code: result.status,
+      requestId: res.locals.requestId,
+    })
+
+    if (result.ok && result.data) {
+      handleDownstreamResponse(result, res)
+      return
+    }
+    res.status(200).json({ items: [], nextCursor: null })
+  } catch (error) {
+    logger.error(`Error in list ${resource} handler`, error)
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: `Failed to list ${resource}`,
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+  }
+}
+
 /**
  * POST /api/v1/barn-records/mortality
  */
@@ -503,5 +566,33 @@ export async function listDailyCountsHandler(req: Request, res: Response): Promi
       },
     })
   }
+}
+
+export async function listMortalityHandler(req: Request, res: Response): Promise<void> {
+  await listBarnRecordsResource(req, res, 'mortality', barnRecordsServiceClient.listMortality)
+}
+
+export async function listMorbidityHandler(req: Request, res: Response): Promise<void> {
+  await listBarnRecordsResource(req, res, 'morbidity', barnRecordsServiceClient.listMorbidity)
+}
+
+export async function listVaccinesHandler(req: Request, res: Response): Promise<void> {
+  await listBarnRecordsResource(req, res, 'vaccines', barnRecordsServiceClient.listVaccines)
+}
+
+export async function listTreatmentsHandler(req: Request, res: Response): Promise<void> {
+  await listBarnRecordsResource(req, res, 'treatments', barnRecordsServiceClient.listTreatments)
+}
+
+export async function listWelfareChecksHandler(req: Request, res: Response): Promise<void> {
+  await listBarnRecordsResource(req, res, 'welfare-checks', barnRecordsServiceClient.listWelfareChecks)
+}
+
+export async function listHousingConditionsHandler(req: Request, res: Response): Promise<void> {
+  await listBarnRecordsResource(req, res, 'housing-conditions', barnRecordsServiceClient.listHousingConditions)
+}
+
+export async function listGeneticsHandler(req: Request, res: Response): Promise<void> {
+  await listBarnRecordsResource(req, res, 'genetics', barnRecordsServiceClient.listGenetics)
 }
 

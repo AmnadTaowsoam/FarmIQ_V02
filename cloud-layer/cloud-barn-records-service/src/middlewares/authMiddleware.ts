@@ -32,33 +32,33 @@ export function jwtAuthMiddleware(
 
     const token = authHeader.substring(7)
 
-    if (process.env.JWT_SECRET) {
-      try {
-        const parts = token.split('.')
-        if (parts.length === 3) {
-          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString())
-
-          const roles = payload.roles || payload.role || []
-          const rolesArray = Array.isArray(roles) ? roles : [roles]
-          res.locals.roles = rolesArray
-
-          if (payload.tenant_id) {
-            res.locals.tenantId = payload.tenant_id
-          }
-
-          if (rolesArray.includes('platform_admin')) {
-            res.locals.isPlatformAdmin = true
-          }
-
-          res.locals.userId = payload.sub || payload.user_id
-        }
-      } catch (parseError) {
-        logger.warn('Failed to parse JWT token in cloud-barn-records-service', {
-          error: (parseError as Error).message,
-        })
-      }
-    } else {
+    if (!process.env.JWT_SECRET) {
       logger.warn('JWT_SECRET not set - JWT validation disabled (dev mode)')
+    }
+
+    try {
+      const parts = token.split('.')
+      if (parts.length === 3) {
+        const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString())
+
+        const roles = payload.roles || payload.role || []
+        const rolesArray = Array.isArray(roles) ? roles : [roles]
+        res.locals.roles = rolesArray
+
+        if (payload.tenant_id) {
+          res.locals.tenantId = payload.tenant_id
+        }
+
+        if (rolesArray.includes('platform_admin')) {
+          res.locals.isPlatformAdmin = true
+        }
+
+        res.locals.userId = payload.sub || payload.user_id
+      }
+    } catch (parseError) {
+      logger.warn('Failed to parse JWT token in cloud-barn-records-service', {
+        error: (parseError as Error).message,
+      })
     }
 
     next()
@@ -84,7 +84,7 @@ export function jwtAuthMiddleware(
 export function requireRole(...allowedRoles: string[]) {
   return (req: Request, res: Response, next: NextFunction): void => {
     const roles = res.locals.roles || []
-    const hasRole = allowedRoles.some((role) => roles.includes(role))
+    const hasRole = roles.includes('platform_admin') || allowedRoles.some((role) => roles.includes(role))
 
     if (!hasRole && process.env.NODE_ENV === 'production') {
       res.status(403).json({

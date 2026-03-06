@@ -40,13 +40,13 @@ type TabKey =
 
 const TAB_CONFIG: { key: TabKey; label: string; resource: string; supportsList: boolean; createRoles: Role[] }[] = [
   { key: 'daily-counts', label: 'Daily Counts', resource: 'daily-counts', supportsList: true, createRoles: ['platform_admin', 'tenant_admin', 'farm_manager', 'operator'] },
-  { key: 'mortality', label: 'Mortality', resource: 'mortality', supportsList: false, createRoles: ['platform_admin', 'tenant_admin', 'farm_manager', 'operator'] },
-  { key: 'morbidity', label: 'Morbidity', resource: 'morbidity', supportsList: false, createRoles: ['platform_admin', 'tenant_admin', 'farm_manager', 'operator'] },
-  { key: 'vaccines', label: 'Vaccines', resource: 'vaccines', supportsList: false, createRoles: ['platform_admin', 'tenant_admin', 'farm_manager'] },
-  { key: 'treatments', label: 'Treatments', resource: 'treatments', supportsList: false, createRoles: ['platform_admin', 'tenant_admin', 'farm_manager'] },
-  { key: 'welfare-checks', label: 'Welfare Checks', resource: 'welfare-checks', supportsList: false, createRoles: ['platform_admin', 'tenant_admin', 'farm_manager'] },
-  { key: 'housing-conditions', label: 'Housing Conditions', resource: 'housing-conditions', supportsList: false, createRoles: ['platform_admin', 'tenant_admin', 'farm_manager'] },
-  { key: 'genetics', label: 'Genetics', resource: 'genetics', supportsList: false, createRoles: ['platform_admin', 'tenant_admin', 'farm_manager'] },
+  { key: 'mortality', label: 'Mortality', resource: 'mortality', supportsList: true, createRoles: ['platform_admin', 'tenant_admin', 'farm_manager', 'operator'] },
+  { key: 'morbidity', label: 'Morbidity', resource: 'morbidity', supportsList: true, createRoles: ['platform_admin', 'tenant_admin', 'farm_manager', 'operator'] },
+  { key: 'vaccines', label: 'Vaccines', resource: 'vaccines', supportsList: true, createRoles: ['platform_admin', 'tenant_admin', 'farm_manager'] },
+  { key: 'treatments', label: 'Treatments', resource: 'treatments', supportsList: true, createRoles: ['platform_admin', 'tenant_admin', 'farm_manager'] },
+  { key: 'welfare-checks', label: 'Welfare Checks', resource: 'welfare-checks', supportsList: true, createRoles: ['platform_admin', 'tenant_admin', 'farm_manager'] },
+  { key: 'housing-conditions', label: 'Housing Conditions', resource: 'housing-conditions', supportsList: true, createRoles: ['platform_admin', 'tenant_admin', 'farm_manager'] },
+  { key: 'genetics', label: 'Genetics', resource: 'genetics', supportsList: true, createRoles: ['platform_admin', 'tenant_admin', 'farm_manager'] },
 ];
 
 const formatDate = (value?: string) => {

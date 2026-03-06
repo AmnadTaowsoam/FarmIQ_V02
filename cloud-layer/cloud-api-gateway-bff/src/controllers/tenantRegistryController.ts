@@ -489,6 +489,68 @@ export async function getBatchesHandler(req: Request, res: Response): Promise<vo
 }
 
 /**
+ * POST /api/v1/batches
+ */
+export async function createBatchHandler(req: Request, res: Response): Promise<void> {
+  const startTime = Date.now()
+  const tenantId = getTenantIdFromRequest(res, resolveRequestTenantId(req))
+  const farmId = req.body?.farmId || req.body?.farm_id
+  const barnId = req.body?.barnId || req.body?.barn_id
+  const startDate = req.body?.startDate || req.body?.start_date
+  const endDate = req.body?.endDate || req.body?.end_date
+  const species = req.body?.species
+  const status = req.body?.status
+
+  if (!tenantId || !farmId || !barnId || !species) {
+    res.status(400).json({
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'tenantId, farmId, barnId, and species are required',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+    return
+  }
+
+  try {
+    const body = {
+      ...req.body,
+      tenantId,
+      farmId,
+      barnId,
+      species,
+      ...(status ? { status } : {}),
+      ...(startDate ? { startDate: new Date(startDate).toISOString() } : {}),
+      ...(endDate ? { endDate: new Date(endDate).toISOString() } : {}),
+    }
+    const result = await tenantRegistryServiceClient.createBatch({
+      body,
+      headers: buildDownstreamHeaders(req, res),
+    })
+
+    const duration = Date.now() - startTime
+    logger.info('Create batch request completed', {
+      route: '/api/v1/batches',
+      downstreamService: 'tenant-registry',
+      duration_ms: duration,
+      status_code: result.status,
+      requestId: res.locals.requestId,
+    })
+
+    handleDownstreamResponse(result, res)
+  } catch (error) {
+    logger.error('Error in createBatchHandler', error)
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to create batch',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+  }
+}
+
+/**
  * GET /api/v1/devices
  */
 export async function getDevicesHandler(req: Request, res: Response): Promise<void> {

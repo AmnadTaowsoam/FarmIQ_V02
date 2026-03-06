@@ -12,6 +12,7 @@ import {
   getBarnsHandler,
   createBarnHandler,
   getBatchesHandler,
+  createBatchHandler,
   getDevicesHandler,
   createDeviceHandler,
   updateDeviceHandler,
@@ -43,6 +44,7 @@ router.post('/barns', createBarnHandler)
 
 // Batches
 router.get('/batches', getBatchesHandler)
+router.post('/batches', createBatchHandler)
 
 // Devices
 router.get('/devices', getDevicesHandler)
