@@ -524,7 +524,15 @@ export const BarnRecordsPage: React.FC = () => {
       (sum, item) => sum + (item.mortalityCount || item.mortality_count || 0),
       0
     );
+    const mortalityFromTab = data.mortality.items.reduce(
+      (sum, item) => sum + (item.animalCount || item.animal_count || 0),
+      0
+    );
     const mortalityFromHistory = history.mortality.reduce(
+      (sum, item) => sum + (item.animalCount || item.animal_count || 0),
+      0
+    );
+    const morbidityFromTab = data.morbidity.items.reduce(
       (sum, item) => sum + (item.animalCount || item.animal_count || 0),
       0
     );
@@ -534,11 +542,12 @@ export const BarnRecordsPage: React.FC = () => {
     );
     const daily = data['daily-counts'].items[0];
     const animalCount = daily?.animalCount ?? daily?.animal_count;
-    const mortalityTotal = mortalityFromDaily || mortalityFromHistory;
+    const mortalityTotal = mortalityFromDaily || mortalityFromTab || mortalityFromHistory;
+    const morbidityTotal = morbidityFromTab || morbidityFromHistory;
     const mortalityRate = animalCount ? ((mortalityTotal / animalCount) * 100).toFixed(2) : null;
     return {
       mortality: mortalityTotal || '—',
-      morbidity: morbidityFromHistory || '—',
+      morbidity: morbidityTotal || '—',
       animalCount: animalCount ?? '—',
       mortalityRate: mortalityRate ? `${mortalityRate}%` : '—',
     };

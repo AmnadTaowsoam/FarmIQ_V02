@@ -10,6 +10,7 @@ import { api, unwrapApiResponse } from '../../../api';
 import { ErrorState } from '../../../components/feedback/ErrorState';
 import { LoadingCard } from '../../../components/LoadingCard';
 import { EmptyState } from '../../../components/EmptyState';
+import { resolveWeighvisionContextFilters } from '../utils/resolveWeighvisionContextFilters';
 import type { components } from '@farmiq/api-client';
 
 type AnalyticsResponse = components['schemas']['WeighvisionAnalyticsResponse'];
@@ -33,11 +34,16 @@ export const AnalyticsPage: React.FC = () => {
       try {
         const startDate = timeRange.start.toISOString().split('T')[0];
         const endDate = timeRange.end.toISOString().split('T')[0];
+        const resolvedFilters = await resolveWeighvisionContextFilters({
+          tenantId,
+          farmId,
+          barnId,
+        });
         
         const response = await api.weighvisionAnalytics({
           tenantId: tenantId,
-          farm_id: farmId || undefined,
-          barn_id: barnId || undefined,
+          farm_id: resolvedFilters.farmId,
+          barn_id: resolvedFilters.barnId,
           start_date: startDate,
           end_date: endDate,
         });
