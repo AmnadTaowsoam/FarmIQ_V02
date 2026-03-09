@@ -78,6 +78,9 @@ export const STANDARDS_ENDPOINTS = {
     ADJUST: (setId: string) => `${BASE_PATH}/standards/sets/${setId}/adjust`,
     IMPORT_CSV: `${BASE_PATH}/standards/imports/csv`,
     IMPORT_JOB: (jobId: string) => `${BASE_PATH}/standards/imports/${jobId}`,
+    CATALOG_SPECIES: `${BASE_PATH}/standards/catalog/species`,
+    CATALOG_BREEDER_COMPANIES: `${BASE_PATH}/standards/catalog/breeder-companies`,
+    CATALOG_GENETIC_LINES: `${BASE_PATH}/standards/catalog/genetic-lines`,
 } as const;
 
 // Feeding endpoints (cloud-feed-service via BFF)

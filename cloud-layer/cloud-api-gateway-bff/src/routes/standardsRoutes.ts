@@ -37,6 +37,16 @@ router.post('/sets/:setId/adjust', proxyJsonWrite)
 router.get('/ui/catalog', getUiCatalog)
 router.get('/ui/targets', getUiTargets)
 
+// Catalog passthrough
+router.get('/catalog/species', proxyGet)
+router.post('/catalog/species', proxyJsonWrite)
+router.get('/catalog/breeder-companies', proxyGet)
+router.post('/catalog/breeder-companies', proxyJsonWrite)
+router.get('/catalog/genetic-lines', proxyGet)
+router.post('/catalog/genetic-lines', proxyJsonWrite)
+router.get('/catalog/standard-schemas', proxyGet)
+router.post('/catalog/standard-schemas', proxyJsonWrite)
+
 // Import needs raw body so we can forward multipart/form-data unchanged
 router.post(
   '/import',

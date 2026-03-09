@@ -379,6 +379,62 @@ export async function getFarmsHandler(req: Request, res: Response): Promise<void
 }
 
 /**
+ * GET /api/v1/farms/:id
+ */
+export async function getFarmByIdHandler(req: Request, res: Response): Promise<void> {
+  const startTime = Date.now()
+  const { id } = req.params
+  const tenantId = getTenantIdFromRequest(res, req.query.tenantId as string)
+
+  if (!tenantId) {
+    res.status(400).json({
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'tenantId is required',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+    return
+  }
+
+  const query: Record<string, string> = {}
+  Object.keys(req.query).forEach((key) => {
+    if (req.query[key]) {
+      query[key] = req.query[key] as string
+    }
+  })
+  query.tenantId = tenantId
+
+  try {
+    const result = await tenantRegistryServiceClient.getFarmById({
+      id,
+      query,
+      headers: buildDownstreamHeaders(req, res),
+    })
+
+    const duration = Date.now() - startTime
+    logger.info('Get farm by id request completed', {
+      route: '/api/v1/farms/:id',
+      downstreamService: 'tenant-registry',
+      duration_ms: duration,
+      status_code: result.status,
+      requestId: res.locals.requestId,
+    })
+
+    handleDownstreamResponse(result, res, 'NOT_FOUND')
+  } catch (error) {
+    logger.error('Error in getFarmByIdHandler', error)
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to fetch farm',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+  }
+}
+
+/**
  * GET /api/v1/barns
  */
 export async function getBarnsHandler(req: Request, res: Response): Promise<void> {
@@ -427,6 +483,62 @@ export async function getBarnsHandler(req: Request, res: Response): Promise<void
       error: {
         code: 'INTERNAL_ERROR',
         message: 'Failed to fetch barns',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+  }
+}
+
+/**
+ * GET /api/v1/barns/:id
+ */
+export async function getBarnByIdHandler(req: Request, res: Response): Promise<void> {
+  const startTime = Date.now()
+  const { id } = req.params
+  const tenantId = getTenantIdFromRequest(res, req.query.tenantId as string)
+
+  if (!tenantId) {
+    res.status(400).json({
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'tenantId is required',
+        traceId: res.locals.traceId || 'unknown',
+      },
+    })
+    return
+  }
+
+  const query: Record<string, string> = {}
+  Object.keys(req.query).forEach((key) => {
+    if (req.query[key]) {
+      query[key] = req.query[key] as string
+    }
+  })
+  query.tenantId = tenantId
+
+  try {
+    const result = await tenantRegistryServiceClient.getBarnById({
+      id,
+      query,
+      headers: buildDownstreamHeaders(req, res),
+    })
+
+    const duration = Date.now() - startTime
+    logger.info('Get barn by id request completed', {
+      route: '/api/v1/barns/:id',
+      downstreamService: 'tenant-registry',
+      duration_ms: duration,
+      status_code: result.status,
+      requestId: res.locals.requestId,
+    })
+
+    handleDownstreamResponse(result, res, 'NOT_FOUND')
+  } catch (error) {
+    logger.error('Error in getBarnByIdHandler', error)
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to fetch barn',
         traceId: res.locals.traceId || 'unknown',
       },
     })

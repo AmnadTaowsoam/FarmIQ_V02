@@ -31,8 +31,18 @@ export interface TenantRegistryServiceClient {
     query: Record<string, string>
     headers: Record<string, string>
   }): Promise<{ ok: boolean; status: number; data?: unknown }>
+  getFarmById(params: {
+    id: string
+    query: Record<string, string>
+    headers: Record<string, string>
+  }): Promise<{ ok: boolean; status: number; data?: unknown }>
 
   getBarns(params: {
+    query: Record<string, string>
+    headers: Record<string, string>
+  }): Promise<{ ok: boolean; status: number; data?: unknown }>
+  getBarnById(params: {
+    id: string
     query: Record<string, string>
     headers: Record<string, string>
   }): Promise<{ ok: boolean; status: number; data?: unknown }>
@@ -188,11 +198,33 @@ export const tenantRegistryServiceClient: TenantRegistryServiceClient = {
     })
   },
 
+  async getFarmById(params) {
+    const { registryBaseUrl } = getServiceBaseUrls()
+    const queryString = buildQueryString(params.query)
+    const url = `${registryBaseUrl}/api/v1/farms/${params.id}${queryString}`
+    logger.info('Calling tenant-registry: GET /api/v1/farms/:id', { id: params.id })
+    return callDownstreamJson(url, {
+      method: 'GET',
+      headers: params.headers,
+    })
+  },
+
   async getBarns(params) {
     const { registryBaseUrl } = getServiceBaseUrls()
     const queryString = buildQueryString(params.query)
     const url = `${registryBaseUrl}/api/v1/barns${queryString}`
     logger.info('Calling tenant-registry: GET /api/v1/barns')
+    return callDownstreamJson(url, {
+      method: 'GET',
+      headers: params.headers,
+    })
+  },
+
+  async getBarnById(params) {
+    const { registryBaseUrl } = getServiceBaseUrls()
+    const queryString = buildQueryString(params.query)
+    const url = `${registryBaseUrl}/api/v1/barns/${params.id}${queryString}`
+    logger.info('Calling tenant-registry: GET /api/v1/barns/:id', { id: params.id })
     return callDownstreamJson(url, {
       method: 'GET',
       headers: params.headers,

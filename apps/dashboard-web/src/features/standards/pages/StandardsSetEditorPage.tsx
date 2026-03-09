@@ -75,6 +75,19 @@ export const StandardsSetEditorPage: React.FC = () => {
     cum_feed_intake_g: 'Cumulative Feed Intake (g)',
     fcr: 'FCR',
     cum_fcr: 'Cumulative FCR',
+    temp_c_min: 'Temp Min (C)',
+    temp_c_max: 'Temp Max (C)',
+    humidity_pct_min: 'Humidity Min (%)',
+    humidity_pct_max: 'Humidity Max (%)',
+    o2_pct_min: 'O2 Min (%)',
+    co2_pct_max_pct: 'CO2 Max (%)',
+    co_ppm_max: 'CO Max (ppm)',
+    nh3_ppm_max: 'NH3 Max (ppm)',
+    dust_mg_m3_max: 'Dust Max (mg/m3)',
+    hours_light: 'Hours Light',
+    lux: 'Lux',
+    avg_body_weight_g: 'Avg Body Weight (g)',
+    min_vent_m3_per_kg_hr_for_5000: 'Min Vent (m3/kg/hr, 5000 birds)',
   };
 
   const payloadFieldOrder = [
@@ -117,6 +130,40 @@ export const StandardsSetEditorPage: React.FC = () => {
     return (payload as Record<string, unknown>)[key];
   };
 
+  const toHeaderLabel = (key: string) => {
+    if (payloadFieldLabels[key]) return payloadFieldLabels[key];
+    return key
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (m) => m.toUpperCase());
+  };
+
+  const getPayloadKeysForTable = () => {
+    const schema = (set as any)?.standardSchema;
+    const csvColumns = schema?.csvColumnsJson;
+    const dimColumn = typeof csvColumns?.dimColumn === 'string' ? csvColumns.dimColumn : '';
+    const dimCandidates = new Set([dimColumn, 'dim', 'age_day', 'age_week', 'phase', 'body_weight_g'].filter(Boolean));
+
+    const fromSchema = [...(csvColumns?.required || []), ...(csvColumns?.optional || [])]
+      .map(String)
+      .filter((k) => !dimCandidates.has(k));
+    if (fromSchema.length) {
+      return Array.from(new Set(fromSchema));
+    }
+
+    const fromRows = Array.from(
+      new Set(
+        (rows || []).flatMap((row: any) => {
+          const payload = row?.payloadJson;
+          if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return [];
+          return Object.keys(payload);
+        })
+      )
+    );
+    if (fromRows.length) return fromRows;
+
+    return payloadFieldOrder;
+  };
+
   const openPayload = (row: any, mode: 'view' | 'edit') => {
     setSelectedRow(row);
     setPayloadText(prettyPayload(row?.payloadJson));
@@ -125,54 +172,38 @@ export const StandardsSetEditorPage: React.FC = () => {
     setEditOpen(true);
   };
 
-  const columns: GridColDef[] = useMemo(
-    () => [
-      { field: 'dimType', headerName: 'Dim', width: 120 },
-      { field: 'dimFrom', headerName: 'From', width: 100 },
-      { field: 'dimTo', headerName: 'To', width: 100 },
-      { field: 'phase', headerName: 'Phase', width: 160 },
-      {
-        field: 'body_weight_g',
-        headerName: 'Body Weight (g)',
-        width: 150,
-        valueGetter: (_value, row) => formatPayloadValue(getPayloadField(row, 'body_weight_g')),
-      },
-      {
-        field: 'daily_gain_g',
-        headerName: 'Daily Gain (g)',
-        width: 150,
-        valueGetter: (_value, row) => formatPayloadValue(getPayloadField(row, 'daily_gain_g')),
-      },
-      {
-        field: 'avg_daily_gain_g',
-        headerName: 'Avg Daily Gain (g)',
-        width: 170,
-        valueGetter: (_value, row) => formatPayloadValue(getPayloadField(row, 'avg_daily_gain_g')),
-      },
-      {
-        field: 'daily_feed_intake_g',
-        headerName: 'Daily Feed Intake (g)',
-        width: 190,
-        valueGetter: (_value, row) => formatPayloadValue(getPayloadField(row, 'daily_feed_intake_g')),
-      },
-      {
-        field: 'cum_feed_intake_g',
-        headerName: 'Cumulative Feed Intake (g)',
-        width: 230,
-        valueGetter: (_value, row) => formatPayloadValue(getPayloadField(row, 'cum_feed_intake_g')),
-      },
-      {
-        field: 'fcr',
-        headerName: 'FCR',
-        width: 90,
-        valueGetter: (_value, row) => formatPayloadValue(getPayloadField(row, 'fcr')),
-      },
-      {
-        field: 'cum_fcr',
-        headerName: 'Cumulative FCR',
-        width: 150,
-        valueGetter: (_value, row) => formatPayloadValue(getPayloadField(row, 'cum_fcr')),
-      },
+  const columns: GridColDef[] = useMemo(() => {
+    const dimType = (set as any)?.standardSchema?.dimTypeDefault || '';
+    const payloadKeys = getPayloadKeysForTable();
+
+    const dimColumns: GridColDef[] = [];
+    if (dimType === 'PHASE') {
+      dimColumns.push({ field: 'phase', headerName: 'Phase', width: 180 });
+    } else if (dimType === 'AGE_WEEK') {
+      dimColumns.push({ field: 'dimFrom', headerName: 'Age Week', width: 120 });
+      dimColumns.push({ field: 'dimTo', headerName: 'To', width: 100 });
+    } else if (dimType === 'BODY_WEIGHT_G') {
+      dimColumns.push({ field: 'dimFrom', headerName: 'Body Weight (g)', width: 150 });
+      dimColumns.push({ field: 'dimTo', headerName: 'To', width: 100 });
+    } else {
+      dimColumns.push({ field: 'dimFrom', headerName: 'Age Day', width: 120 });
+      dimColumns.push({ field: 'dimTo', headerName: 'To', width: 100 });
+      if ((rows || []).some((row: any) => row?.phase)) {
+        dimColumns.push({ field: 'phase', headerName: 'Phase', width: 160 });
+      }
+    }
+
+    const payloadColumns: GridColDef[] = payloadKeys.map((key) => ({
+      field: key,
+      headerName: toHeaderLabel(key),
+      minWidth: 160,
+      flex: 1,
+      valueGetter: (_value, row) => formatPayloadValue(getPayloadField(row, key)),
+    }));
+
+    return [
+      ...dimColumns,
+      ...payloadColumns,
       {
         field: 'payloadJson',
         headerName: 'Payload',
@@ -209,9 +240,8 @@ export const StandardsSetEditorPage: React.FC = () => {
             </Button>
           ) : null,
       },
-    ],
-    [isAdmin]
-  );
+    ];
+  }, [isAdmin, rows, set]);
 
   const handleSaveMeta = async () => {
     await updateSetMutation.mutateAsync({ name, versionTag, isActive });

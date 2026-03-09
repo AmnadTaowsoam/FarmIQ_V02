@@ -10,7 +10,7 @@ import { ErrorState } from '../../../components/feedback/ErrorState';
 import { LoadingCard } from '../../../components/LoadingCard';
 import { useBarnData } from '../../../hooks/useBarnData';
 import { useActiveContext } from '../../../contexts/ActiveContext';
-import { api } from '../../../api';
+import { api, unwrapApiResponse } from '../../../api';
 import type { components } from '@farmiq/api-client';
 
 type TelemetryReading = components['schemas']['TelemetryReading'];
@@ -24,10 +24,28 @@ export const BarnDetailPage: React.FC = () => {
   const [readings, setReadings] = useState<TelemetryReading[]>([]);
   const [readingsLoading, setReadingsLoading] = useState(false);
 
+  const normalizeReadings = (items: any[]): TelemetryReading[] =>
+    items
+      .map((row: any) => {
+        const metricValue =
+          typeof row.metric_value === 'number'
+            ? row.metric_value
+            : typeof row.value === 'number'
+              ? row.value
+              : Number(row.metric_value ?? row.value);
+        return {
+          ...row,
+          timestamp: row.timestamp || row.ts || row.recorded_at,
+          metric_type: row.metric_type || row.metricType || row.metric,
+          metric_value: metricValue,
+        };
+      })
+      .filter((row: any) => row.timestamp && row.metric_type && Number.isFinite(row.metric_value));
+
   useEffect(() => {
     const fetchReadings = async () => {
       if (!tenantId || !barnId) return;
-      setReadingsLoading(true);
+        setReadingsLoading(true);
       try {
         const response = await api.telemetryReadingsList({
           tenantId: tenantId,
@@ -36,7 +54,13 @@ export const BarnDetailPage: React.FC = () => {
           end_time: timeRange.end.toISOString(),
           limit: 200,
         });
-        setReadings(response.data?.readings || []);
+        const payload = unwrapApiResponse<any>(response);
+        const telemetryRows = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.readings)
+            ? payload.readings
+            : [];
+        setReadings(normalizeReadings(telemetryRows));
       } catch (err) {
         console.error('Failed to fetch telemetry readings', err);
         setReadings([]);
@@ -65,6 +89,13 @@ export const BarnDetailPage: React.FC = () => {
 
   const latestTemperature = readings.find((r) => r.metric_type === 'temperature')?.metric_value;
   const latestHumidity = readings.find((r) => r.metric_type === 'humidity')?.metric_value;
+  const barnAny = barn as any;
+  const activeDevices =
+    typeof barnAny?.device_count === 'number'
+      ? barnAny.device_count
+      : Array.isArray(barnAny?.devices)
+        ? barnAny.devices.length
+        : 0;
 
   if (loading) {
     return (
@@ -103,7 +134,7 @@ export const BarnDetailPage: React.FC = () => {
         {[
           { label: 'Current Temp', value: `${latestTemperature ?? '—'}°C`, icon: <Thermometer size={24} />, color: 'error.main' },
           { label: 'Humidity', value: `${latestHumidity ?? '—'}%`, icon: <Droplets size={24} />, color: 'primary.main' },
-          { label: 'Active Devices', value: barn.device_count ?? 0, icon: <Activity size={24} />, color: 'secondary.main' },
+          { label: 'Active Devices', value: activeDevices, icon: <Activity size={24} />, color: 'secondary.main' },
         ].map((stat, idx) => (
           <Grid item xs={12} md={4} key={idx} sx={{ animation: `fadeIn 0.4s ease-out ${idx * 0.1}s both` }}>
             <PremiumCard sx={{ p: 1, bgcolor: alpha(theme.palette.background.paper, 0.4), backdropFilter: 'blur(10px)' }}>

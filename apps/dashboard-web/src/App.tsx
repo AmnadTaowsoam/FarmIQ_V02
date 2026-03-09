@@ -78,6 +78,7 @@ import { StandardsLibraryPage } from './features/standards/pages/StandardsLibrar
 import { StandardsSetEditorPage } from './features/standards/pages/StandardsSetEditorPage';
 import { StandardsImportPage } from './features/standards/pages/StandardsImportPage';
 import { StandardsTargetBuilderPage } from './features/standards/pages/StandardsTargetBuilderPage';
+import { StandardsCatalogPage } from './features/standards/pages/StandardsCatalogPage';
 import { SettingsLayout } from './features/settings/SettingsLayout';
 import { SettingsRedirect } from './features/settings/components/SettingsRedirect';
 import { AccountSettingsPage } from './features/settings/pages/AccountSettingsPage';
@@ -176,6 +177,13 @@ export const App: React.FC = () => {
                   </ContextGuard>
                 } />
                 <Route path="standards/sets/:setId" element={<ContextGuard requireTenant><StandardsSetEditorPage /></ContextGuard>} />
+                <Route path="standards/catalog" element={
+                  <ContextGuard requireTenant>
+                    <RoleGuard allowedRoles={['platform_admin', 'tenant_admin']}>
+                      <StandardsCatalogPage />
+                    </RoleGuard>
+                  </ContextGuard>
+                } />
 
                 {/* WeighVision */}
                 <Route path="weighvision" element={<WeighVisionLandingPage />} />

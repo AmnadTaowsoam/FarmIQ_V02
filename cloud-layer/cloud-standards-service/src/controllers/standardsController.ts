@@ -493,9 +493,16 @@ export async function adjustSetHandler(req: Request, res: Response) {
 export async function importCsvHandler(req: Request, res: Response) {
   try {
     const result = await importCsv(req, res)
+    // importCsv may already write error responses directly for validation cases.
+    if (res.headersSent) {
+      return
+    }
     return res.json({ data: result })
   } catch (error: any) {
     logger.error('CSV import failed', { error })
+    if (res.headersSent) {
+      return
+    }
     return res.status(500).json({
       error: {
         code: 'INTERNAL_ERROR',

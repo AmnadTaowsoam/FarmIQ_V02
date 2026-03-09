@@ -11,6 +11,29 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { NeedHelpButton } from '../../../components/help/NeedHelpButton';
 import { useStandardSets, useStandardsCatalog } from '../hooks/useStandards';
 
+function templateForSchema(code: string) {
+  if (code === 'GROWTH') {
+    return 'age_day,body_weight_g,daily_gain_g,avg_daily_gain_g,daily_feed_intake_g,cum_feed_intake_g,fcr,cum_fcr\n1,40,0,0,0,0,0,0\n';
+  }
+  if (code === 'VENTILATION') {
+    return 'age_week,avg_body_weight_g,min_vent_m3_per_kg_hr_for_5000\n1,100,0\n';
+  }
+  if (code === 'LIGHTING') {
+    return 'age_day,hours_light,lux\n1,23,20\n';
+  }
+  return 'phase,temp_c_min,temp_c_max,humidity_pct_min,humidity_pct_max,o2_pct_min,co2_pct_max_pct,co_ppm_max,nh3_ppm_max,dust_mg_m3_max\nbrooding,32,34,55,70,19.5,0.3,50,10,3\n';
+}
+
+function downloadText(filename: string, text: string) {
+  const blob = new Blob([text], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 
 const SCOPES = [
   { value: '', label: 'All Scopes' },
@@ -53,6 +76,7 @@ export const StandardsLibraryPage: React.FC = () => {
   const [unitSystem, setUnitSystem] = useState(searchParams.get('unitSystem') || '');
   const [sex, setSex] = useState(searchParams.get('sex') || '');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const templateSchemaCode = standardSchemaCode || 'GROWTH';
 
   // Update URL when filters change
   useEffect(() => {
@@ -232,7 +256,11 @@ export const StandardsLibraryPage: React.FC = () => {
                 <Button variant="outlined" startIcon={<PlusCircle size={18} />} onClick={() => navigate('/standards/targets/new')}>
                   Create Target
                 </Button>
-                <Button variant="text" startIcon={<Download size={18} />} onClick={() => alert('Download templates feature coming soon')}>
+                <Button
+                  variant="text"
+                  startIcon={<Download size={18} />}
+                  onClick={() => downloadText(`template_${templateSchemaCode.toLowerCase()}.csv`, templateForSchema(templateSchemaCode))}
+                >
                   Templates
                 </Button>
                 <Button variant="text" startIcon={<Settings size={18} />} onClick={() => navigate('/standards/catalog')}>

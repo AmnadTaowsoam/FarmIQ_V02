@@ -8,8 +8,10 @@ import {
   getAdminDevicesHandler,
   getAdminDeviceByIdHandler,
   getFarmsHandler,
+  getFarmByIdHandler,
   createFarmHandler,
   getBarnsHandler,
+  getBarnByIdHandler,
   createBarnHandler,
   getBatchesHandler,
   createBatchHandler,
@@ -36,10 +38,12 @@ router.get('/admin/devices/:id', requireRole('platform_admin'), getAdminDeviceBy
 
 // Farms
 router.get('/farms', getFarmsHandler)
+router.get('/farms/:id', getFarmByIdHandler)
 router.post('/farms', createFarmHandler)
 
 // Barns
 router.get('/barns', getBarnsHandler)
+router.get('/barns/:id', getBarnByIdHandler)
 router.post('/barns', createBarnHandler)
 
 // Batches

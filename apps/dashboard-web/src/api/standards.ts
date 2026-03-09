@@ -201,4 +201,23 @@ export const standardsApi = {
   uiCatalog: () => httpClient.get<ApiResponse<any>>(`${STANDARDS_ENDPOINTS.SETS.replace('/sets', '')}/ui/catalog`),
   uiTargets: (params: { tenantId: string; farmId?: string; houseId?: string; flockId?: string; standardSchemaCode?: string; speciesCode?: string; geneticLineCode?: string; page?: number; pageSize?: number }) =>
     httpClient.get<ApiResponse<any>>(`${STANDARDS_ENDPOINTS.SETS.replace('/sets', '')}/ui/targets`, { params }),
+
+  listSpeciesCatalog: () => httpClient.get<ApiResponse<SpeciesCatalog[]>>(STANDARDS_ENDPOINTS.CATALOG_SPECIES),
+  upsertSpeciesCatalog: (payload: { code: string; name: string; scientificName?: string; isActive?: boolean }) =>
+    httpClient.post<ApiResponse<SpeciesCatalog>>(STANDARDS_ENDPOINTS.CATALOG_SPECIES, payload),
+
+  listBreederCompanies: () =>
+    httpClient.get<ApiResponse<BreederCompany[]>>(STANDARDS_ENDPOINTS.CATALOG_BREEDER_COMPANIES),
+  upsertBreederCompany: (payload: { name: string; country?: string; isActive?: boolean }) =>
+    httpClient.post<ApiResponse<BreederCompany>>(STANDARDS_ENDPOINTS.CATALOG_BREEDER_COMPANIES, payload),
+
+  listGeneticLinesCatalog: (params?: { speciesCode?: string; breederCompanyName?: string }) =>
+    httpClient.get<ApiResponse<GeneticLineCatalog[]>>(STANDARDS_ENDPOINTS.CATALOG_GENETIC_LINES, { params }),
+  upsertGeneticLineCatalog: (payload: {
+    speciesCode: string;
+    breederCompanyName: string;
+    code?: string;
+    name: string;
+    isActive?: boolean;
+  }) => httpClient.post<ApiResponse<GeneticLineCatalog>>(STANDARDS_ENDPOINTS.CATALOG_GENETIC_LINES, payload),
 };

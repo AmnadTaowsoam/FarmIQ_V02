@@ -57,37 +57,26 @@ function parseMultipartFormData(body: Buffer, contentType: string): ParsedForm {
   if (!boundaryMatch) {
     throw new Error('Missing multipart boundary')
   }
-  const boundary = boundaryMatch[1]
-  const delimiter = Buffer.from(`--${boundary}`)
-
-  const parts: Buffer[] = []
-  let start = body.indexOf(delimiter)
-  if (start === -1) throw new Error('Invalid multipart body')
-  start += delimiter.length
-
-  while (start < body.length) {
-    // Skip CRLF
-    if (body[start] === 0x0d && body[start + 1] === 0x0a) start += 2
-    const next = body.indexOf(delimiter, start)
-    if (next === -1) break
-    const part = body.slice(start, next)
-    start = next + delimiter.length
-    // End marker
-    if (body[start] === 0x2d && body[start + 1] === 0x2d) break
-    if (part.length) parts.push(part)
-  }
+  const boundary = boundaryMatch[1].trim().replace(/^"|"$/g, '')
+  const delimiter = `--${boundary}`
+  const bodyText = body.toString('latin1')
+  const rawParts = bodyText
+    .split(delimiter)
+    .map((p) => p.trim())
+    .filter((p) => p && p !== '--')
 
   const fields: Record<string, string> = {}
   let file: ParsedForm['file']
 
-  for (const rawPart of parts) {
-    const headerEnd = rawPart.indexOf('\r\n\r\n')
+  for (const partText of rawParts) {
+    const normalized = partText.replace(/^\r\n/, '').replace(/\r\n$/, '')
+    const headerEnd = normalized.indexOf('\r\n\r\n')
     if (headerEnd === -1) continue
-    const headerText = rawPart.slice(0, headerEnd).toString('utf8')
-    const content = rawPart.slice(headerEnd + 4)
-    const cleaned = content.slice(0, Math.max(0, content.length - 2)) // trim trailing \r\n
+    const headerText = normalized.slice(0, headerEnd)
+    const contentText = normalized.slice(headerEnd + 4).replace(/\r\n$/, '')
+    const contentBuffer = Buffer.from(contentText, 'latin1')
 
-    const disposition = headerText.match(/content-disposition:\s*form-data;\s*([^\\r\\n]+)/i)
+    const disposition = headerText.match(/content-disposition:\s*form-data;\s*([^\r\n]+)/i)
     if (!disposition) continue
 
     const nameMatch = headerText.match(/name="([^"]+)"/i)
@@ -95,18 +84,18 @@ function parseMultipartFormData(body: Buffer, contentType: string): ParsedForm {
     const name = nameMatch[1]
 
     const filenameMatch = headerText.match(/filename="([^"]*)"/i)
-    const typeMatch = headerText.match(/content-type:\s*([^\\r\\n]+)/i)
+    const typeMatch = headerText.match(/content-type:\s*([^\r\n]+)/i)
 
     if (filenameMatch) {
       file = {
         filename: filenameMatch[1] || 'upload.csv',
         contentType: typeMatch ? typeMatch[1].trim() : 'application/octet-stream',
-        data: cleaned,
+        data: contentBuffer,
       }
       continue
     }
 
-    fields[name] = cleaned.toString('utf8')
+    fields[name] = contentBuffer.toString('utf8')
   }
 
   return { fields, file }
