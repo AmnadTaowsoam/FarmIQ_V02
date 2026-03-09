@@ -5,6 +5,7 @@ import {
   Divider,
   Drawer,
   Grid,
+  MenuItem,
   Stack,
   Tab,
   Tabs,
@@ -54,6 +55,25 @@ const formatDate = (value?: string) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString();
+};
+
+const toDateOnly = (value?: string) => {
+  if (!value) return undefined;
+  const parsed = new Date(value);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString().slice(0, 10);
+  }
+  return value.slice(0, 10);
+};
+
+const getPayloadDateForFilter = (tab: TabKey, payload: Record<string, any>) => {
+  if (tab === 'daily-counts') {
+    return toDateOnly(payload.recordDate);
+  }
+  if (tab === 'genetics') {
+    return toDateOnly(payload.hatchDate);
+  }
+  return toDateOnly(payload.occurredAt);
 };
 
 const buildColumns = (tab: TabKey): Column<Record<string, any>>[] => {
@@ -152,14 +172,17 @@ const buildCreatePayload = (
         notes: form.notes || undefined,
       };
     case 'morbidity':
-      return {
-        ...common,
-        occurredAt: form.occurredAt ? new Date(form.occurredAt).toISOString() : undefined,
-        animalCount: Number(form.animalCount || 0),
-        diseaseCode: form.diseaseCode || undefined,
-        severity: form.severity || undefined,
-        notes: form.notes || undefined,
-      };
+      {
+        const normalizedSeverity = form.severity ? form.severity.trim().toLowerCase() : '';
+        return {
+          ...common,
+          occurredAt: form.occurredAt ? new Date(form.occurredAt).toISOString() : undefined,
+          animalCount: Number(form.animalCount || 0),
+          diseaseCode: form.diseaseCode || undefined,
+          severity: normalizedSeverity || undefined,
+          notes: form.notes || undefined,
+        };
+      }
     case 'vaccines':
       return {
         ...common,
@@ -198,17 +221,50 @@ const buildCreatePayload = (
         ammoniaPpm: form.ammoniaPpm ? Number(form.ammoniaPpm) : undefined,
       };
     case 'genetics':
-      return {
-        tenantId: baseContext.tenantId,
-        batchId: context.batchId || baseContext.batchId || undefined,
-        strain: form.strain || undefined,
-        breedLine: form.breedLine || undefined,
-        supplier: form.supplier || undefined,
-        hatchDate: form.hatchDate || undefined,
-      };
+      {
+        const geneticsBatchId = form.batchId?.trim();
+        return {
+          tenantId: baseContext.tenantId,
+          batchId: geneticsBatchId || context.batchId || baseContext.batchId || undefined,
+          speciesCode: 'chicken',
+          strain: form.strain || undefined,
+          breedLine: form.breedLine || undefined,
+          supplier: form.supplier || undefined,
+          hatchDate: form.hatchDate || undefined,
+        };
+      }
     default:
       return common;
   }
+};
+
+const buildOptimisticRecord = (
+  tab: TabKey,
+  created: Record<string, any>,
+  payload: Record<string, any>
+) => {
+  if (tab === 'daily-counts') {
+    return {
+      ...payload,
+      ...created,
+      id: created.id || `temp-${Date.now()}`,
+    };
+  }
+
+  if (tab === 'genetics') {
+    return {
+      ...payload,
+      ...created,
+      id: created.id || `temp-${Date.now()}`,
+    };
+  }
+
+  return {
+    ...payload,
+    ...created,
+    id: created.id || `temp-${Date.now()}`,
+    occurredAt: payload.occurredAt || created.occurredAt,
+  };
 };
 
 const defaultFormState = () => ({
@@ -236,6 +292,7 @@ const defaultFormState = () => ({
   temperatureC: '',
   humidityPct: '',
   ammoniaPpm: '',
+  batchId: '',
   strain: '',
   breedLine: '',
   supplier: '',
@@ -363,7 +420,10 @@ export const BarnRecordsPage: React.FC = () => {
   };
 
   const openCreateDrawer = () => {
-    setFormState(defaultFormState());
+    setFormState((prev) => ({
+      ...defaultFormState(),
+      batchId: filtersRef.current.batchId || batchId || prev.batchId || '',
+    }));
     setDrawerMode('create');
     setDrawerOpen(true);
   };
@@ -377,7 +437,7 @@ export const BarnRecordsPage: React.FC = () => {
   const handleSubmit = async () => {
     if (!tenantId) return;
     const effectiveBarnId = filters.barnId || barnId;
-    const effectiveBatchId = filters.batchId || batchId;
+    const effectiveBatchId = formState.batchId.trim() || filters.batchId || batchId;
     if (!effectiveBarnId && activeTab !== 'genetics') {
       toast.error('Barn is required to create records.');
       return;
@@ -402,16 +462,54 @@ export const BarnRecordsPage: React.FC = () => {
       toast.error('Treatment name is required.');
       return;
     }
+    if (activeTab === 'morbidity' && formState.severity) {
+      const severity = formState.severity.trim().toLowerCase();
+      if (!['low', 'medium', 'high'].includes(severity)) {
+        toast.error('Severity must be low, medium, or high.');
+        return;
+      }
+    }
     try {
       const payload = buildCreatePayload(activeTab, filters, { tenantId, farmId, barnId, batchId }, formState);
       const created = await barnRecordsApi.createRecord(currentConfig.resource, payload);
       toast.success('Record created');
+      setData((prev) => {
+        const config = TAB_CONFIG.find((item) => item.key === activeTab) || TAB_CONFIG[0];
+        if (!config.supportsList) return prev;
+        return {
+          ...prev,
+          [activeTab]: {
+            ...prev[activeTab],
+            items: [buildOptimisticRecord(activeTab, created as Record<string, any>, payload), ...prev[activeTab].items],
+          },
+        };
+      });
       setHistory((prev) => ({
         ...prev,
         [activeTab]: [created, ...prev[activeTab]].slice(0, 25),
       }));
+      let refetchFilters = filtersRef.current;
+      const payloadDate = getPayloadDateForFilter(activeTab, payload as Record<string, any>);
+      if (payloadDate) {
+        const candidate = { ...filtersRef.current };
+        let adjusted = false;
+        if (candidate.startDate && payloadDate < candidate.startDate) {
+          candidate.startDate = payloadDate;
+          adjusted = true;
+        }
+        if (candidate.endDate && payloadDate > candidate.endDate) {
+          candidate.endDate = payloadDate;
+          adjusted = true;
+        }
+        if (adjusted) {
+          refetchFilters = candidate;
+          filtersRef.current = candidate;
+          setFilters(candidate);
+          toast.info('Date range adjusted to include the new record.');
+        }
+      }
       setDrawerOpen(false);
-      fetchTab(activeTab, { replace: true });
+      fetchTab(activeTab, { replace: true, filters: refetchFilters });
     } catch (err: any) {
       const apiError = err as BarnRecordsError;
       if (apiError.isServiceUnavailable) {
@@ -537,7 +635,7 @@ export const BarnRecordsPage: React.FC = () => {
           <Box mt={2} display="flex" justifyContent="center">
             <Button
               variant="outlined"
-              onClick={() => fetchTab(activeTab, { cursor: tabData.nextCursor })}
+              onClick={() => fetchTab(activeTab, { cursor: tabData.nextCursor ?? undefined })}
               disabled={isLoading}
             >
               {isLoading ? 'Loading...' : 'Load more'}
@@ -698,15 +796,29 @@ export const BarnRecordsPage: React.FC = () => {
                   </Grid>
                 )}
                 {activeTab === 'mortality' && (
-                  <Grid item xs={12} md={6}>
-                    <TextField
-                      label="Cause Code"
-                      size="small"
-                      fullWidth
-                      value={formState.causeCode}
-                      onChange={(event) => setFormState((prev) => ({ ...prev, causeCode: event.target.value }))}
-                    />
-                  </Grid>
+                  <>
+                    <Grid item xs={12} md={6}>
+                      <TextField
+                        label="Cause Code"
+                        size="small"
+                        fullWidth
+                        value={formState.causeCode}
+                        onChange={(event) => setFormState((prev) => ({ ...prev, causeCode: event.target.value }))}
+                      />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <TextField
+                        label="Notes"
+                        size="small"
+                        fullWidth
+                        multiline
+                        minRows={3}
+                        value={formState.notes}
+                        onChange={(event) => setFormState((prev) => ({ ...prev, notes: event.target.value }))}
+                        placeholder="Add additional details"
+                      />
+                    </Grid>
+                  </>
                 )}
                 {activeTab === 'morbidity' && (
                   <>
@@ -721,12 +833,18 @@ export const BarnRecordsPage: React.FC = () => {
                     </Grid>
                     <Grid item xs={12} md={6}>
                       <TextField
-                        label="Severity (low/medium/high)"
+                        label="Severity"
+                        select
                         size="small"
                         fullWidth
                         value={formState.severity}
                         onChange={(event) => setFormState((prev) => ({ ...prev, severity: event.target.value }))}
-                      />
+                      >
+                        <MenuItem value="">Select severity</MenuItem>
+                        <MenuItem value="low">Low</MenuItem>
+                        <MenuItem value="medium">Medium</MenuItem>
+                        <MenuItem value="high">High</MenuItem>
+                      </TextField>
                     </Grid>
                   </>
                 )}
@@ -902,6 +1020,16 @@ export const BarnRecordsPage: React.FC = () => {
                 )}
                 {activeTab === 'genetics' && (
                   <>
+                    <Grid item xs={12} md={6}>
+                      <TextField
+                        label="Batch ID"
+                        size="small"
+                        fullWidth
+                        required
+                        value={formState.batchId}
+                        onChange={(event) => setFormState((prev) => ({ ...prev, batchId: event.target.value }))}
+                      />
+                    </Grid>
                     <Grid item xs={12} md={6}>
                       <TextField
                         label="Strain"
