@@ -51,6 +51,7 @@ export const CreateSensorPage: React.FC = () => {
         throw new Error('Tenant is required');
       }
       return api.sensors.create({
+        tenantId,
         sensorId: data.sensorId || data.label,
         type: data.type,
         unit: data.unit,

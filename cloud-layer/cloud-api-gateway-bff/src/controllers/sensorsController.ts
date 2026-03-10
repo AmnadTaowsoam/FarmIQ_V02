@@ -3,6 +3,33 @@ import { logger } from '../utils/logger'
 import { getTenantIdFromRequest } from '../utils/tenantScope'
 import { sensorsServiceClient } from '../services/sensorsService'
 
+function resolveTenantId(req: Request, res: Response): string | null {
+  return getTenantIdFromRequest(
+    res,
+    (req.body?.tenantId as string | undefined) ||
+      (req.body?.tenant_id as string | undefined) ||
+      (req.query?.tenantId as string | undefined) ||
+      (req.query?.tenant_id as string | undefined)
+  )
+}
+
+function normalizeSensorPayload(body: any, tenantId: string) {
+  return {
+    ...body,
+    tenantId,
+    sensorId: body?.sensorId || body?.sensor_id,
+    barnId: body?.barnId ?? body?.barn_id,
+  }
+}
+
+function normalizeSensorUpdatePayload(body: any, tenantId: string) {
+  return {
+    ...body,
+    tenantId,
+    barnId: body?.barnId ?? body?.barn_id,
+  }
+}
+
 /**
  * Helper to build headers for downstream calls
  */
@@ -174,7 +201,7 @@ export async function getSensorHandler(req: Request, res: Response): Promise<voi
  */
 export async function createSensorHandler(req: Request, res: Response): Promise<void> {
   const startTime = Date.now()
-  const tenantId = getTenantIdFromRequest(res, req.body.tenantId)
+  const tenantId = resolveTenantId(req, res)
   
   if (!tenantId) {
     res.status(400).json({
@@ -187,12 +214,11 @@ export async function createSensorHandler(req: Request, res: Response): Promise<
     return
   }
 
-  // Ensure tenantId in body matches resolved tenantId
-  req.body.tenantId = tenantId
+  const normalizedBody = normalizeSensorPayload(req.body, tenantId)
 
   try {
     const result = await sensorsServiceClient.createSensor({
-      body: req.body,
+      body: normalizedBody,
       headers: buildDownstreamHeaders(req, res),
     })
 
@@ -223,7 +249,7 @@ export async function createSensorHandler(req: Request, res: Response): Promise<
  */
 export async function updateSensorHandler(req: Request, res: Response): Promise<void> {
   const startTime = Date.now()
-  const tenantId = getTenantIdFromRequest(res, req.body.tenantId)
+  const tenantId = resolveTenantId(req, res)
   const sensorId = req.params.sensorId
   
   if (!tenantId) {
@@ -237,12 +263,12 @@ export async function updateSensorHandler(req: Request, res: Response): Promise<
     return
   }
 
-  req.body.tenantId = tenantId
+  const normalizedBody = normalizeSensorUpdatePayload(req.body, tenantId)
 
   try {
     const result = await sensorsServiceClient.updateSensor({
       sensorId,
-      body: req.body,
+      body: normalizedBody,
       headers: buildDownstreamHeaders(req, res),
     })
 
@@ -479,4 +505,3 @@ export async function createCalibrationHandler(req: Request, res: Response): Pro
     })
   }
 }
-

@@ -83,6 +83,7 @@ export const SensorCatalogPage: React.FC = () => {
     if (!tenantId || !sensorId.trim() || !type.trim() || !unit.trim()) return;
     try {
       await api.sensors.create({
+        tenantId,
         sensorId: sensorId.trim(),
         type: type.trim(),
         unit: unit.trim(),
