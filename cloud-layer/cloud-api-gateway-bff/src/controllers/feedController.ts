@@ -49,6 +49,13 @@ function handleDownstreamResponse(
     
     // Map downstream errors to standard format
     const status = result.status >= 400 && result.status < 600 ? result.status : 502
+
+    // Preserve downstream error payload when available.
+    if (result.data && typeof result.data === 'object') {
+      res.status(status).json(result.data)
+      return
+    }
+
     res.status(status).json({
       error: {
         code: status === 502 ? 'SERVICE_UNAVAILABLE' : defaultErrorCode,
@@ -270,12 +277,7 @@ export async function listIntakeRecordsHandler(req: Request, res: Response): Pro
       requestId: res.locals.requestId,
     })
 
-    if (result.ok && result.data) {
-      handleDownstreamResponse(result, res)
-      return
-    }
-
-    res.status(200).json({ items: [], nextCursor: null })
+    handleDownstreamResponse(result, res, 'DOWNSTREAM_ERROR')
   } catch (error) {
     logger.error('Error in listIntakeRecordsHandler', error)
     res.status(500).json({

@@ -144,6 +144,7 @@ apiClient.interceptors.response.use(
         const errorResponse = {
             message: 'An unexpected error occurred',
             code: 'UNKNOWN_ERROR',
+            status: error.response?.status,
             traceId: error.response?.headers['x-trace-id'] || uuidv4(),
             originalError: error
         };

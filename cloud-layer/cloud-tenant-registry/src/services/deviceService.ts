@@ -9,6 +9,8 @@ type AdminDevice = {
   name: string
   type: string
   status: string
+  lifecycleStatus: string
+  connectivityStatus: string
   tenantId: string
   tenantName: string | null
   farmId: string | null
@@ -73,12 +75,15 @@ function mapAdminDevice(device: {
     || device.updatedAt.toISOString()
   const firmwareVersion = getMetadataValue(metadata, 'firmwareVersion') || 'unknown'
   const ipAddress = getMetadataValue(metadata, 'ipAddress') || 'unknown'
+  const connectivityStatus = mapStatusToAdmin(device.status, device.lastHello)
 
   return {
     id: device.id,
     name,
     type: getMetadataValue(metadata, 'type') || device.deviceType,
-    status: mapStatusToAdmin(device.status, device.lastHello),
+    status: connectivityStatus,
+    lifecycleStatus: device.status,
+    connectivityStatus,
     tenantId: device.tenantId,
     tenantName: device.tenant?.name || null,
     farmId: device.farmId,

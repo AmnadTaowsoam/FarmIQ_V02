@@ -29,6 +29,17 @@ export const DeviceDetailPage: React.FC = () => {
 
   const { data: device, isLoading, error } = useDevice(deviceId || '');
 
+  const normalizedStatus =
+    device?.status === 'active' || device?.status === 'inactive' || device?.status === 'maintenance'
+      ? device.status
+      : device?.status === 'online'
+      ? 'active'
+      : device?.status === 'offline'
+      ? 'inactive'
+      : 'inactive';
+
+  const badgeStatus = normalizedStatus === 'active' ? 'healthy' : normalizedStatus === 'inactive' ? 'degraded' : 'critical';
+
   if (error) {
     return (
       <Box>
@@ -99,14 +110,8 @@ export const DeviceDetailPage: React.FC = () => {
                   Status
                 </Typography>
                 <HealthBadge
-                  status={
-                    device.status === 'online'
-                      ? 'healthy'
-                      : device.status === 'offline'
-                      ? 'degraded'
-                      : 'critical'
-                  }
-                  label={device.status.toUpperCase()}
+                  status={badgeStatus}
+                  label={normalizedStatus.toUpperCase()}
                   showIcon
                 />
               </Stack>
@@ -257,8 +262,8 @@ export const DeviceDetailPage: React.FC = () => {
                         Connection Status
                       </Typography>
                       <HealthBadge
-                        status={device.status === 'online' ? 'healthy' : 'degraded'}
-                        label={device.status.toUpperCase()}
+                        status={badgeStatus}
+                        label={normalizedStatus.toUpperCase()}
                         showIcon
                       />
                     </Stack>

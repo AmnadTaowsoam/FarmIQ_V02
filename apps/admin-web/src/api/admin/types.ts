@@ -69,7 +69,9 @@ export interface Device {
   farmName: string | null;
   barnId: string | null;
   barnName: string | null;
-  status: 'online' | 'offline';
+  status: 'active' | 'inactive' | 'maintenance' | 'online' | 'offline';
+  lifecycleStatus?: 'active' | 'inactive' | 'maintenance';
+  connectivityStatus?: 'online' | 'offline';
   ipAddress: string | null;
   lastSeen: string | null;
   firmwareVersion: string;

@@ -65,16 +65,27 @@ const loadContextFromStorage = (): Partial<ActiveContextType> => {
     if (!stored) return {};
     
     const parsed = JSON.parse(stored);
+    const storedTimeRange = parsed.timeRange;
+    const storedPreset = (storedTimeRange?.preset || '7d') as TimeRangePreset;
+
+    // Preset ranges should be relative to "now", not fixed historical dates from storage.
+    // Keep fixed dates only for custom range.
+    const restoredTimeRange =
+      storedTimeRange
+        ? storedPreset === 'custom'
+          ? {
+              ...storedTimeRange,
+              start: new Date(storedTimeRange.start),
+              end: new Date(storedTimeRange.end),
+              preset: storedPreset,
+            }
+          : getDefaultTimeRange(storedPreset)
+        : getDefaultTimeRange();
+
     // Only restore timeRange, not context IDs (tenant/farm/barn)
     // This prevents hardcoded UUIDs from persisting in URL
     return {
-      timeRange: parsed.timeRange 
-        ? {
-            ...parsed.timeRange,
-            start: new Date(parsed.timeRange.start),
-            end: new Date(parsed.timeRange.end),
-          }
-        : getDefaultTimeRange(),
+      timeRange: restoredTimeRange,
     };
   } catch {
     return {};

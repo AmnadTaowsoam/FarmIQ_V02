@@ -49,10 +49,18 @@ const INITIAL_FORM_VALUES: DeviceFormValues = {
   firmwareVersion: '',
 };
 
-function mapUiStatusToDb(status: string): 'active' | 'inactive' | 'maintenance' {
+function normalizeDeviceStatus(status: string): 'active' | 'inactive' | 'maintenance' {
+  if (status === 'active' || status === 'inactive' || status === 'maintenance') return status;
   if (status === 'online') return 'active';
   if (status === 'offline') return 'inactive';
-  return 'maintenance';
+  return 'inactive';
+}
+
+function mapDeviceStatusToHealthBadge(status: string): 'healthy' | 'degraded' | 'critical' {
+  const normalized = normalizeDeviceStatus(status);
+  if (normalized === 'active') return 'healthy';
+  if (normalized === 'inactive') return 'degraded';
+  return 'critical';
 }
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -139,7 +147,7 @@ export const AdminDevicesPage: React.FC = () => {
       batchId: '',
       deviceType: device.type || 'weighvision',
       serialNo: device.serialNumber || device.name || '',
-      status: mapUiStatusToDb(device.status),
+      status: normalizeDeviceStatus(device.lifecycleStatus || device.status),
       name: device.name || '',
       ipAddress: device.ipAddress || '',
       firmwareVersion: device.firmwareVersion || '',
@@ -259,7 +267,7 @@ export const AdminDevicesPage: React.FC = () => {
       width: 120,
       renderCell: (params) => (
         <HealthBadge
-          status={params.value === 'online' ? 'healthy' : params.value === 'offline' ? 'degraded' : 'critical'}
+          status={mapDeviceStatusToHealthBadge(String(params.value))}
           label={params.value.toUpperCase()}
           showIcon
         />

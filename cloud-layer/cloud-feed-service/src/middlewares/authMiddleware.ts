@@ -1,6 +1,36 @@
 import { Request, Response, NextFunction } from 'express'
 import { logger } from '../utils/logger'
 
+function decodeJwtPayload(token: string): any | null {
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return null
+
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4)
+    const payload = JSON.parse(Buffer.from(padded, 'base64').toString('utf8'))
+    return payload
+  } catch {
+    return null
+  }
+}
+
+function applyJwtLocals(payload: any, res: Response): void {
+  const roles = payload?.roles || payload?.role || []
+  const rolesArray = Array.isArray(roles) ? roles : [roles]
+  res.locals.roles = rolesArray
+
+  if (payload?.tenant_id) {
+    res.locals.tenantId = payload.tenant_id
+  }
+
+  if (rolesArray.includes('platform_admin')) {
+    res.locals.isPlatformAdmin = true
+  }
+
+  res.locals.userId = payload?.sub || payload?.user_id
+}
+
 /**
  * JWT Auth Middleware (for read endpoints)
  */
@@ -33,32 +63,20 @@ export function jwtAuthMiddleware(
     const token = authHeader.substring(7)
 
     if (process.env.JWT_SECRET) {
-      try {
-        const parts = token.split('.')
-        if (parts.length === 3) {
-          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString())
-
-          const roles = payload.roles || payload.role || []
-          const rolesArray = Array.isArray(roles) ? roles : [roles]
-          res.locals.roles = rolesArray
-
-          if (payload.tenant_id) {
-            res.locals.tenantId = payload.tenant_id
-          }
-
-          if (rolesArray.includes('platform_admin')) {
-            res.locals.isPlatformAdmin = true
-          }
-
-          res.locals.userId = payload.sub || payload.user_id
-        }
-      } catch (parseError) {
-        logger.warn('Failed to parse JWT token in cloud-feed-service', {
-          error: (parseError as Error).message,
-        })
+      const payload = decodeJwtPayload(token)
+      if (payload) {
+        applyJwtLocals(payload, res)
+      } else {
+        logger.warn('Failed to parse JWT token in cloud-feed-service')
       }
     } else {
       logger.warn('JWT_SECRET not set - JWT validation disabled (dev mode)')
+      // In local/dev deployments without JWT_SECRET, decode token payload
+      // to preserve role-based access checks.
+      const payload = decodeJwtPayload(token)
+      if (payload) {
+        applyJwtLocals(payload, res)
+      }
     }
 
     next()
@@ -83,10 +101,18 @@ export function jwtAuthMiddleware(
  */
 export function requireRole(...allowedRoles: string[]) {
   return (req: Request, res: Response, next: NextFunction): void => {
+    const shouldEnforceRbac =
+      process.env.NODE_ENV === 'production' && Boolean(process.env.JWT_SECRET)
+
+    if (!shouldEnforceRbac) {
+      next()
+      return
+    }
+
     const roles = res.locals.roles || []
     const hasRole = allowedRoles.some((role) => roles.includes(role))
 
-    if (!hasRole && process.env.NODE_ENV === 'production') {
+    if (!hasRole) {
       res.status(403).json({
         error: {
           code: 'FORBIDDEN',

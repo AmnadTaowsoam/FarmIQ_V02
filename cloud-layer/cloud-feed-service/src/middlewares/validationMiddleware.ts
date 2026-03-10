@@ -4,7 +4,7 @@ import { logger } from '../utils/logger'
 
 // Feed formula validation schema
 export const feedFormulaSchema = z.object({
-  tenantId: z.string().uuid().optional(),
+  tenantId: z.string().min(1).optional(),
   name: z.string().min(1),
   species: z.enum(['broiler', 'layer', 'swine', 'fish']).optional().nullable(),
   phase: z.string().optional().nullable(),
@@ -18,11 +18,12 @@ export const feedFormulaSchema = z.object({
 
 // Feed lot validation schema
 export const feedLotSchema = z.object({
-  tenantId: z.string().uuid().optional(),
+  tenantId: z.string().min(1).optional(),
   farmId: z.string().uuid(),
   supplierName: z.string().optional().nullable(),
   lotCode: z.string().min(1),
-  feedFormulaId: z.string().uuid().optional().nullable(),
+  // UI uses business IDs (e.g. 203T000001), not UUID.
+  feedFormulaId: z.string().min(1).optional().nullable(),
   manufactureDate: z.string().date().optional().nullable(),
   receivedDate: z.string().date().optional().nullable(),
   quantityKg: z.number().min(0).optional().nullable(),
@@ -33,10 +34,11 @@ export const feedLotSchema = z.object({
 
 // Feed delivery validation schema
 export const feedDeliverySchema = z.object({
-  tenantId: z.string().uuid().optional(),
+  tenantId: z.string().min(1).optional(),
   farmId: z.string().uuid(),
   barnId: z.string().uuid().optional().nullable(),
-  feedLotId: z.string().uuid(),
+  // UI uses lot code (e.g. F260309001), not UUID.
+  feedLotId: z.string().min(1),
   deliveryRef: z.string().optional().nullable(),
   deliveredAt: z.string().datetime(),
   quantityKg: z.number().min(0),
@@ -47,8 +49,9 @@ export const feedDeliverySchema = z.object({
 
 // Feed quality result validation schema
 export const feedQualityResultSchema = z.object({
-  tenantId: z.string().uuid().optional(),
-  feedLotId: z.string().uuid(),
+  tenantId: z.string().min(1).optional(),
+  // UI uses lot code (e.g. F260309001), not UUID.
+  feedLotId: z.string().min(1),
   sampledAt: z.string().datetime(),
   metric: z.string().min(1),
   value: z.number().min(0),
@@ -60,14 +63,16 @@ export const feedQualityResultSchema = z.object({
 
 // Feed intake record validation schema
 export const feedIntakeRecordSchema = z.object({
-  tenantId: z.string().uuid().optional(),
+  // Tenant IDs in this project are not always UUID (e.g. "t-001"), so accept non-empty string.
+  tenantId: z.string().min(1).optional(),
   farmId: z.string().uuid(),
   barnId: z.string().uuid(),
   batchId: z.string().uuid().optional().nullable(),
   deviceId: z.string().uuid().optional().nullable(),
   source: z.enum(['MANUAL', 'API_IMPORT', 'SILO_AUTO']),
-  feedFormulaId: z.string().uuid().optional().nullable(),
-  feedLotId: z.string().uuid().optional().nullable(),
+  // Manual intake form can submit business codes (not UUID) for formula/lot IDs.
+  feedFormulaId: z.string().min(1).optional().nullable(),
+  feedLotId: z.string().min(1).optional().nullable(),
   quantityKg: z.number().min(0),
   occurredAt: z.string().datetime(),
   ingestedAt: z.string().datetime().optional().nullable(),
@@ -79,7 +84,7 @@ export const feedIntakeRecordSchema = z.object({
 
 // Feed program validation schema (optional)
 export const feedProgramSchema = z.object({
-  tenantId: z.string().uuid().optional(),
+  tenantId: z.string().min(1).optional(),
   farmId: z.string().uuid().optional().nullable(),
   barnId: z.string().uuid().optional().nullable(),
   name: z.string().min(1),
@@ -92,7 +97,7 @@ export const feedProgramSchema = z.object({
 
 // Feed inventory snapshot validation schema (optional)
 export const feedInventorySnapshotSchema = z.object({
-  tenantId: z.string().uuid().optional(),
+  tenantId: z.string().min(1).optional(),
   farmId: z.string().uuid().optional().nullable(),
   barnId: z.string().uuid().optional().nullable(),
   feedLotId: z.string().uuid().optional().nullable(),

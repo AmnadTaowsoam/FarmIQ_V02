@@ -102,14 +102,14 @@ router.get(
 router.post(
   '/intake-records',
   jwtAuthMiddleware,
-  requireRole('tenant_admin', 'farm_manager', 'house_operator'),
+  requireRole('tenant_admin', 'farm_manager', 'house_operator', 'operator'),
   validateFeedIntakeRecord,
   createFeedIntakeRecordHandler
 )
 router.get(
   '/intake-records',
   jwtAuthMiddleware,
-  requireRole('tenant_admin', 'farm_manager', 'house_operator', 'viewer'),
+  requireRole('tenant_admin', 'farm_manager', 'house_operator', 'operator', 'viewer'),
   listFeedIntakeRecordsHandler
 )
 

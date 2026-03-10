@@ -51,6 +51,13 @@ interface IntakeFormValues {
   notes?: string;
 }
 
+interface UiError {
+  title: string;
+  message: string;
+  code?: string;
+  traceId?: string;
+}
+
 const formatDateTime = (value?: string) => {
   if (!value) return '—';
   const date = new Date(value);
@@ -69,13 +76,69 @@ const parseNumber = (value: unknown): number | null => {
   return null;
 };
 
+const mapFeedingError = (err: any, action: 'load' | 'create' | 'retry'): UiError => {
+  const status = err?.status ?? err?.originalError?.response?.status;
+  const code = err?.code;
+  const traceId = err?.traceId ?? err?.originalError?.response?.headers?.['x-trace-id'];
+  const fallbackMessage =
+    (typeof err?.message === 'string' && err.message.trim()) || 'เกิดข้อผิดพลาดที่ไม่คาดคิด';
+
+  if (status === 401) {
+    return {
+      title: action === 'load' ? 'Session หมดอายุ' : 'Session หมดอายุระหว่างบันทึก',
+      message: 'กรุณาเข้าสู่ระบบใหม่ แล้วลองอีกครั้ง',
+      code,
+      traceId,
+    };
+  }
+
+  if (status === 403) {
+    return {
+      title: action === 'load' ? 'ไม่มีสิทธิ์ดูข้อมูล Feed Intake' : 'ไม่มีสิทธิ์สร้าง Intake Record',
+      message: 'บัญชีของคุณไม่มีสิทธิ์เข้าถึงข้อมูลใน tenant/farm/barn นี้',
+      code,
+      traceId,
+    };
+  }
+
+  if (status === 404) {
+    return {
+      title: 'ไม่พบ endpoint ของบริการ',
+      message: 'บริการ Feed API ยังไม่พร้อมใช้งาน หรือเส้นทาง API ไม่ถูกต้อง',
+      code,
+      traceId,
+    };
+  }
+
+  if (typeof status === 'number' && status >= 500) {
+    return {
+      title: 'เซิร์ฟเวอร์ขัดข้องชั่วคราว',
+      message: 'ระบบส่วนกลางมีปัญหาชั่วคราว กรุณาลองใหม่อีกครั้งในภายหลัง',
+      code,
+      traceId,
+    };
+  }
+
+  return {
+    title:
+      action === 'load'
+        ? 'ไม่สามารถโหลดข้อมูล Feed Intake'
+        : action === 'retry'
+        ? 'Retry ไม่สำเร็จ'
+        : 'ไม่สามารถสร้าง Intake Record',
+    message: fallbackMessage,
+    code,
+    traceId,
+  };
+};
+
 export const FeedingIntakePage: React.FC = () => {
   const { tenantId, farmId, barnId, batchId, timeRange } = useActiveContext();
   const [searchParams] = useSearchParams();
   const toast = useToast();
   const [records, setRecords] = useState<IntakeRecord[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<UiError | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -123,6 +186,7 @@ export const FeedingIntakePage: React.FC = () => {
     { id: 'barnId', label: 'Barn', format: (_value, row) => row.barnId || row.barn_id || '—' },
     { id: 'batchId', label: 'Batch', format: (_value, row) => row.batchId || row.batch_id || '—' },
     { id: 'feedLotId', label: 'Feed Lot', format: (_value, row) => row.feedLotId || row.feed_lot_id || '—' },
+    { id: 'feedFormulaId', label: 'Feed Formula ID', format: (_value, row) => row.feedFormulaId || row.feed_formula_id || '—' },
   ], []);
 
   const fetchRecords = async (cursor?: string, replace = false) => {
@@ -137,7 +201,7 @@ export const FeedingIntakePage: React.FC = () => {
       setNextCursor(response.nextCursor || null);
       setError(null);
     } catch (err: any) {
-      setError(err.message || 'Failed to load intake records');
+      setError(mapFeedingError(err, 'load'));
     } finally {
       setLoading(false);
     }
@@ -177,10 +241,10 @@ export const FeedingIntakePage: React.FC = () => {
       });
       fetchRecords(undefined, true);
     } catch (err: any) {
-      const message = err.message || 'Failed to create intake record';
-      setSubmitError(message);
+      const mapped = mapFeedingError(err, 'create');
+      setSubmitError(mapped.message);
       setPendingSubmission({ key: idempotencyKey, payload: values });
-      toast.error('Failed to create intake record', { description: message });
+      toast.error(mapped.title, { description: mapped.message });
     } finally {
       setSubmitting(false);
     }
@@ -209,16 +273,24 @@ export const FeedingIntakePage: React.FC = () => {
       setPendingSubmission(null);
       fetchRecords(undefined, true);
     } catch (err: any) {
-      const message = err.message || 'Retry failed';
-      setSubmitError(message);
-      toast.error('Retry failed', { description: message });
+      const mapped = mapFeedingError(err, 'retry');
+      setSubmitError(mapped.message);
+      toast.error(mapped.title, { description: mapped.message });
     } finally {
       setSubmitting(false);
     }
   };
 
   if (error) {
-    return <ErrorState title="Failed to load intake records" message={error} />;
+    return (
+      <ErrorState
+        title={error.title}
+        message={error.message}
+        code={error.code}
+        traceId={error.traceId}
+        onRetry={() => fetchRecords(undefined, true)}
+      />
+    );
   }
 
   return (

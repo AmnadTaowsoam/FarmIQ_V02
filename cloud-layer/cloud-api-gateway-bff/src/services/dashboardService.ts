@@ -111,6 +111,23 @@ export async function callDownstreamJson<T>(
       body: options.body ? JSON.stringify(options.body) : undefined,
     })
 
+    const contentType = response.headers.get('content-type') || ''
+    let data: T | undefined
+
+    if (contentType.includes('application/json')) {
+      data = (await response.json()) as T
+    } else {
+      // Some endpoints (e.g. /api/health) return plain text.
+      const text = await response.text()
+      if (text.length > 0) {
+        try {
+          data = JSON.parse(text) as T
+        } catch {
+          data = text as T
+        }
+      }
+    }
+
     if (!response.ok) {
       // 401 is expected in dev mode when no auth token is provided
       if (response.status === 401) {
@@ -118,22 +135,10 @@ export async function callDownstreamJson<T>(
       } else {
         logger.warn('Downstream call failed', { url, status: response.status })
       }
-      return { ok: false, status: response.status }
+      return { ok: false, status: response.status, data }
     }
 
-    const contentType = response.headers.get('content-type') || ''
-    if (contentType.includes('application/json')) {
-      const data = (await response.json()) as T
-      return { ok: true, status: response.status, data }
-    }
-
-    // Some endpoints (e.g. /api/health) return plain text.
-    const text = await response.text()
-    try {
-      return { ok: true, status: response.status, data: JSON.parse(text) as T }
-    } catch {
-      return { ok: true, status: response.status, data: text as T }
-    }
+    return { ok: true, status: response.status, data }
   } catch (error) {
     logger.error('Downstream call error', { url, error })
     return { ok: false, status: 502 }

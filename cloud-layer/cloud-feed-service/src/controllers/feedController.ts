@@ -11,9 +11,23 @@ function getQueryValue(req: Request, camel: string, snake: string): string | und
 function parseDateRange(req: Request) {
   const startStr = getQueryValue(req, 'start', 'start') || getQueryValue(req, 'startDate', 'start_date')
   const endStr = getQueryValue(req, 'end', 'end') || getQueryValue(req, 'endDate', 'end_date')
+  const dateOnlyRegex = /^\d{4}-\d{2}-\d{2}$/
+
+  const parseStart = (value?: string): Date | undefined => {
+    if (!value) return undefined
+    if (dateOnlyRegex.test(value)) return new Date(`${value}T00:00:00.000Z`)
+    return new Date(value)
+  }
+
+  const parseEnd = (value?: string): Date | undefined => {
+    if (!value) return undefined
+    if (dateOnlyRegex.test(value)) return new Date(`${value}T23:59:59.999Z`)
+    return new Date(value)
+  }
+
   return {
-    start: startStr ? new Date(startStr) : undefined,
-    end: endStr ? new Date(endStr) : undefined,
+    start: parseStart(startStr),
+    end: parseEnd(endStr),
   }
 }
 

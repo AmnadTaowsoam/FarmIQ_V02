@@ -66,8 +66,8 @@ COPY --from=build /usr/src/app/openapi.yaml ./openapi.yaml
 # Install nodemon globally for hot-reload
 RUN npm install -g nodemon ts-node
 
-# Install curl for healthcheck
-RUN apk add --no-cache curl
+# Install runtime deps required by Prisma schema/query engines on Alpine
+RUN apk add --no-cache curl openssl libc6-compat
 
 EXPOSE 3000
 
@@ -104,11 +104,12 @@ COPY --from=build /usr/src/app/dist ./dist
 COPY --from=build /usr/src/app/prisma ./prisma
 COPY --from=build /usr/src/app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=build /usr/src/app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=build /usr/src/app/node_modules/prisma ./node_modules/prisma
 # Copy the openapi.yaml file
 COPY --from=build /usr/src/app/openapi.yaml ./openapi.yaml
 
-# Install curl for healthcheck
-RUN apk add --no-cache curl
+# Install runtime deps required by Prisma engines on Alpine
+RUN apk add --no-cache curl openssl libc6-compat
 
 # Create a non-root user
 RUN adduser -D -u 1001 nodeuser
@@ -123,7 +124,6 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
 CMD curl --fail http://localhost:3000/api/health || exit 1
 
-# Run database migrations before starting the application
-# Note: DATABASE_URL must be provided as environment variable
-CMD sh -c "npx prisma migrate deploy && node dist/src/index.js"
+# Start service directly. Migrations are executed outside this container in this environment.
+CMD ["node", "dist/src/index.js"]
 
