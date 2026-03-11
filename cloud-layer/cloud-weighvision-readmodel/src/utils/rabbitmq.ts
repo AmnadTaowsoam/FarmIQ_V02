@@ -6,6 +6,30 @@ const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://farmiq:farmiq_dev@rabbi
 let connection: amqp.Connection | null = null
 let channel: amqp.Channel | null = null
 
+const WEIGHVISION_QUEUE_BINDINGS = [
+  {
+    exchange: 'farmiq.weighvision.exchange',
+    routingKeys: [
+      'weighvision.session.created',
+      'weighvision.session.finalized',
+      'weighvision.weight.recorded',
+      'weighvision.inference.completed',
+    ],
+  },
+  {
+    exchange: 'farmiq.weight.exchange',
+    routingKeys: ['weight.recorded'],
+  },
+  {
+    exchange: 'farmiq.media.exchange',
+    routingKeys: ['media.stored'],
+  },
+  {
+    exchange: 'farmiq.inference.exchange',
+    routingKeys: ['inference.completed'],
+  },
+] as const
+
 export async function connectRabbitMQ() {
   try {
     const conn = await amqp.connect(RABBITMQ_URL) as any
@@ -44,10 +68,6 @@ export async function setupWeighVisionConsumer(
   }
 
   try {
-    // Exchange: farmiq.weighvision.exchange (topic)
-    const exchange = 'farmiq.weighvision.exchange'
-    await channel.assertExchange(exchange, 'topic', { durable: true })
-
     // Queue: farmiq.cloud-weighvision-readmodel.queue
     const queue = 'farmiq.cloud-weighvision-readmodel.queue'
     await channel.assertQueue(queue, {
@@ -58,17 +78,11 @@ export async function setupWeighVisionConsumer(
       },
     })
 
-    // Bind to routing keys: weighvision.session.created, weighvision.session.finalized, weight.recorded, media.stored, inference.completed
-    const routingKeys = [
-      'weighvision.session.created',
-      'weighvision.session.finalized',
-      'weight.recorded',
-      'media.stored',
-      'inference.completed',
-    ]
-
-    for (const routingKey of routingKeys) {
-      await channel.bindQueue(queue, exchange, routingKey)
+    for (const binding of WEIGHVISION_QUEUE_BINDINGS) {
+      await channel.assertExchange(binding.exchange, 'topic', { durable: true })
+      for (const routingKey of binding.routingKeys) {
+        await channel.bindQueue(queue, binding.exchange, routingKey)
+      }
     }
 
     // DLQ setup
@@ -77,9 +91,8 @@ export async function setupWeighVisionConsumer(
     await channel.bindQueue(dlq, 'farmiq.dlq.exchange', 'weighvision.dlq')
 
     logger.info('RabbitMQ consumer setup complete', {
-      exchange,
       queue,
-      routingKeys,
+      bindings: WEIGHVISION_QUEUE_BINDINGS,
       dlq,
       service: 'cloud-weighvision-readmodel',
     })

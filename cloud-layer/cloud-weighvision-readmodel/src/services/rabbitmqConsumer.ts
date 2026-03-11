@@ -48,12 +48,14 @@ export async function startWeighVisionConsumer() {
           case 'weighvision.session.finalized':
             await handleSessionFinalized(content)
             break
+          case 'weighvision.weight.recorded':
           case 'weight.recorded':
             await handleWeightRecorded(content)
             break
           case 'media.stored':
             await handleMediaStored(content)
             break
+          case 'weighvision.inference.completed':
           case 'inference.completed':
             await handleInferenceCompleted(content)
             break

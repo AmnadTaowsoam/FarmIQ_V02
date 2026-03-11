@@ -248,6 +248,133 @@ export interface WeighVisionEvent {
   payload: Record<string, unknown>
 }
 
+function getStringValue(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim()
+    }
+  }
+  return undefined
+}
+
+function getDateValue(...values: unknown[]): Date | undefined {
+  for (const value of values) {
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+      return value
+    }
+
+    if (typeof value === 'string' && value.trim().length > 0) {
+      const parsed = new Date(value)
+      if (!Number.isNaN(parsed.getTime())) {
+        return parsed
+      }
+    }
+  }
+  return undefined
+}
+
+function getNumericValue(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value
+  }
+
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) {
+      return parsed
+    }
+  }
+
+  return undefined
+}
+
+function getSessionIdFromEvent(event: WeighVisionEvent): string | undefined {
+  return getStringValue(event.session_id, event.payload.session_id, event.payload.sessionId)
+}
+
+async function ensureSessionForEvent(
+  event: WeighVisionEvent,
+  options: { finalized?: boolean } = {}
+) {
+  const sessionId = getSessionIdFromEvent(event)
+  if (!sessionId) {
+    return null
+  }
+
+  const farmId = getStringValue(event.farm_id, event.payload.farm_id, event.payload.farmId)
+  const barnId = getStringValue(event.barn_id, event.payload.barn_id, event.payload.barnId)
+  const batchId = getStringValue(event.batch_id, event.payload.batch_id, event.payload.batchId)
+  const stationId = getStringValue(event.station_id, event.payload.station_id, event.payload.stationId)
+  const startedAt =
+    getDateValue(event.payload.start_at, event.payload.startAt, event.occurred_at) || new Date()
+  const endedAt = getDateValue(event.payload.end_at, event.payload.endAt, event.occurred_at)
+
+  const existing = await prisma.weighVisionSession.findUnique({
+    where: {
+      tenantId_sessionId: {
+        tenantId: event.tenant_id,
+        sessionId,
+      },
+    },
+  })
+
+  if (!existing) {
+    const created = await prisma.weighVisionSession.create({
+      data: {
+        id: event.event_id,
+        tenantId: event.tenant_id,
+        farmId: farmId || null,
+        barnId: barnId || null,
+        batchId: batchId || null,
+        stationId: stationId || null,
+        sessionId,
+        startedAt,
+        endedAt: options.finalized ? endedAt || startedAt : null,
+        status: options.finalized ? 'FINALIZED' : 'RUNNING',
+      },
+    })
+
+    return { sessionId, session: created, createdPlaceholder: true }
+  }
+
+  const updateData: Record<string, unknown> = {
+    updatedAt: new Date(),
+  }
+
+  if (farmId && farmId !== existing.farmId) updateData.farmId = farmId
+  if (barnId && barnId !== existing.barnId) updateData.barnId = barnId
+  if (batchId && batchId !== existing.batchId) updateData.batchId = batchId
+  if (stationId && stationId !== existing.stationId) updateData.stationId = stationId
+  if (startedAt.getTime() <= existing.startedAt.getTime()) {
+    updateData.startedAt = startedAt
+  }
+
+  if (options.finalized) {
+    updateData.status = 'FINALIZED'
+    if (!existing.endedAt || (endedAt && endedAt.getTime() >= existing.endedAt.getTime())) {
+      updateData.endedAt = endedAt || existing.endedAt || startedAt
+    }
+  } else if (existing.status !== 'FINALIZED' && existing.status !== 'RUNNING') {
+    updateData.status = 'RUNNING'
+  }
+
+  if (Object.keys(updateData).length === 1) {
+    return { sessionId, session: existing, createdPlaceholder: false }
+  }
+
+  const updated = await prisma.weighVisionSession.update({
+    where: {
+      tenantId_sessionId: {
+        tenantId: event.tenant_id,
+        sessionId,
+      },
+    },
+    data: updateData,
+  })
+
+  return { sessionId, session: updated, createdPlaceholder: false }
+}
+
 /**
  * Handle weighvision.session.created event
  */
@@ -281,8 +408,7 @@ export async function handleSessionCreated(event: WeighVisionEvent) {
       },
     })
 
-    // Create session
-    const sessionId = event.session_id || event.payload.session_id as string
+    const sessionId = getSessionIdFromEvent(event)
     if (!sessionId) {
       logger.warn('Missing session_id in weighvision.session.created event', {
         eventId: event.event_id,
@@ -291,30 +417,7 @@ export async function handleSessionCreated(event: WeighVisionEvent) {
       return false
     }
 
-    await prisma.weighVisionSession.upsert({
-      where: {
-        tenantId_sessionId: {
-          tenantId: event.tenant_id,
-          sessionId,
-        },
-      },
-      create: {
-        id: event.event_id, // Use event_id as id
-        tenantId: event.tenant_id,
-        farmId: event.farm_id || null,
-        barnId: event.barn_id || null,
-        batchId: event.batch_id || (event.payload.batch_id as string) || null,
-        stationId: event.station_id || (event.payload.station_id as string) || null,
-        sessionId,
-        startedAt: new Date(event.occurred_at),
-        status: 'RUNNING',
-      },
-      update: {
-        // Update if exists (shouldn't happen, but safe)
-        status: 'RUNNING',
-        updatedAt: new Date(),
-      },
-    })
+    await ensureSessionForEvent(event)
 
     logger.info('WeighVision session created', {
       eventId: event.event_id,
@@ -375,7 +478,7 @@ export async function handleSessionFinalized(event: WeighVisionEvent) {
       },
     })
 
-    const sessionId = event.session_id || event.payload.session_id as string
+    const sessionId = getSessionIdFromEvent(event)
     if (!sessionId) {
       logger.warn('Missing session_id in weighvision.session.finalized event', {
         eventId: event.event_id,
@@ -384,56 +487,45 @@ export async function handleSessionFinalized(event: WeighVisionEvent) {
       return false
     }
 
-    const finalWeightRaw = (event.payload.final_weight_kg ?? event.payload.finalWeightKg) as unknown
-    const imageCountRaw = (event.payload.image_count ?? event.payload.imageCount) as unknown
-    const finalWeightKg =
-      typeof finalWeightRaw === 'number'
-        ? finalWeightRaw
-        : typeof finalWeightRaw === 'string'
-          ? Number(finalWeightRaw)
-          : NaN
-    const imageCount =
-      typeof imageCountRaw === 'number'
-        ? imageCountRaw
-        : typeof imageCountRaw === 'string'
-          ? Number(imageCountRaw)
-          : NaN
+    const finalWeightKg = getNumericValue(event.payload.final_weight_kg ?? event.payload.finalWeightKg)
+    const imageCount = getNumericValue(event.payload.image_count ?? event.payload.imageCount)
+    const ensured = await ensureSessionForEvent(event, { finalized: true })
+    if (!ensured) {
+      return false
+    }
 
-    // Update session
-    const session = await prisma.weighVisionSession.update({
-      where: {
-        tenantId_sessionId: {
-          tenantId: event.tenant_id,
-          sessionId,
-        },
-      },
-      data: {
-        status: 'FINALIZED',
-        endedAt: new Date(event.occurred_at),
-        updatedAt: new Date(),
-      },
-    })
-
-    if (Number.isFinite(finalWeightKg)) {
+    if (typeof finalWeightKg === 'number') {
       const finalizedMeta: Record<string, unknown> = { source_event: 'weighvision.session.finalized' }
-      if (Number.isFinite(imageCount) && imageCount >= 0) {
+      if (typeof imageCount === 'number' && imageCount >= 0) {
         finalizedMeta.image_count = Math.trunc(imageCount)
       }
 
-      await prisma.weighVisionMeasurement.create({
-        data: {
+      await prisma.weighVisionMeasurement.upsert({
+        where: {
+          id: `${event.event_id}:finalized`,
+        },
+        update: {
           id: `${event.event_id}:finalized`,
           tenantId: event.tenant_id,
           sessionId,
-          sessionDbId: session.id,
-          ts: new Date(event.occurred_at),
+          sessionDbId: ensured.session.id,
+          ts: getDateValue(event.payload.end_at, event.payload.endAt, event.occurred_at) || new Date(),
+          weightKg: finalWeightKg,
+          source: 'finalized',
+          metaJson: JSON.stringify(finalizedMeta),
+        },
+        create: {
+          id: `${event.event_id}:finalized`,
+          tenantId: event.tenant_id,
+          sessionId,
+          sessionDbId: ensured.session.id,
+          ts: getDateValue(event.payload.end_at, event.payload.endAt, event.occurred_at) || new Date(),
           weightKg: finalWeightKg,
           source: 'finalized',
           metaJson: JSON.stringify(finalizedMeta),
         },
       })
     }
-
     logger.info('WeighVision session finalized', {
       eventId: event.event_id,
       tenantId: event.tenant_id,
@@ -443,15 +535,6 @@ export async function handleSessionFinalized(event: WeighVisionEvent) {
 
     return true
   } catch (error: any) {
-    if (error.code === 'P2025') {
-      // Session not found - log warning but don't fail
-      logger.warn('WeighVision session not found for finalized event', {
-        eventId: event.event_id,
-        tenantId: event.tenant_id,
-        sessionId: event.session_id,
-      })
-      return false
-    }
     logger.error('Error handling weighvision.session.finalized', {
       error,
       eventId: event.event_id,
@@ -494,7 +577,7 @@ export async function handleWeightRecorded(event: WeighVisionEvent) {
       },
     })
 
-    const sessionId = event.session_id || event.payload.session_id as string
+    const sessionId = getSessionIdFromEvent(event)
     if (!sessionId) {
       logger.warn('Missing session_id in weight.recorded event', {
         eventId: event.event_id,
@@ -503,27 +586,13 @@ export async function handleWeightRecorded(event: WeighVisionEvent) {
       return false
     }
 
-    // Find session by external sessionId to get internal DB ID
-    const session = await prisma.weighVisionSession.findUnique({
-      where: {
-        tenantId_sessionId: {
-          tenantId: event.tenant_id,
-          sessionId: sessionId,
-        },
-      },
-    })
-
-    if (!session) {
-      logger.warn('Session not found for weight.recorded event', {
-        eventId: event.event_id,
-        tenantId: event.tenant_id,
-        sessionId,
-      })
+    const ensured = await ensureSessionForEvent(event)
+    if (!ensured) {
       return false
     }
 
-    const weightKg = event.payload.weight_kg as number || event.payload.weightKg as number
-    if (!weightKg) {
+    const weightKg = getNumericValue(event.payload.weight_kg ?? event.payload.weightKg)
+    if (typeof weightKg !== 'number') {
       logger.warn('Missing weight_kg in weight.recorded event', {
         eventId: event.event_id,
         tenantId: event.tenant_id,
@@ -532,13 +601,26 @@ export async function handleWeightRecorded(event: WeighVisionEvent) {
     }
 
     // Create measurement
-    await prisma.weighVisionMeasurement.create({
-      data: {
+    await prisma.weighVisionMeasurement.upsert({
+      where: {
+        id: event.event_id,
+      },
+      update: {
         id: event.event_id,
         tenantId: event.tenant_id,
         sessionId, // Keep external sessionId for querying
-        sessionDbId: session.id, // Use internal DB ID for relation
-        ts: new Date(event.occurred_at),
+        sessionDbId: ensured.session.id, // Use internal DB ID for relation
+        ts: getDateValue(event.payload.occurred_at, event.occurred_at) || new Date(),
+        weightKg,
+        source: (event.payload.source as string) || 'scale',
+        metaJson: event.payload.meta ? JSON.stringify(event.payload.meta) : null,
+      },
+      create: {
+        id: event.event_id,
+        tenantId: event.tenant_id,
+        sessionId, // Keep external sessionId for querying
+        sessionDbId: ensured.session.id, // Use internal DB ID for relation
+        ts: getDateValue(event.payload.occurred_at, event.occurred_at) || new Date(),
         weightKg,
         source: (event.payload.source as string) || 'scale',
         metaJson: event.payload.meta ? JSON.stringify(event.payload.meta) : null,
@@ -604,7 +686,7 @@ export async function handleMediaStored(event: WeighVisionEvent) {
       },
     })
 
-    const sessionId = event.session_id || event.payload.session_id as string
+    const sessionId = getSessionIdFromEvent(event)
     if (!sessionId) {
       logger.warn('Missing session_id in media.stored event', {
         eventId: event.event_id,
@@ -613,24 +695,8 @@ export async function handleMediaStored(event: WeighVisionEvent) {
       return false
     }
 
-    // Find session by external sessionId to get internal DB ID
-    const session = await prisma.weighVisionSession.findUnique({
-      where: {
-        tenantId_sessionId: {
-          tenantId: event.tenant_id,
-          sessionId: sessionId,
-        },
-      },
-    })
-
-    if (!session) {
-      logger.warn('Session not found for media.stored event', {
-        eventId: event.event_id,
-        tenantId: event.tenant_id,
-        sessionId,
-      })
-      return false
-    }
+    const ensured = await ensureSessionForEvent(event)
+    if (!ensured) return false
 
     const objectId =
       event.payload.object_id as string ||
@@ -651,15 +717,27 @@ export async function handleMediaStored(event: WeighVisionEvent) {
     }
 
     // Create media record
-    await prisma.weighVisionMedia.create({
-      data: {
+    await prisma.weighVisionMedia.upsert({
+      where: {
+        id: event.event_id,
+      },
+      update: {
         id: event.event_id,
         tenantId: event.tenant_id,
         sessionId, // Keep external sessionId for querying
-        sessionDbId: session.id, // Use internal DB ID for relation
+        sessionDbId: ensured.session.id, // Use internal DB ID for relation
         objectId,
         path,
-        ts: new Date(event.occurred_at),
+        ts: getDateValue(event.payload.captured_at, event.occurred_at) || new Date(),
+      },
+      create: {
+        id: event.event_id,
+        tenantId: event.tenant_id,
+        sessionId, // Keep external sessionId for querying
+        sessionDbId: ensured.session.id, // Use internal DB ID for relation
+        objectId,
+        path,
+        ts: getDateValue(event.payload.captured_at, event.occurred_at) || new Date(),
       },
     })
 
@@ -1015,7 +1093,7 @@ export async function handleInferenceCompleted(event: WeighVisionEvent) {
       },
     })
 
-    const sessionId = event.session_id || event.payload.session_id as string
+    const sessionId = getSessionIdFromEvent(event)
     if (!sessionId) {
       logger.warn('Missing session_id in inference.completed event', {
         eventId: event.event_id,
@@ -1024,22 +1102,8 @@ export async function handleInferenceCompleted(event: WeighVisionEvent) {
       return false
     }
 
-    // Find session by external sessionId to get internal DB ID
-    const session = await prisma.weighVisionSession.findUnique({
-      where: {
-        tenantId_sessionId: {
-          tenantId: event.tenant_id,
-          sessionId: sessionId,
-        },
-      },
-    })
-
-    if (!session) {
-      logger.warn('Session not found for inference.completed event', {
-        eventId: event.event_id,
-        tenantId: event.tenant_id,
-        sessionId,
-      })
+    const ensured = await ensureSessionForEvent(event)
+    if (!ensured) {
       return false
     }
 
@@ -1047,15 +1111,27 @@ export async function handleInferenceCompleted(event: WeighVisionEvent) {
     const resultJson = JSON.stringify(event.payload.result || event.payload)
 
     // Create inference record
-    await prisma.weighVisionInference.create({
-      data: {
+    await prisma.weighVisionInference.upsert({
+      where: {
+        id: event.event_id,
+      },
+      update: {
         id: event.event_id,
         tenantId: event.tenant_id,
         sessionId, // Keep external sessionId for querying
-        sessionDbId: session.id, // Use internal DB ID for relation
+        sessionDbId: ensured.session.id, // Use internal DB ID for relation
         modelVersion,
         resultJson,
-        ts: new Date(event.occurred_at),
+        ts: getDateValue(event.payload.occurred_at, event.occurred_at) || new Date(),
+      },
+      create: {
+        id: event.event_id,
+        tenantId: event.tenant_id,
+        sessionId, // Keep external sessionId for querying
+        sessionDbId: ensured.session.id, // Use internal DB ID for relation
+        modelVersion,
+        resultJson,
+        ts: getDateValue(event.payload.occurred_at, event.occurred_at) || new Date(),
       },
     })
 
