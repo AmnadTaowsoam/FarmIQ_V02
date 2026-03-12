@@ -703,12 +703,12 @@ def main() -> int:
 
     args.detect_every = max(1, int(args.detect_every))
     args.reconnect_after = max(1, int(args.reconnect_after))
-    if args.capture_cooldown_seconds < 240.0:
+    if args.capture_cooldown_seconds < 0.0:
         print(
-            f"[INFO] Auto capture cooldown {args.capture_cooldown_seconds:.1f}s is below minimum; "
-            "enforcing 240.0s (4 minutes)."
+            f"[WARN] Invalid auto capture cooldown {args.capture_cooldown_seconds:.1f}s; "
+            "using 0.0s."
         )
-        args.capture_cooldown_seconds = 240.0
+        args.capture_cooldown_seconds = 0.0
     if args.rtsp_tcp:
         os.environ.setdefault("OPENCV_FFMPEG_CAPTURE_OPTIONS", "rtsp_transport;tcp")
     disparity_cfg = _load_disparity_config()
@@ -1001,9 +1001,8 @@ def main() -> int:
                             break
                 for track_id, start_ts in new_track_start_ts.items():
                     if (now - start_ts) >= args.track_new_delay_seconds:
-                        if last_count_on_capture is None or current_count > last_count_on_capture:
-                            detection_ready = True
-                            detection_track_id = track_id
+                        detection_ready = True
+                        detection_track_id = track_id
                         break
             else:
                 if detection_session_seen_ts is None:

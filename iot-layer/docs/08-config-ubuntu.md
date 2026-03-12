@@ -57,40 +57,41 @@ sudo udevadm trigger
 ls -l /dev/ttyUSB0
 
 ✅ STEP 2: ตั้ง WiFi เป็น Network หลัก ถาวร
-ตั้ง metric ให้ WiFi ต่ำกว่า LAN
-sudo nmcli connection modify "TP-Link_61E3_2.4" ipv4.route-metric 100
-sudo nmcli connection modify "Wired connection 1" ipv4.route-metric 1000
-sudo systemctl restart NetworkManager
+sudo nano /etc/netplan/01-netplan.yaml
 
-เช็ค:
-ip route
-ต้องเห็น:
-default via 192.168.1.1 dev wlx... metric 100
-default via 192.168.1.1 dev enp2s0 metric 1000
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    eno1:                      # คุยกับกล้อง (Lan)
+      dhcp4: no
+      addresses:
+        - 192.168.1.100/24
+      routes:
+        - to: 192.168.1.199/32 # กล้อง 1
+          via: 192.168.1.100
+        - to: 192.168.1.200/32 # กล้อง 2
+          via: 192.168.1.100
 
-✅ STEP 3: ให้กล้องออก LAN เท่านั้น (ถาวร)
-เพิ่ม static route ผ่าน NetworkManager (ถาวร)
-sudo nmcli connection modify "Wired connection 1" +ipv4.routes "192.168.1.199/32 0.0.0.0"
-sudo nmcli connection modify "Wired connection 1" +ipv4.routes "192.168.1.200/32 0.0.0.0"
+  wifis:
+    wlx40a5ef5943f6:           # ออกเน็ต (Wifi หลัก)
+      dhcp4: no
+      addresses:
+        - 192.168.1.121/24
+      gateway4: 192.168.1.1    # แก้เป็น IP Router ของคุณ
+      nameservers:
+        addresses: [8.8.8.8, 1.1.1.1]
+      access-points:
+        "ชื่อ_WIFI_ของคุณ":
+          password: "รหัสผ่าน_WIFI"
+      routes:
+        - to: default
+          via: 192.168.1.1
+          metric: 50           # ตัวเลขน้อย = สำคัญกว่า (เป็นหลัก)
 
-รีสตาร์ท network:
-sudo systemctl restart NetworkManager
 
-เช็ค:
-ip route
-ต้องเห็น:
-192.168.1.199 dev enp2s0
-192.168.1.200 dev enp2s0
 
-✅ STEP 4: ปิด rp_filter ถาวร (สำคัญมาก)
-เพราะมี 2 NIC subnet เดียวกัน
-สร้างไฟล์:
-sudo nano /etc/sysctl.d/99-multinic.conf
-ใส่:
-net.ipv4.conf.all.rp_filter=0
-net.ipv4.conf.default.rp_filter=0
-net.ipv4.conf.enp2s0.rp_filter=0
-net.ipv4.conf.wlx18a6f7181220.rp_filter=0
+sudo netplan try
 
 Apply:
 sudo sysctl --system
