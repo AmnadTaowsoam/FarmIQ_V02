@@ -69,3 +69,5 @@ weight-vision-train-model/data/labels/
 *.db
 *.sqlite
 *.sqlite3
+
+/camera-config/calibration-camera/stereo_rectify_maps.yml
