@@ -4,6 +4,9 @@
 #include <ArduinoJson.h>
 #include <DHT.h>
 #include <time.h>
+#include <Wire.h>
+#include <LiquidCrystal.h>
+#include <LiquidCrystal_I2C.h>
 
 /*
   ESP8266 -> Edge MQTT publisher
@@ -47,6 +50,40 @@ static const uint8_t DHT_CANDIDATE_TYPES[] = {DHT11, DHT22};
 // Publish interval
 static const uint32_t POLL_INTERVAL_MS = 60000;
 
+// -----------------------------
+// Calibration settings
+// -----------------------------
+// Formula: calibrated = (raw * SCALE) + OFFSET
+// Tune these values based on your reference instrument.
+static const float TEMP_CALIBRATION_SCALE = 1.0f;
+static const float TEMP_CALIBRATION_OFFSET_C = -2.8964f;
+static const float HUMI_CALIBRATION_SCALE = 1.0749f;
+static const float HUMI_CALIBRATION_OFFSET_PERCENT = 16.0273f;
+
+// -----------------------------
+// LCD display settings (1602A, parallel 4-bit)
+// -----------------------------
+static const uint8_t DISPLAY_I2C_SDA_PIN = 4;  // D2
+static const uint8_t DISPLAY_I2C_SCL_PIN = 5;  // D1
+static const uint8_t LCD_PIN_RS = 5;   // D1
+static const uint8_t LCD_PIN_EN = 4;   // D2
+static const uint8_t LCD_PIN_D4 = 14;  // D5
+static const uint8_t LCD_PIN_D5 = 12;  // D6
+static const uint8_t LCD_PIN_D6 = 13;  // D7
+static const uint8_t LCD_PIN_D7 = 16;  // D0
+static const uint8_t LCD_COLS = 16;
+static const uint8_t LCD_ROWS = 2;
+static const uint8_t DISPLAY_I2C_CANDIDATES[] = {0x27, 0x3F};
+
+LiquidCrystal display(LCD_PIN_RS, LCD_PIN_EN, LCD_PIN_D4, LCD_PIN_D5, LCD_PIN_D6, LCD_PIN_D7);
+LiquidCrystal_I2C displayI2c27(0x27, LCD_COLS, LCD_ROWS);
+LiquidCrystal_I2C displayI2c3f(0x3F, LCD_COLS, LCD_ROWS);
+LiquidCrystal_I2C* activeI2cDisplay = nullptr;
+bool displayReady = false;
+
+enum class DisplayMode : uint8_t { NONE = 0, I2C = 1, PARALLEL = 2 };
+DisplayMode displayMode = DisplayMode::NONE;
+
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
 
@@ -56,6 +93,135 @@ uint8_t activeDhtType = 0;
 
 unsigned long lastPublishMs = 0;
 String statusTopic;
+
+float clampHumidity(float humidity) {
+  if (humidity < 0.0f) return 0.0f;
+  if (humidity > 100.0f) return 100.0f;
+  return humidity;
+}
+
+void applyDhtCalibration(float& temperature, float& humidity) {
+  temperature = (temperature * TEMP_CALIBRATION_SCALE) + TEMP_CALIBRATION_OFFSET_C;
+  humidity = (humidity * HUMI_CALIBRATION_SCALE) + HUMI_CALIBRATION_OFFSET_PERCENT;
+  humidity = clampHumidity(humidity);
+}
+
+bool i2cAddressExists(uint8_t address) {
+  Wire.beginTransmission(address);
+  return Wire.endTransmission() == 0;
+}
+
+void displayClear() {
+  if (!displayReady) return;
+  if (displayMode == DisplayMode::I2C && activeI2cDisplay != nullptr) {
+    activeI2cDisplay->clear();
+    return;
+  }
+  if (displayMode == DisplayMode::PARALLEL) {
+    display.clear();
+  }
+}
+
+void displaySetCursor(uint8_t col, uint8_t row) {
+  if (!displayReady) return;
+  if (displayMode == DisplayMode::I2C && activeI2cDisplay != nullptr) {
+    activeI2cDisplay->setCursor(col, row);
+    return;
+  }
+  if (displayMode == DisplayMode::PARALLEL) {
+    display.setCursor(col, row);
+  }
+}
+
+void displayPrint(const char* text) {
+  if (!displayReady) return;
+  if (displayMode == DisplayMode::I2C && activeI2cDisplay != nullptr) {
+    activeI2cDisplay->print(text);
+    return;
+  }
+  if (displayMode == DisplayMode::PARALLEL) {
+    display.print(text);
+  }
+}
+
+bool initDisplayAuto() {
+  Wire.begin(DISPLAY_I2C_SDA_PIN, DISPLAY_I2C_SCL_PIN);
+  delay(50);
+
+  uint8_t foundAddress = 0;
+  for (uint8_t i = 0; i < sizeof(DISPLAY_I2C_CANDIDATES); ++i) {
+    if (i2cAddressExists(DISPLAY_I2C_CANDIDATES[i])) {
+      foundAddress = DISPLAY_I2C_CANDIDATES[i];
+      break;
+    }
+  }
+
+  if (foundAddress == 0x27) {
+    activeI2cDisplay = &displayI2c27;
+    activeI2cDisplay->init();
+    activeI2cDisplay->backlight();
+    displayMode = DisplayMode::I2C;
+    displayReady = true;
+    Serial.println("[DISPLAY] I2C LCD found at 0x27");
+    return true;
+  }
+
+  if (foundAddress == 0x3F) {
+    activeI2cDisplay = &displayI2c3f;
+    activeI2cDisplay->init();
+    activeI2cDisplay->backlight();
+    displayMode = DisplayMode::I2C;
+    displayReady = true;
+    Serial.println("[DISPLAY] I2C LCD found at 0x3F");
+    return true;
+  }
+
+  display.begin(LCD_COLS, LCD_ROWS);
+  displayMode = DisplayMode::PARALLEL;
+  displayReady = true;
+  Serial.println("[DISPLAY] No I2C LCD found, using parallel LCD mode");
+  return true;
+}
+
+bool isDisplayReservedPin(uint8_t pin) {
+  if (displayMode == DisplayMode::I2C) {
+    return pin == DISPLAY_I2C_SDA_PIN || pin == DISPLAY_I2C_SCL_PIN;
+  }
+  if (displayMode == DisplayMode::PARALLEL) {
+    return pin == LCD_PIN_RS || pin == LCD_PIN_EN || pin == LCD_PIN_D4 || pin == LCD_PIN_D5 ||
+           pin == LCD_PIN_D6 || pin == LCD_PIN_D7;
+  }
+  return false;
+}
+
+void renderDisplay(bool dhtOk, float temperature, float humidity, float co2ePpm) {
+  if (!displayReady) return;
+
+  char line1[17];
+  char line2[17];
+  if (dhtOk) {
+    snprintf(line1, sizeof(line1), "T:%4.1fC H:%4.1f", temperature, humidity);
+  } else {
+    snprintf(line1, sizeof(line1), "T/H sensor fail ");
+  }
+
+  if (isnan(co2ePpm)) {
+    snprintf(line2, sizeof(line2), "W:%s M:%s C:--",
+             WiFi.status() == WL_CONNECTED ? "Y" : "N",
+             mqttClient.connected() ? "Y" : "N");
+  } else {
+    snprintf(line2, sizeof(line2), "W:%s M:%s C:%4.0f",
+             WiFi.status() == WL_CONNECTED ? "Y" : "N",
+             mqttClient.connected() ? "Y" : "N",
+             co2ePpm);
+  }
+
+  displayClear();
+  displaySetCursor(0, 0);
+  displayPrint(line1);
+  displaySetCursor(0, 1);
+  displayPrint(line2);
+}
 
 String makeIsoTimestampUtc() {
   time_t now = time(nullptr);
@@ -122,13 +288,14 @@ String buildStatusPayload(const char* statusValue, const char* message) {
   payload["status"] = statusValue;
   payload["message"] = message;
   payload["last_seen_at"] = ts;
-  payload["firmware_version"] = "esp8266-edge-mqtt-1.0.2";
+  payload["firmware_version"] = "esp8266-edge-mqtt-1.1.0";
   payload["ip"] = WiFi.localIP().toString();
 
   JsonObject health = payload.createNestedObject("health");
   health["sensor_ok"] = (activeDht != nullptr);
   health["wifi_ok"] = (WiFi.status() == WL_CONNECTED);
   health["mqtt_ok"] = mqttClient.connected();
+  health["display_ok"] = displayReady;
 
   String out;
   serializeJson(doc, out);
@@ -260,6 +427,9 @@ bool detectDhtSensor() {
 
   for (uint8_t i = 0; i < sizeof(DHT_CANDIDATE_PINS); i++) {
     uint8_t pin = DHT_CANDIDATE_PINS[i];
+    if (isDisplayReservedPin(pin)) {
+      continue;
+    }
     for (uint8_t j = 0; j < sizeof(DHT_CANDIDATE_TYPES); j++) {
       uint8_t type = DHT_CANDIDATE_TYPES[j];
       DHT probe(pin, type);
@@ -304,28 +474,35 @@ bool readDhtWithRetry(float& temperature, float& humidity) {
 }
 
 void publishSensorBatch() {
-  float temperature = NAN;
-  float humidity = NAN;
-  bool dhtOk = readDhtWithRetry(temperature, humidity);
+  float rawTemperature = NAN;
+  float rawHumidity = NAN;
+  bool dhtOk = readDhtWithRetry(rawTemperature, rawHumidity);
   int rawMq = analogRead(MQ_PIN);
 
   float mqPpmApprox = (static_cast<float>(rawMq) / 1023.0f) * 1000.0f;  // MQ-135 mapped as CO2e placeholder
+  float calibratedTemperature = rawTemperature;
+  float calibratedHumidity = rawHumidity;
 
   if (dhtOk) {
-    publishTelemetry(TEMP_DEVICE_ID, "temperature", temperature, "C");
-    publishTelemetry(HUMI_DEVICE_ID, "humidity", humidity, "%");
+    applyDhtCalibration(calibratedTemperature, calibratedHumidity);
+    publishTelemetry(TEMP_DEVICE_ID, "temperature", calibratedTemperature, "C");
+    publishTelemetry(HUMI_DEVICE_ID, "humidity", calibratedHumidity, "%");
   } else {
     Serial.println("[DHT] Read failed (auto-detect will retry next cycle)");
   }
 
   publishTelemetry(GATEWAY_DEVICE_ID, "co2_equivalent", mqPpmApprox, "ppm");
-  Serial.printf("[PUB] dht_ok=%s pin=%d type=%s temp=%.2fC hum=%.2f%% co2e=%.2fppm\r\n",
+  Serial.printf("[PUB] dht_ok=%s pin=%d type=%s temp_raw=%.2fC hum_raw=%.2f%% temp_cal=%.2fC hum_cal=%.2f%% co2e=%.2fppm\r\n",
                 dhtOk ? "true" : "false",
                 activeDht == nullptr ? -1 : static_cast<int>(activeDhtPin),
                 activeDhtType == DHT11 ? "DHT11" : (activeDhtType == DHT22 ? "DHT22" : "N/A"),
-                temperature,
-                humidity,
+                rawTemperature,
+                rawHumidity,
+                calibratedTemperature,
+                calibratedHumidity,
                 mqPpmApprox);
+
+  renderDisplay(dhtOk, calibratedTemperature, calibratedHumidity, mqPpmApprox);
 }
 
 void setup() {
@@ -333,6 +510,13 @@ void setup() {
   delay(200);
   Serial.println("\r\n[BOOT] ESP8266 starting...");
   randomSeed(static_cast<unsigned long>(ESP.getChipId()) ^ micros());
+
+  initDisplayAuto();
+  displayClear();
+  displaySetCursor(0, 0);
+  displayPrint("FarmIQ Booting");
+  displaySetCursor(0, 1);
+  displayPrint(displayMode == DisplayMode::I2C ? "LCD I2C Ready   " : "LCD Parallel OK ");
 
   statusTopic = String("iot/status/") + TENANT_ID + "/" + FARM_ID + "/" + BARN_ID + "/" + GATEWAY_DEVICE_ID;
 
@@ -344,6 +528,7 @@ void setup() {
   mqttClient.setKeepAlive(60);
 
   ensureMqtt();
+  renderDisplay(false, NAN, NAN, NAN);
 }
 
 void loop() {
