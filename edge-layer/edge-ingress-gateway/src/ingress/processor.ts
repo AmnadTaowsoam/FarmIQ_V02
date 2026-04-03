@@ -74,6 +74,19 @@ export async function processIngressMessage(params: {
       eventType: envelope.event_type,
     })
   }
+  if (parsed.tsNormalizedFromProducedAt) {
+    logger.warn('ts too old; using produced_at instead', {
+      ...ids,
+      eventType: envelope.event_type,
+      producedAt: envelope.produced_at,
+    })
+  }
+  if (parsed.tsNormalizedFromServerTime) {
+    logger.warn('ts too old; using server receive time instead', {
+      ...ids,
+      eventType: envelope.event_type,
+    })
+  }
 
   // Topic/envelope consistency
   if (params.topic.tenantId !== envelope.tenant_id) {
@@ -280,10 +293,12 @@ export async function processIngressMessage(params: {
   }
 
   if (params.topic.kind === 'status') {
+    const observedAtIso = new Date().toISOString()
     await params.deps.lastSeen.upsertLastSeen({
       tenantId: envelope.tenant_id,
       deviceId: envelope.device_id,
-      lastSeenAtIso: envelope.ts,
+      observedAtIso,
+      reportedAtIso: parsed.reportedTs,
       topic: params.rawTopic,
       payloadHash,
     })

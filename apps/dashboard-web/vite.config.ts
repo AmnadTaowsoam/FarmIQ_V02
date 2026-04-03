@@ -63,6 +63,11 @@ export default defineConfig({
           });
         }
       },
+      '/edge-sync': {
+        target: 'http://localhost:5108',
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
   build: {

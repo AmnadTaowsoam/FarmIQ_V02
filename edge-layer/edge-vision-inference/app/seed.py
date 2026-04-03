@@ -109,7 +109,7 @@ async def seed_inference(db: InferenceDb):
 async def main():
     database_url = os.getenv(
         'DATABASE_URL',
-        'postgresql://farmiq:farmiq_dev@localhost:5141/farmiq'
+        'postgresql://farmiq:farmiq_dev@postgres:5432/edge_vision_inference'
     )
     db = InferenceDb(database_url)
     try:

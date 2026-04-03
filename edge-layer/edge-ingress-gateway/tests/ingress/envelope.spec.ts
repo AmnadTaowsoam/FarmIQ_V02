@@ -26,6 +26,8 @@ describe('parseEnvelopeFromBuffer', () => {
       expect(result.envelope.trace_id).toBeTruthy()
       expect(result.envelope.ts).toBe('2025-01-01T00:00:00Z')
       expect(result.tsFromAlias).toBe(false)
+      expect(result.tsNormalizedFromProducedAt).toBe(false)
+      expect(result.tsNormalizedFromServerTime).toBe(false)
     }
   })
 
@@ -47,6 +49,53 @@ describe('parseEnvelopeFromBuffer', () => {
     if (result.ok) {
       expect(result.envelope.ts).toBe('2025-01-01T00:00:00Z')
       expect(result.tsFromAlias).toBe(true)
+      expect(result.tsNormalizedFromProducedAt).toBe(false)
+      expect(result.tsNormalizedFromServerTime).toBe(false)
+    }
+  })
+
+  it('uses produced_at when ts is too old', () => {
+    const msg = Buffer.from(
+      JSON.stringify({
+        schema_version: '1.0',
+        event_id: 'e-2',
+        tenant_id: 'tenant-1',
+        device_id: 'device-1',
+        event_type: 'telemetry.reading',
+        ts: '1970-01-01T00:00:00Z',
+        produced_at: '2026-04-02T09:31:43Z',
+        payload: { value: 1 },
+      })
+    )
+
+    const result = parseEnvelopeFromBuffer(msg)
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.envelope.ts).toBe('2026-04-02T09:31:43Z')
+      expect(result.tsNormalizedFromProducedAt).toBe(true)
+      expect(result.tsNormalizedFromServerTime).toBe(false)
+    }
+  })
+
+  it('uses server receive time when ts is too old and produced_at is absent', () => {
+    const msg = Buffer.from(
+      JSON.stringify({
+        schema_version: '1.0',
+        event_id: 'e-3',
+        tenant_id: 'tenant-1',
+        device_id: 'device-1',
+        event_type: 'telemetry.reading',
+        ts: '1970-01-01T00:00:00Z',
+        payload: { value: 1 },
+      })
+    )
+
+    const result = parseEnvelopeFromBuffer(msg)
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.envelope.ts).not.toBe('1970-01-01T00:00:00Z')
+      expect(result.tsNormalizedFromProducedAt).toBe(false)
+      expect(result.tsNormalizedFromServerTime).toBe(true)
     }
   })
 

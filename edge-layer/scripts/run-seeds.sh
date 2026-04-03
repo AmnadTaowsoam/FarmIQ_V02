@@ -36,7 +36,7 @@ compose up -d postgres >/dev/null
 
 echo "==> Waiting for postgres readiness"
 for i in {1..60}; do
-  if docker exec farmiq-edge-postgres pg_isready -U "${POSTGRES_USER:-farmiq}" -d "${POSTGRES_DB:-farmiq}" >/dev/null 2>&1; then
+  if compose exec -T postgres pg_isready -U "${POSTGRES_USER:-farmiq}" -d "${POSTGRES_DB:-farmiq}" >/dev/null 2>&1; then
     echo "Postgres is ready"
     break
   fi
@@ -48,10 +48,34 @@ for i in {1..60}; do
 done
 
 echo "==> Ensuring required extensions"
-docker exec -i farmiq-edge-postgres psql -U "${POSTGRES_USER:-farmiq}" -d "${POSTGRES_DB:-farmiq}" <<'SQL'
+compose exec -T postgres psql -U "${POSTGRES_USER:-farmiq}" -d "${POSTGRES_DB:-farmiq}" <<'SQL'
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 SQL
+
+echo "==> Ensuring required edge databases"
+EDGE_DBS=(
+  edge_ingress_gateway
+  edge_telemetry_timeseries
+  edge_weighvision_session
+  edge_media_store
+  edge_feed_intake
+  edge_policy_sync
+  edge_sync_forwarder
+  edge_vision_inference
+)
+
+for db in "${EDGE_DBS[@]}"; do
+  exists="$(
+    compose exec -T postgres psql -U "${POSTGRES_USER:-farmiq}" -d postgres -tAc \
+      "SELECT 1 FROM pg_database WHERE datname='${db}'" 2>/dev/null | tr -d '[:space:]'
+  )"
+  if [ "${exists}" != "1" ]; then
+    echo "Creating database: ${db}"
+    compose exec -T postgres psql -U "${POSTGRES_USER:-farmiq}" -d postgres -v ON_ERROR_STOP=1 \
+      -c "CREATE DATABASE \"${db}\";"
+  fi
+done
 
 PRISMA_DB_SERVICES=(
   edge-ingress-gateway

@@ -13,7 +13,13 @@ const app = express()
 const port = process.env.APP_PORT || 3000
 
 // CORS configuration
-const allowedOrigins = ['http://localhost:3000']
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5135',
+  'http://127.0.0.1:5135',
+  'http://localhost:5109',
+  'http://127.0.0.1:5109',
+]
 if (process.env.NODE_ENV === 'development') {
   const corsOptions = {
     origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {

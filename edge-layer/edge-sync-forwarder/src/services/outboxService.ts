@@ -467,12 +467,33 @@ export class OutboxService {
   /**
    * Query outbox entries by status
    */
-  async queryByStatus(status: OutboxStatus, limit: number = 100): Promise<OutboxEntity[]> {
-    return this.dataSource.getRepository(OutboxEntity).find({
-      where: { status },
-      order: { occurredAt: 'ASC' },
-      take: limit,
-    })
+  async queryByStatus(
+    status: OutboxStatus,
+    limit: number = 100,
+    filters?: {
+      tenantId?: string
+      farmId?: string
+      barnId?: string
+      eventType?: string
+      from?: Date
+      to?: Date
+    }
+  ): Promise<OutboxEntity[]> {
+    const qb = this.dataSource
+      .getRepository(OutboxEntity)
+      .createQueryBuilder('o')
+      .where('o.status = :status', { status })
+      .orderBy('o.occurredAt', 'DESC')
+      .take(limit)
+
+    if (filters?.tenantId) qb.andWhere('o.tenantId = :tenantId', { tenantId: filters.tenantId })
+    if (filters?.farmId) qb.andWhere('o.farmId = :farmId', { farmId: filters.farmId })
+    if (filters?.barnId) qb.andWhere('o.barnId = :barnId', { barnId: filters.barnId })
+    if (filters?.eventType) qb.andWhere('o.eventType = :eventType', { eventType: filters.eventType })
+    if (filters?.from) qb.andWhere('o.occurredAt >= :from', { from: filters.from })
+    if (filters?.to) qb.andWhere('o.occurredAt <= :to', { to: filters.to })
+
+    return qb.getMany()
   }
 }
 

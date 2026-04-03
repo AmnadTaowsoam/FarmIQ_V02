@@ -132,8 +132,19 @@ export class SyncService {
     return this.outboxService.getStats()
   }
 
-  async queryByStatus(status: string, limit: number) {
-    return this.outboxService.queryByStatus(status as any, limit)
+  async queryByStatus(
+    status: string,
+    limit: number,
+    filters?: {
+      tenantId?: string
+      farmId?: string
+      barnId?: string
+      eventType?: string
+      from?: Date
+      to?: Date
+    }
+  ) {
+    return this.outboxService.queryByStatus(status as any, limit, filters)
   }
 
   async getDlqEntries(limit: number) {

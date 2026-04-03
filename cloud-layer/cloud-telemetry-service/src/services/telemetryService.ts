@@ -19,7 +19,9 @@ export interface TelemetryIngestedEvent {
   trace_id: string
   payload: {
     metric_type?: string
-    metric_value: number
+    metric_value?: number
+    value?: number
+    metric?: string
     unit?: string
   }
 }
@@ -30,9 +32,21 @@ export interface TelemetryIngestedEvent {
  */
 export async function persistTelemetryReading(event: TelemetryIngestedEvent) {
   try {
-    const metric = event.payload.metric_type || 'unknown'
-    const value = event.payload.metric_value
+    const metric = event.payload.metric_type || event.payload.metric || 'unknown'
+    const value = event.payload.metric_value ?? event.payload.value
     const unit = event.payload.unit
+
+    // Edge ingress currently emits telemetry payload as { value, unit }.
+    // Cloud ingestion may emit { metric_value, unit } in other paths.
+    if (typeof value !== 'number' || Number.isNaN(value)) {
+      logger.warn('Telemetry payload missing numeric value; dropping event', {
+        eventId: event.event_id,
+        tenantId: event.tenant_id,
+        traceId: event.trace_id,
+        payloadKeys: Object.keys(event.payload || {}),
+      })
+      return false
+    }
 
     // Try to create - if duplicate, Prisma will throw P2002
     await prisma.telemetryRaw.create({
@@ -157,4 +171,3 @@ export async function getAvailableMetrics(params: {
     throw error
   }
 }
-

@@ -11,6 +11,12 @@ import {
 import { logger } from '../utils/logger'
 import { getTenantIdFromRequest } from '../utils/tenantScope'
 
+function normalizeMetricAlias(metric?: string | null): string | null | undefined {
+  if (!metric) return metric
+  if (metric === 'co2_equivalent') return 'co2'
+  return metric
+}
+
 /**
  * Get telemetry readings
  */
@@ -56,7 +62,13 @@ export async function getReadings(req: Request, res: Response) {
       limit,
     })
 
-    res.json(readings)
+    const normalizedReadings = readings.map((row: any) => ({
+      ...row,
+      metric: normalizeMetricAlias(row?.metric),
+      metric_type: normalizeMetricAlias(row?.metric_type),
+    }))
+
+    res.json(normalizedReadings)
   } catch (error) {
     logger.error('Error in getReadings:', error)
     res.status(500).json({
@@ -158,7 +170,13 @@ export async function getAggregatesHandler(req: Request, res: Response) {
       }))
     }
 
-    res.json(aggregates)
+    const normalizedAggregates = aggregates.map((row: any) => ({
+      ...row,
+      metric: normalizeMetricAlias(row?.metric),
+      metric_type: normalizeMetricAlias(row?.metric_type),
+    }))
+
+    res.json(normalizedAggregates)
   } catch (error) {
     logger.error('Error in getAggregatesHandler:', error)
     res.status(500).json({
@@ -210,4 +228,3 @@ export async function getMetrics(req: Request, res: Response) {
     })
   }
 }
-

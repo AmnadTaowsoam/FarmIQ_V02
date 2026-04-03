@@ -37,10 +37,21 @@ export type ParsedEnvelopeResult =
   | {
       ok: true
       envelope: MqttEnvelope
+      reportedTs: string
       traceGenerated: boolean
       tsFromAlias: boolean
+      tsNormalizedFromProducedAt: boolean
+      tsNormalizedFromServerTime: boolean
     }
   | { ok: false; error: string }
+
+const MIN_REASONABLE_TS_MS = Date.UTC(2000, 0, 1, 0, 0, 0, 0)
+
+function parseIsoTimestamp(value: string | undefined): number | null {
+  if (!value) return null
+  const parsed = Date.parse(value)
+  return Number.isNaN(parsed) ? null : parsed
+}
 
 /**
  *
@@ -73,9 +84,27 @@ export function parseEnvelopeFromBuffer(message: Buffer): ParsedEnvelopeResult {
   const traceGenerated = !envelope.trace_id
   const trace_id = envelope.trace_id ?? uuidv4()
 
-  const ts = envelope.ts ?? envelope.occurred_at
-  if (!ts) {
+  const tsCandidate = envelope.ts ?? envelope.occurred_at
+  if (!tsCandidate) {
     return { ok: false, error: 'missing ts' }
+  }
+  const tsCandidateMs = parseIsoTimestamp(tsCandidate)
+  if (tsCandidateMs === null) {
+    return { ok: false, error: 'invalid ts' }
+  }
+
+  let ts = tsCandidate
+  let tsNormalizedFromProducedAt = false
+  let tsNormalizedFromServerTime = false
+  if (tsCandidateMs < MIN_REASONABLE_TS_MS) {
+    const producedAtMs = parseIsoTimestamp(envelope.produced_at)
+    if (producedAtMs !== null) {
+      ts = envelope.produced_at as string
+      tsNormalizedFromProducedAt = true
+    } else {
+      ts = new Date().toISOString()
+      tsNormalizedFromServerTime = true
+    }
   }
 
   return {
@@ -93,7 +122,10 @@ export function parseEnvelopeFromBuffer(message: Buffer): ParsedEnvelopeResult {
       retry_count: envelope.retry_count,
       produced_at: envelope.produced_at,
     },
+    reportedTs: tsCandidate,
     traceGenerated,
     tsFromAlias: !envelope.ts && !!envelope.occurred_at,
+    tsNormalizedFromProducedAt,
+    tsNormalizedFromServerTime,
   }
 }

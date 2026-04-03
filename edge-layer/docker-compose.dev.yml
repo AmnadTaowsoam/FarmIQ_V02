@@ -7,6 +7,7 @@ services:
   # ============================================
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     # container_name: farmiq-edge-postgres
     ports:
       - "5141:5432" # Different port from cloud (5140)
@@ -26,6 +27,7 @@ services:
 
   pgadmin:
     image: dpage/pgadmin4:8
+    restart: unless-stopped
     ports:
       - "5438:80"
     environment:
@@ -42,6 +44,7 @@ services:
 
   minio:
     image: minio/minio:latest
+    restart: unless-stopped
     #container_name: farmiq-edge-minio
     ports:
       - "9000:9000" # MinIO API
@@ -60,6 +63,18 @@ services:
       timeout: 20s
       start_period: 40s
       retries: 3
+
+  edge-local-ntp:
+    image: cturra/ntp:latest
+    restart: unless-stopped
+    ports:
+      - "123:123/udp"
+    environment:
+      # Local-only mode: if upstream is unreachable, still serve local clock.
+      - NTP_SERVERS=${EDGE_LOCAL_NTP_SERVERS:-127.127.1.0}
+      - LOG_LEVEL=0
+    networks:
+      - farmiq-net
 
   # ============================================
   # EDGE SERVICE OVERRIDES
@@ -193,14 +208,18 @@ services:
       - ./edge-vision-inference/app:/app/app:ro
     environment:
       - LOG_LEVEL=DEBUG
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/edge_vision_inference
       - MEDIA_STORE_URL=http://edge-media-store:3000
     networks:
       - farmiq-net
 
   edge-sync-forwarder:
+    restart: unless-stopped
     build:
       context: ./edge-sync-forwarder
       dockerfile: Dockerfile.dev
+    ports:
+      - "5108:3000"
     volumes:
       - ./edge-sync-forwarder/src:/usr/src/app/src:ro
       - ./edge-sync-forwarder/package.json:/usr/src/app/package.json:ro

@@ -41,14 +41,44 @@ export class SyncController {
     try {
       const status = (req.query.status as string) || 'pending'
       const limit = Math.min(Number(req.query.limit) || 100, 1000) // Max 1000
+      const tenantId = req.query.tenantId ? String(req.query.tenantId) : undefined
+      const farmId = req.query.farmId ? String(req.query.farmId) : undefined
+      const barnId = req.query.barnId ? String(req.query.barnId) : undefined
+      const eventType = req.query.eventType ? String(req.query.eventType) : undefined
+      const from = req.query.from ? new Date(String(req.query.from)) : undefined
+      const to = req.query.to ? new Date(String(req.query.to)) : undefined
+      const hasInvalidDate = (from && Number.isNaN(from.getTime())) || (to && Number.isNaN(to.getTime()))
+      if (hasInvalidDate) {
+        res.status(400).json({
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'from/to must be valid ISO datetime',
+            traceId,
+          },
+        })
+        return
+      }
 
-      const entries = await this.syncService.queryByStatus(status, limit)
+      const entries = await this.syncService.queryByStatus(status, limit, {
+        tenantId,
+        farmId,
+        barnId,
+        eventType,
+        from,
+        to,
+      })
 
       res.json({
         entries: entries.map((e) => ({
           id: e.id,
           tenant_id: e.tenantId,
+          farm_id: e.farmId,
+          barn_id: e.barnId,
+          device_id: e.deviceId,
           event_type: e.eventType,
+          occurred_at: e.occurredAt?.toISOString() || null,
+          trace_id: e.traceId,
+          payload_json: e.payload,
           status: e.status,
           attempt_count: e.attemptCount,
           next_attempt_at: e.nextAttemptAt?.toISOString(),

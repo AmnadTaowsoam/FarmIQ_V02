@@ -32,6 +32,7 @@ export interface ActiveContextType {
 const ActiveContext = createContext<ActiveContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'farmiq_active_context';
+const LIVE_TIME_RANGE_REFRESH_MS = 30 * 1000;
 
 const getDefaultTimeRange = (preset: TimeRangePreset = '7d'): TimeRange => {
   const end = new Date();
@@ -234,6 +235,19 @@ export const ActiveContextProvider: React.FC<{ children: React.ReactNode }> = ({
     });
   }, [tenantId, farmId, barnId, batchId, species, timeRange]);
 
+  useEffect(() => {
+    if (timeRange.preset === 'custom') return;
+
+    const timerId = window.setInterval(() => {
+      setTimeRangeState((prev) => {
+        if (prev.preset === 'custom') return prev;
+        return getDefaultTimeRange(prev.preset);
+      });
+    }, LIVE_TIME_RANGE_REFRESH_MS);
+
+    return () => window.clearInterval(timerId);
+  }, [timeRange.preset]);
+
   const setTenantId = useCallback((id: string | null) => {
     setTenantIdState(id);
     // Clear dependent context when tenant changes
@@ -310,4 +324,3 @@ export const useActiveContext = () => {
   }
   return context;
 };
-

@@ -65,11 +65,17 @@ export async function ensureIngressSchema(prisma: PrismaClient): Promise<void> {
       tenant_id TEXT NOT NULL,
       device_id TEXT NOT NULL,
       last_seen_at TIMESTAMPTZ NOT NULL,
+      device_reported_at TIMESTAMPTZ NULL,
       last_topic TEXT NOT NULL,
       last_payload_hash TEXT NULL,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       PRIMARY KEY (tenant_id, device_id)
     );
+  `)
+
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE device_last_seen
+    ADD COLUMN IF NOT EXISTS device_reported_at TIMESTAMPTZ NULL;
   `)
 
   await prisma.$executeRawUnsafe(`

@@ -6,6 +6,7 @@ services:
   # ============================================
   
   edge-cloud-ingestion-mock:
+    restart: unless-stopped
     build:
       context: ./edge-cloud-ingestion-mock
       dockerfile: Dockerfile.dev
@@ -19,6 +20,7 @@ services:
       retries: 5
   
   edge-mqtt-broker:
+    restart: unless-stopped
     build:
       context: ./edge-mqtt-broker
       dockerfile: Dockerfile
@@ -36,12 +38,13 @@ services:
     networks:
       - farmiq-net
     healthcheck:
-      test: ["CMD", "mosquitto_sub", "-h", "localhost", "-t", "$SYS/health", "-C", "1"]
+      test: ["CMD", "mosquitto_pub", "-h", "localhost", "-t", "$$SYS/health", "-m", "ping", "-q", "0"]
       interval: 10s
       timeout: 5s
       retries: 5
   
   edge-ingress-gateway:
+    restart: unless-stopped
     build:
       context: ./edge-ingress-gateway
       dockerfile: Dockerfile
@@ -78,6 +81,7 @@ services:
       retries: 5
   
   edge-telemetry-timeseries:
+    restart: unless-stopped
     build:
       context: ./edge-telemetry-timeseries
       dockerfile: Dockerfile
@@ -102,6 +106,7 @@ services:
       retries: 5
   
   edge-weighvision-session:
+    restart: unless-stopped
     build:
       context: ./edge-weighvision-session
       dockerfile: Dockerfile
@@ -126,6 +131,7 @@ services:
       retries: 5
   
   edge-media-store:
+    restart: unless-stopped
     build:
       context: ./edge-media-store
       dockerfile: Dockerfile
@@ -153,6 +159,7 @@ services:
       retries: 5
   
   edge-vision-inference:
+    restart: unless-stopped
     build:
       context: ./edge-vision-inference
       dockerfile: Dockerfile
@@ -162,6 +169,7 @@ services:
     environment:
       - LOG_LEVEL=INFO
       - PORT=8000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-farmiq}:${POSTGRES_PASSWORD:-farmiq_dev}@postgres:5432/edge_vision_inference
       - MEDIA_STORE_URL=http://edge-media-store:3000
       - DD_SERVICE=edge-vision-inference
       - DD_ENV=production
@@ -179,6 +187,7 @@ services:
       retries: 5
   
   edge-sync-forwarder:
+    restart: unless-stopped
     build:
       context: ./edge-sync-forwarder
       dockerfile: Dockerfile
@@ -211,6 +220,7 @@ services:
       retries: 5
   
   edge-policy-sync:
+    restart: unless-stopped
     build:
       context: ./edge-policy-sync
       dockerfile: Dockerfile
@@ -241,6 +251,7 @@ services:
       retries: 5
   
   edge-retention-janitor:
+    restart: unless-stopped
     build:
       context: ./edge-retention-janitor
       dockerfile: Dockerfile
@@ -272,6 +283,7 @@ services:
       retries: 5
   
   edge-observability-agent:
+    restart: unless-stopped
     build:
       context: ./edge-observability-agent
       dockerfile: Dockerfile
@@ -300,6 +312,7 @@ services:
       retries: 5
   
   edge-feed-intake:
+    restart: unless-stopped
     build:
       context: ./edge-feed-intake
       dockerfile: Dockerfile
@@ -331,6 +344,7 @@ services:
       retries: 5
   
   edge-ops-web:
+    restart: unless-stopped
     build:
       context: ./edge-ops-web
       dockerfile: Dockerfile
