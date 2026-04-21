@@ -30,6 +30,44 @@ def _open_capture(url: str) -> cv2.VideoCapture:
     return cap
 
 
+def _release_capture(cap: cv2.VideoCapture | None) -> None:
+    if cap is not None:
+        try:
+            cap.release()
+        except Exception:
+            pass
+
+
+def _open_capture_pair_with_retry(
+    left_url: str,
+    right_url: str,
+    retry_seconds: float,
+    max_retry_seconds: float,
+) -> tuple[cv2.VideoCapture, cv2.VideoCapture]:
+    retry_seconds = max(0.5, float(retry_seconds))
+    max_retry_seconds = max(retry_seconds, float(max_retry_seconds))
+    delay_seconds = retry_seconds
+    attempt = 1
+
+    while True:
+        cap_left = _open_capture(left_url)
+        cap_right = _open_capture(right_url)
+        if cap_left.isOpened() and cap_right.isOpened():
+            if attempt > 1:
+                print("[INFO] RTSP streams reconnected")
+            return cap_left, cap_right
+
+        _release_capture(cap_left)
+        _release_capture(cap_right)
+        print(
+            f"[WARN] Failed to open RTSP streams; retrying in {delay_seconds:.1f}s "
+            f"(attempt {attempt})"
+        )
+        time.sleep(delay_seconds)
+        delay_seconds = min(max_retry_seconds, delay_seconds * 1.5)
+        attempt += 1
+
+
 def _read_pair(cap_left: cv2.VideoCapture, cap_right: cv2.VideoCapture, retries: int = 3) -> tuple[bool, np.ndarray | None, np.ndarray | None]:
     for _ in range(max(1, retries)):
         ok_l, frame_l = cap_left.read()
@@ -631,6 +669,8 @@ def main() -> int:
     parser.add_argument("--port", type=int, default=554)
     parser.add_argument("--rtsp-tcp", action="store_true", default=True, help="Force RTSP over TCP")
     parser.add_argument("--read-retries", type=int, default=3, help="Retries for reading valid frames")
+    parser.add_argument("--rtsp-retry-seconds", type=float, default=5.0, help="Initial delay before retrying RTSP open/reconnect")
+    parser.add_argument("--rtsp-max-retry-seconds", type=float, default=30.0, help="Maximum RTSP reconnect backoff delay")
     parser.add_argument("--base-dir", default=None, help="Folder with run_YYYYMMDD_HHMMSS")
     parser.add_argument("--maps", default=None, help="Path to stereo_rectify_maps.yml")
     parser.add_argument("--floor", default=None, help="Path to floor_config.yml or numeric z_floor (mm)")
@@ -703,6 +743,8 @@ def main() -> int:
 
     args.detect_every = max(1, int(args.detect_every))
     args.reconnect_after = max(1, int(args.reconnect_after))
+    args.rtsp_retry_seconds = max(0.5, float(args.rtsp_retry_seconds))
+    args.rtsp_max_retry_seconds = max(args.rtsp_retry_seconds, float(args.rtsp_max_retry_seconds))
     if args.capture_cooldown_seconds < 0.0:
         print(
             f"[WARN] Invalid auto capture cooldown {args.capture_cooldown_seconds:.1f}s; "
@@ -791,11 +833,12 @@ def main() -> int:
     left_url = _rtsp_url(args.left_ip, args.username, args.password, args.stream_path, args.port)
     right_url = _rtsp_url(args.right_ip, args.username, args.password, args.stream_path, args.port)
 
-    cap_left = _open_capture(left_url)
-    cap_right = _open_capture(right_url)
-    if not cap_left.isOpened() or not cap_right.isOpened():
-        print("Failed to open RTSP streams")
-        return 1
+    cap_left, cap_right = _open_capture_pair_with_retry(
+        left_url,
+        right_url,
+        retry_seconds=args.rtsp_retry_seconds,
+        max_retry_seconds=args.rtsp_max_retry_seconds,
+    )
 
     data_root = Path(__file__).resolve().parent / "data"
     images_dir, metadata_dir, masks_dir = _output_dirs(data_root)
@@ -875,11 +918,14 @@ def main() -> int:
             consecutive_failures += 1
             if consecutive_failures >= args.reconnect_after:
                 print("[WARN] Reconnecting RTSP streams after consecutive read failures")
-                cap_left.release()
-                cap_right.release()
-                time.sleep(0.5)
-                cap_left = _open_capture(left_url)
-                cap_right = _open_capture(right_url)
+                _release_capture(cap_left)
+                _release_capture(cap_right)
+                cap_left, cap_right = _open_capture_pair_with_retry(
+                    left_url,
+                    right_url,
+                    retry_seconds=args.rtsp_retry_seconds,
+                    max_retry_seconds=args.rtsp_max_retry_seconds,
+                )
                 consecutive_failures = 0
             if display_enabled:
                 key = cv2.waitKey(1) & 0xFF

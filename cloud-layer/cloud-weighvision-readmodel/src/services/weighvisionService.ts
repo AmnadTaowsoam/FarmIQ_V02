@@ -65,11 +65,10 @@ export async function getSessions(params: {
             LIMIT 1
           ),
           (
-            SELECT m_last."weightKg"
-            FROM weighvision_measurement m_last
-            WHERE m_last."sessionDbId" = s.id
-            ORDER BY m_last.ts DESC
-            LIMIT 1
+            SELECT AVG(m_avg."weightKg")
+            FROM weighvision_measurement m_avg
+            WHERE m_avg."sessionDbId" = s.id
+              AND m_avg.source <> 'finalized'
           )
         )
       ) as final_weight_kg,

@@ -248,13 +248,17 @@ export const finalizeSession = async (
   const updatedSession = await prisma.$transaction(async (tx) => {
     const session = await tx.weightSession.findUnique({
       where: { sessionId },
-      include: { weights: { orderBy: { occurredAt: 'desc' }, take: 1 } },
+      include: { weights: { orderBy: { occurredAt: 'asc' } } },
     })
 
     if (!session) throw new Error('Session not found')
     if (session.status === 'finalized') return session
 
-    const finalWeight = session.weights[0]?.weightKg ?? session.initialWeightKg ?? 0
+    const finalWeight =
+      session.weights.length > 0
+        ? session.weights.reduce((sum, w) => sum + Number(w.weightKg), 0) /
+          session.weights.length
+        : Number(session.initialWeightKg ?? 0)
     const endTime = new Date()
 
     const updatedSession = await tx.weightSession.update({

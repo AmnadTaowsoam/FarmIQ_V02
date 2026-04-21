@@ -76,9 +76,9 @@ export const SessionDetailPage: React.FC = () => {
       />
       <Grid container spacing={3} mt={1}>
         {[
-            { label: 'Initial Weight', value: session.initial_weight_kg ? `${session.initial_weight_kg} kg` : '62.1 kg', icon: <Scale size={24} />, color: 'info.main' },
-            { label: 'Final Weight', value: session.final_weight_kg ? `${session.final_weight_kg} kg` : '78.4 kg', icon: <Target size={24} />, color: 'success.main' },
-            { label: 'Inference Captures', value: session.image_count || 124, icon: <Camera size={24} />, color: 'primary.main' },
+            { label: 'Initial Weight', value: session.initial_weight_kg != null ? `${Number(session.initial_weight_kg).toFixed(2)} kg` : '—', icon: <Scale size={24} />, color: 'info.main' },
+            { label: 'Final Weight', value: session.final_weight_kg != null ? `${Number(session.final_weight_kg).toFixed(2)} kg` : '—', icon: <Target size={24} />, color: 'success.main' },
+            { label: 'Inference Captures', value: session.image_count ?? 0, icon: <Camera size={24} />, color: 'primary.main' },
         ].map((stat, idx) => (
             <Grid item xs={12} md={4} key={idx}>
                 <PremiumCard>
